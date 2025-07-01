@@ -238,7 +238,7 @@ export default function DashboardAdmin() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setActiveTab('users')}
-                className={`px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
                   activeTab === 'users'
                     ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
                     : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
@@ -248,7 +248,7 @@ export default function DashboardAdmin() {
               </button>
               <button
                 onClick={() => setActiveTab('xp-logs')}
-                className={`px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
                   activeTab === 'xp-logs'
                     ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
                     : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
@@ -258,7 +258,7 @@ export default function DashboardAdmin() {
               </button>
               <button
                 onClick={() => setActiveTab('rewards')}
-                className={`px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
                   activeTab === 'rewards'
                     ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
                     : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
@@ -282,30 +282,30 @@ export default function DashboardAdmin() {
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Nama</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden md:table-cell">Sekolah</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden sm:table-cell">Tingkatan</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Role</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">XP</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Nama</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Email</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden md:table-cell">Sekolah</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden sm:table-cell">Tingkatan</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Role</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">XP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700/50">
                     {profiles.map((profile) => (
                       <tr key={profile.id} className="hover:bg-electric-blue/5 transition-all duration-300">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="font-medium text-gray-100">{profile.name || 'Tiada nama'}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="text-gray-300 text-sm">{profile.email}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                        <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
                           <div className="text-gray-300 text-sm max-w-xs truncate">{profile.sekolah || '-'}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                        <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
                           <div className="text-gray-300 text-sm">{profile.tingkatan || '-'}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             profile.role === 'admin' 
                               ? 'bg-red-500/20 text-red-400 border border-red-500/30'
@@ -316,7 +316,7 @@ export default function DashboardAdmin() {
                             {profile.role === 'admin' ? '👑 Admin' : profile.role === 'murid' ? '🎓 Murid' : '👤 Awam'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="font-bold text-electric-blue">{profile.xp || 0}</div>
                         </td>
                       </tr>
@@ -339,26 +339,26 @@ export default function DashboardAdmin() {
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Pengguna</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Aktiviti</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">XP</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Tarikh</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Pengguna</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Aktiviti</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">XP</th>
+                      <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Tarikh</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700/50">
                     {xpLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-electric-blue/5 transition-all duration-300">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="font-medium text-gray-100">{log.profiles?.name || 'Unknown'}</div>
                           <div className="text-sm text-gray-400">{log.profiles?.email}</div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <div className="text-gray-300 max-w-xs">{log.aktiviti}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="font-bold text-neon-green">+{log.mata}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="text-gray-300 text-sm">
                             {new Date(log.created_at).toLocaleDateString('ms-MY')}
                           </div>

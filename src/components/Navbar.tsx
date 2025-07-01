@@ -1,4 +1,5 @@
-'use client'
+
+"use client"
 
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
@@ -7,7 +8,7 @@ import { useState, useEffect } from 'react'
 
 export default function Navbar() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ email?: string; user_metadata?: { role?: string } } | null>(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -25,7 +26,7 @@ export default function Navbar() {
     })
 
     return () => {
-      authListener?.unsubscribe()
+      authListener.subscription.unsubscribe()
     }
   }, [])
 
@@ -72,17 +73,17 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-4">
             {!loading && user ? (
               <>
-                {user.user_metadata.role === 'murid' && (
+                  {user.user_metadata?.role === 'murid' && (
                   <Link href="/dashboard-murid" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-electric-blue/25">
                     Dashboard Murid
                   </Link>
                 )}
-                {user.user_metadata.role === 'awam' && (
+                {user.user_metadata?.role === 'awam' && (
                   <Link href="/dashboard-awam" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-electric-blue/25">
                     Dashboard Awam
                   </Link>
                 )}
-                {user.user_metadata.role === 'admin' && (
+                {user.user_metadata?.role === 'admin' && (
                   <Link href="/dashboard-admin" className="px-4 py-2 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-neon-green/25">
                     Dashboard Admin
                   </Link>
@@ -99,7 +100,7 @@ export default function Navbar() {
                 <Link href="/daftar" className="text-gray-300 hover:text-electric-blue transition-all duration-300">
                   Daftar
                 </Link>
-                <Link href="/login" className="px-6 py-2 bg-gradient-to-r from-electric-blue to-neon-cyan text-dark-black font-semibold rounded-lg hover:shadow-lg hover:shadow-electric-blue/50 transition-all duration-300 transform hover:scale-105">
+                <Link href="/login" className="px-4 py-2 bg-gradient-to-r from-electric-blue to-neon-cyan text-dark-black font-semibold rounded-lg hover:shadow-lg hover:shadow-electric-blue/50 transition-all duration-300 transform hover:scale-105">
                   Log Masuk
                 </Link>
               </>
@@ -134,17 +135,17 @@ export default function Navbar() {
             
             {!loading && user ? (
               <>
-                {user.user_metadata.role === 'murid' && (
+                {user.user_metadata?.role === 'murid' && (
                   <Link href="/dashboard-murid" className="block text-electric-blue py-2">
                     Dashboard Murid
                   </Link>
                 )}
-                {user.user_metadata.role === 'awam' && (
+                {user.user_metadata?.role === 'awam' && (
                   <Link href="/dashboard-awam" className="block text-electric-blue py-2">
                     Dashboard Awam
                   </Link>
                 )}
-                {user.user_metadata.role === 'admin' && (
+                {user.user_metadata?.role === 'admin' && (
                   <Link href="/dashboard-admin" className="block text-neon-green py-2">
                     Dashboard Admin
                   </Link>
@@ -172,4 +173,6 @@ export default function Navbar() {
     </nav>
   )
 }
+
+
 

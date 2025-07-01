@@ -1,5 +1,7 @@
-'use client'
 
+"use client"
+
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 
@@ -185,7 +187,7 @@ export default function LeaderboardPage() {
 
                   <button
                     onClick={clearFilters}
-                    className="px-6 py-3 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25"
+                    className="px-4 py-3 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25"
                   >
                     🗑️ Kosongkan
                   </button>
@@ -265,32 +267,32 @@ export default function LeaderboardPage() {
                     <table className="w-full">
                       <thead className="bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20">
                         <tr>
-                          <th className="px-4 md:px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Kedudukan</th>
-                          <th className="px-4 md:px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Nama</th>
-                          <th className="px-4 md:px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden md:table-cell">Sekolah</th>
-                          <th className="px-4 md:px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden sm:table-cell">Tingkatan</th>
-                          <th className="px-4 md:px-6 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">XP</th>
+                          <th className="px-4 md:px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Kedudukan</th>
+                          <th className="px-4 md:px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Nama</th>
+                          <th className="px-4 md:px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden md:table-cell">Sekolah</th>
+                          <th className="px-4 md:px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden sm:table-cell">Tingkatan</th>
+                          <th className="px-4 md:px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">XP</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-700/50">
                         {filteredLeaderboard.map((entry, index) => (
                           <tr key={entry.id} className={`hover:bg-electric-blue/5 transition-all duration-300 ${index < 3 ? 'bg-gradient-to-r from-electric-blue/5 to-neon-cyan/5' : ''}`}>
-                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 md:px-4 py-4 whitespace-nowrap">
                               <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r ${getRankStyle(index + 1)} font-bold text-sm`}>
                                 {index < 3 ? getRankIcon(index + 1) : index + 1}
                               </div>
                             </td>
-                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 md:px-4 py-4 whitespace-nowrap">
                               <div className="font-medium text-gray-100">{entry.name}</div>
                               <div className="text-sm text-gray-400 md:hidden">{entry.sekolah}</div>
                             </td>
-                            <td className="px-4 md:px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                            <td className="px-4 md:px-4 py-4 whitespace-nowrap hidden md:table-cell">
                               <div className="text-gray-300 max-w-xs truncate">{entry.sekolah}</div>
                             </td>
-                            <td className="px-4 md:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                            <td className="px-4 md:px-4 py-4 whitespace-nowrap hidden sm:table-cell">
                               <div className="text-gray-300">Tingkatan {entry.tingkatan}</div>
                             </td>
-                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 md:px-4 py-4 whitespace-nowrap">
                               <div className="font-bold text-electric-blue text-lg">{entry.xp || 0} XP</div>
                             </td>
                           </tr>
@@ -323,12 +325,12 @@ export default function LeaderboardPage() {
               Sertai CodeCikgu dan mula kumpul XP dengan menyelesaikan topik-topik pembelajaran Sains Komputer!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/daftar" className="btn-primary text-lg px-8 py-4">
+              <Link href="/daftar" className="btn-primary text-lg px-8 py-4">
                 🚀 Daftar Sekarang
-              </a>
-              <a href="/" className="btn-secondary text-lg px-8 py-4">
-                🏠 Kembali ke Laman Utama
-              </a>
+              </Link>
+              <Link href="/login" className="btn-secondary text-lg px-8 py-4">
+                Masuk Akaun
+              </Link>
             </div>
           </div>
         </div>
@@ -336,4 +338,6 @@ export default function LeaderboardPage() {
     </div>
   )
 }
+
+
 

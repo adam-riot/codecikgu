@@ -161,7 +161,7 @@ export default function DashboardAwam() {
               </div>
               
               <div className="grid md:grid-cols-2 gap-6">
-                {publicMaterials.map((material, index) => (
+                {publicMaterials.map((material) => (
                   <div key={material.title} className={`glass rounded-xl p-6 card-hover border ${material.status === 'open' ? 'border-electric-blue/30' : 'border-gray-600/30'} ${material.status === 'restricted' ? 'opacity-60' : ''}`}>
                     <div className="flex items-center mb-4">
                       <div className={`w-12 h-12 bg-gradient-to-br ${material.color} rounded-lg flex items-center justify-center mr-4`}>
