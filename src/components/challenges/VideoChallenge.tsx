@@ -1,12 +1,7 @@
 'use client'
 
-// OLD (Lucide)
-import { Play, Pause, Volume2 } from 'lucide-react'
-
-// NEW (React Icons)
-import { FaPlay, FaPause, FaVolumeUp } from 'react-icons/fa'
-import { MdQuiz, MdVideoLibrary, MdUpload } from 'react-icons/md'
-
+import { useState, useEffect, useRef } from 'react'
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCheckCircle, FaClock, FaTrophy } from 'react-icons/fa'
 
 interface Challenge {
   id: string
@@ -34,14 +29,10 @@ export default function VideoChallenge({ challenge, onComplete, onBack }: VideoC
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [watchedSegments, setWatchedSegments] = useState<Array<{start: number, end: number}>>([])
   const [watchPercentage, setWatchPercentage] = useState(0)
   const [isCompleted, setIsCompleted] = useState(false)
   const [showControls, setShowControls] = useState(true)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>()
 
   useEffect(() => {
     const video = videoRef.current
@@ -49,80 +40,48 @@ export default function VideoChallenge({ challenge, onComplete, onBack }: VideoC
 
     const handleLoadedMetadata = () => {
       setDuration(video.duration)
-      setIsLoading(false)
     }
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime)
-      updateWatchedSegments(video.currentTime)
-    }
-
-    const handlePlay = () => setIsPlaying(true)
-    const handlePause = () => setIsPlaying(false)
-    const handleVolumeChange = () => {
-      setVolume(video.volume)
-      setIsMuted(video.muted)
-    }
-
-    video.addEventListener('loadedmetadata', handleLoadedMetadata)
-    video.addEventListener('timeupdate', handleTimeUpdate)
-    video.addEventListener('play', handlePlay)
-    video.addEventListener('pause', handlePause)
-    video.addEventListener('volumechange', handleVolumeChange)
-
-    return () => {
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-      video.removeEventListener('timeupdate', handleTimeUpdate)
-      video.removeEventListener('play', handlePlay)
-      video.removeEventListener('pause', handlePause)
-      video.removeEventListener('volumechange', handleVolumeChange)
-    }
-  }, [])
-
-  const updateWatchedSegments = (currentTime: number) => {
-    setWatchedSegments(prev => {
-      const newSegments = [...prev]
-      const segmentSize = 5 // 5 second segments
-      const segmentIndex = Math.floor(currentTime / segmentSize)
-      const segmentStart = segmentIndex * segmentSize
-      const segmentEnd = Math.min(segmentStart + segmentSize, duration)
-
-      // Check if this segment is already watched
-      const existingSegment = newSegments.find(
-        seg => seg.start <= segmentStart && seg.end >= segmentEnd
-      )
-
-      if (!existingSegment) {
-        newSegments.push({ start: segmentStart, end: segmentEnd })
+      const current = video.currentTime
+      setCurrentTime(current)
+      
+      // Track watched segments
+      setWatchedSegments(prev => {
+        const newSegments = [...prev]
+        const existingSegment = newSegments.find(seg => 
+          current >= seg.start - 5 && current <= seg.end + 5
+        )
         
-        // Merge overlapping segments
-        newSegments.sort((a, b) => a.start - b.start)
-        const merged = []
-        for (const segment of newSegments) {
-          if (merged.length === 0 || merged[merged.length - 1].end < segment.start) {
-            merged.push(segment)
-          } else {
-            merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, segment.end)
-          }
+        if (existingSegment) {
+          existingSegment.end = Math.max(existingSegment.end, current)
+        } else {
+          newSegments.push({ start: current, end: current })
         }
         
-        // Calculate watch percentage
-        const totalWatched = merged.reduce((sum, seg) => sum + (seg.end - seg.start), 0)
-        const percentage = Math.min((totalWatched / duration) * 100, 100)
-        setWatchPercentage(percentage)
-
+        // Calculate total watched time
+        const totalWatched = newSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0)
+        const percentage = (totalWatched / video.duration) * 100
+        setWatchPercentage(Math.min(percentage, 100))
+        
         // Check if completed
         if (percentage >= challenge.pass_criteria.min_watch_percentage && !isCompleted) {
           setIsCompleted(true)
           onComplete(percentage, true)
         }
+        
+        return newSegments
+      })
+    }
 
-        return merged
-      }
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    video.addEventListener('timeupdate', handleTimeUpdate)
 
-      return prev
-    })
-  }
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+    }
+  }, [challenge.pass_criteria.min_watch_percentage, isCompleted, onComplete])
 
   const togglePlay = () => {
     const video = videoRef.current
@@ -133,23 +92,23 @@ export default function VideoChallenge({ challenge, onComplete, onBack }: VideoC
     } else {
       video.play()
     }
+    setIsPlaying(!isPlaying)
   }
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current
     if (!video) return
 
-    const rect = e.currentTarget.getBoundingClientRect()
-    const clickX = e.clientX - rect.left
-    const newTime = (clickX / rect.width) * duration
+    const newTime = (parseFloat(e.target.value) / 100) * duration
     video.currentTime = newTime
+    setCurrentTime(newTime)
   }
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const video = videoRef.current
     if (!video) return
 
-    const newVolume = parseFloat(e.target.value)
+    const newVolume = parseFloat(e.target.value) / 100
     video.volume = newVolume
     setVolume(newVolume)
     setIsMuted(newVolume === 0)
@@ -159,24 +118,13 @@ export default function VideoChallenge({ challenge, onComplete, onBack }: VideoC
     const video = videoRef.current
     if (!video) return
 
-    video.muted = !video.muted
-    setIsMuted(!isMuted)
-  }
-
-  const toggleFullscreen = () => {
-    const video = videoRef.current
-    if (!video) return
-
-    if (!isFullscreen) {
-      if (video.requestFullscreen) {
-        video.requestFullscreen()
-      }
+    if (isMuted) {
+      video.volume = volume
+      setIsMuted(false)
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen()
-      }
+      video.volume = 0
+      setIsMuted(true)
     }
-    setIsFullscreen(!isFullscreen)
   }
 
   const formatTime = (time: number) => {
@@ -185,240 +133,211 @@ export default function VideoChallenge({ challenge, onComplete, onBack }: VideoC
     return `${minutes}:${seconds.toString().padStart(2, '0')}`
   }
 
-  const handleMouseMove = () => {
-    setShowControls(true)
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current)
+  const getVideoEmbedUrl = (url: string) => {
+    // Convert YouTube URLs to embed format
+    if (url.includes('youtube.com/watch')) {
+      const videoId = url.split('v=')[1]?.split('&')[0]
+      return `https://www.youtube.com/embed/${videoId}`
     }
-    controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false)
-      }
-    }, 3000)
+    if (url.includes('youtu.be/' )) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0]
+      return `https://www.youtube.com/embed/${videoId}`
+    }
+    return url
   }
 
-  const getVideoId = (url: string) => {
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
-    return match ? match[1] : null
-  }
-
-  const isYouTubeVideo = challenge.content.video_url.includes('youtube.com') || challenge.content.video_url.includes('youtu.be')
-
-  if (isCompleted) {
+  if (isCompleted ) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-neon-green to-electric-blue rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-white" />
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700 p-8 text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaCheckCircle className="w-8 h-8 text-white" />
           </div>
-          
-          <h1 className="text-3xl font-bold text-gradient-green mb-4">
-            Video Selesai Ditonton!
-          </h1>
-          
-          <p className="text-gray-300 text-lg mb-6">
-            Tahniah! Anda telah menonton {Math.round(watchPercentage)}% daripada video ini.
+          <h2 className="text-2xl font-bold text-white mb-2">Video Selesai Ditonton!</h2>
+          <p className="text-gray-300 mb-6">
+            Anda telah menonton {Math.round(watchPercentage)}% daripada video ini.
           </p>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-gradient mb-1">{Math.round(watchPercentage)}%</div>
-              <div className="text-gray-400 text-sm">Ditonton</div>
+          
+          <div className="grid md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-green-400 mb-1">
+                {Math.round(watchPercentage)}%
+              </div>
+              <div className="text-sm text-gray-400">Ditonton</div>
             </div>
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-gradient mb-1">{formatTime(duration)}</div>
-              <div className="text-gray-400 text-sm">Durasi</div>
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-400 mb-1">
+                {challenge.xp_reward}
+              </div>
+              <div className="text-sm text-gray-400">XP Diperoleh</div>
             </div>
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-gradient mb-1">{challenge.xp_reward}</div>
-              <div className="text-gray-400 text-sm">XP Diperoleh</div>
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-purple-400 mb-1">
+                {formatTime(duration)}
+              </div>
+              <div className="text-sm text-gray-400">Durasi</div>
             </div>
           </div>
 
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={onBack}
-              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
-            >
-              Kembali ke Senarai
-            </button>
-            <button
-              onClick={() => setIsCompleted(false)}
-              className="px-6 py-3 bg-gradient-to-r from-electric-blue to-neon-cyan text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300"
-            >
-              Tonton Semula
-            </button>
-          </div>
+          <button
+            onClick={onBack}
+            className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300"
+          >
+            Kembali ke Senarai
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Video Header */}
-      <div className="glass-dark rounded-2xl p-6 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gradient mb-2">{challenge.title}</h1>
-            <p className="text-gray-300">{challenge.description}</p>
+    <div className="max-w-6xl mx-auto p-6">
+      <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-white mb-1">{challenge.title}</h1>
+              <p className="text-gray-400">{challenge.description}</p>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-400">Kemajuan</div>
+              <div className="text-lg font-bold text-blue-400">
+                {Math.round(watchPercentage)}% / {challenge.pass_criteria.min_watch_percentage}%
+              </div>
+            </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gradient">{Math.round(watchPercentage)}%</div>
-              <div className="text-gray-400 text-sm">Kemajuan</div>
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(watchPercentage / challenge.pass_criteria.min_watch_percentage) * 100}%` }}
+              />
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gradient">{challenge.xp_reward}</div>
-              <div className="text-gray-400 text-sm">XP</div>
+            <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <span>Minimum: {challenge.pass_criteria.min_watch_percentage}%</span>
+              <span>Semasa: {Math.round(watchPercentage)}%</span>
             </div>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mt-4">
-          <div className="flex justify-between text-sm text-gray-400 mb-2">
-            <span>Kemajuan Tontonan</span>
-            <span>Minimum: {challenge.pass_criteria.min_watch_percentage}%</span>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-3">
-            <div 
-              className="bg-gradient-to-r from-electric-blue to-neon-cyan h-3 rounded-full transition-all duration-300"
-              style={{ width: `${watchPercentage}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Video Player */}
-      <div className="glass-dark rounded-2xl overflow-hidden mb-6">
-        <div 
-          className="relative bg-black aspect-video"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => isPlaying && setShowControls(false)}
-        >
-          {isYouTubeVideo ? (
+        {/* Video Player */}
+        <div className="relative bg-black">
+          {challenge.content.video_url.includes('youtube') ? (
             <iframe
-              src={`https://www.youtube.com/embed/${getVideoId(challenge.content.video_url )}?enablejsapi=1`}
-              className="w-full h-full"
+              src={getVideoEmbedUrl(challenge.content.video_url)}
+              className="w-full aspect-video"
               allowFullScreen
               title={challenge.title}
             />
           ) : (
-            <>
+            <div
+              className="relative w-full aspect-video group"
+              onMouseEnter={() => setShowControls(true)}
+              onMouseLeave={() => setShowControls(false)}
+            >
               <video
                 ref={videoRef}
                 src={challenge.content.video_url}
-                className="w-full h-full"
-                onClick={togglePlay}
+                className="w-full h-full object-contain"
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
               />
               
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <div className="text-white text-lg">Memuat video...</div>
+              {/* Custom Controls */}
+              {showControls && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                  {/* Progress Bar */}
+                  <div className="mb-3">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={duration ? (currentTime / duration) * 100 : 0}
+                      onChange={handleSeek}
+                      className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                  </div>
+                  
+                  {/* Controls */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={togglePlay}
+                        className="p-2 text-white hover:text-blue-400 transition-colors"
+                      >
+                        {isPlaying ? <FaPause className="w-5 h-5" /> : <FaPlay className="w-5 h-5" />}
+                      </button>
+                      
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={toggleMute}
+                          className="text-white hover:text-blue-400 transition-colors"
+                        >
+                          {isMuted ? <FaVolumeMute className="w-4 h-4" /> : <FaVolumeUp className="w-4 h-4" />}
+                        </button>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={isMuted ? 0 : volume * 100}
+                          onChange={handleVolumeChange}
+                          className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+                      
+                      <span className="text-white text-sm">
+                        {formatTime(currentTime)} / {formatTime(duration)}
+                      </span>
+                    </div>
+                    
+                    <button
+                      onClick={() => videoRef.current?.requestFullscreen()}
+                      className="p-2 text-white hover:text-blue-400 transition-colors"
+                    >
+                      <FaExpand className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
-
-              {/* Video Controls */}
-              <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
-                showControls ? 'opacity-100' : 'opacity-0'
-              }`}>
-                {/* Progress Bar */}
-                <div 
-                  className="w-full bg-gray-600 rounded-full h-2 mb-4 cursor-pointer"
-                  onClick={handleSeek}
-                >
-                  <div 
-                    className="bg-electric-blue h-2 rounded-full relative"
-                    style={{ width: `${(currentTime / duration) * 100}%` }}
-                  >
-                    <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg"></div>
-                  </div>
-                </div>
-
-                {/* Controls */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={togglePlay}
-                      className="text-white hover:text-electric-blue transition-colors"
-                    >
-                      {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                    </button>
-                    
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={toggleMute}
-                        className="text-white hover:text-electric-blue transition-colors"
-                      >
-                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                      </button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={isMuted ? 0 : volume}
-                        onChange={handleVolumeChange}
-                        className="w-20"
-                      />
-                    </div>
-                    
-                    <div className="text-white text-sm">
-                      {formatTime(currentTime)} / {formatTime(duration)}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={toggleFullscreen}
-                    className="text-white hover:text-electric-blue transition-colors"
-                  >
-                    <Maximize className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Video Info */}
-      <div className="glass-dark rounded-2xl p-6">
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          <span>📹</span>
-          Maklumat Video
-        </h2>
-        
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="font-semibold text-electric-blue mb-2">Keperluan</h3>
-            <ul className="text-gray-300 space-y-1 text-sm">
-              <li>• Tonton sekurang-kurangnya {challenge.pass_criteria.min_watch_percentage}% daripada video</li>
-              <li>• Video akan dijejaki secara automatik</li>
-              <li>• Anda boleh pause dan sambung menonton</li>
-              <li>• Kemajuan akan disimpan secara real-time</li>
-            </ul>
+        {/* Instructions */}
+        <div className="p-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-semibold text-blue-400 mb-2">Keperluan</h3>
+              <ul className="text-gray-300 space-y-1 text-sm">
+                <li>• Tonton sekurang-kurangnya {challenge.pass_criteria.min_watch_percentage}% daripada video</li>
+                <li>• Video akan dijejaki secara automatik</li>
+                <li>• Anda boleh pause dan sambung menonton</li>
+                <li>• Kemajuan akan disimpan secara real-time</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold text-blue-400 mb-2">Tips</h3>
+              <ul className="text-gray-300 space-y-1 text-sm">
+                <li>• Gunakan headphone untuk pengalaman yang lebih baik</li>
+                <li>• Ambil nota penting semasa menonton</li>
+                <li>• Anda boleh menonton semula jika perlu</li>
+                <li>• Pastikan sambungan internet stabil</li>
+              </ul>
+            </div>
           </div>
-          
-          <div>
-            <h3 className="font-semibold text-electric-blue mb-2">Tips</h3>
-            <ul className="text-gray-300 space-y-1 text-sm">
-              <li>• Gunakan headphone untuk pengalaman yang lebih baik</li>
-              <li>• Ambil nota penting semasa menonton</li>
-              <li>• Anda boleh menonton semula jika perlu</li>
-              <li>• Pastikan sambungan internet stabil</li>
-            </ul>
-          </div>
-        </div>
 
-        <div className="mt-6 pt-6 border-t border-gray-700/50">
-          <button
-            onClick={onBack}
-            className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
-          >
-            Kembali ke Senarai
-          </button>
+          <div className="mt-6 pt-6 border-t border-gray-700/50">
+            <button
+              onClick={onBack}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
+            >
+              Kembali ke Senarai
+            </button>
+          </div>
         </div>
       </div>
     </div>

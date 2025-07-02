@@ -1,12 +1,8 @@
 'use client'
 
-// OLD (Lucide)
-import { Play, Pause, Volume2 } from 'lucide-react'
-
-// NEW (React Icons)
-import { FaPlay, FaPause, FaVolumeUp } from 'react-icons/fa'
-import { MdQuiz, MdVideoLibrary, MdUpload } from 'react-icons/md'
-
+import { useState, useRef } from 'react'
+import { supabase } from '@/utils/supabase'
+import { FaUpload, FaFile, FaCheckCircle, FaTimes, FaDownload, FaEye, FaClock, FaTrophy } from 'react-icons/fa'
 
 interface Challenge {
   id: string
@@ -46,13 +42,9 @@ export default function UploadChallenge({ challenge, onComplete, onBack }: Uploa
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const getFileExtension = (filename: string) => {
-    return filename.split('.').pop()?.toLowerCase() || ''
-  }
-
   const isFileTypeAllowed = (file: File) => {
-    const extension = getFileExtension(file.name)
-    return allowedTypes.includes(extension)
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    return extension && allowedTypes.includes(extension)
   }
 
   const handleDrag = (e: React.DragEvent) => {
@@ -69,24 +61,26 @@ export default function UploadChallenge({ challenge, onComplete, onBack }: Uploa
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-
+    
     const files = Array.from(e.dataTransfer.files)
     handleFiles(files)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    handleFiles(files)
+    if (e.target.files) {
+      const files = Array.from(e.target.files)
+      handleFiles(files)
+    }
   }
 
   const handleFiles = (files: File[]) => {
     const validFiles = files.filter(file => {
       if (!isFileTypeAllowed(file)) {
-        alert(`Jenis fail ${getFileExtension(file.name)} tidak dibenarkan`)
+        alert(`File ${file.name} tidak dibenarkan. Jenis file yang dibenarkan: ${allowedTypes.join(', ')}`)
         return false
       }
       if (file.size > maxFileSize) {
-        alert(`Fail ${file.name} terlalu besar. Maksimum: ${formatFileSize(maxFileSize)}`)
+        alert(`File ${file.name} terlalu besar. Saiz maksimum: ${formatFileSize(maxFileSize)}`)
         return false
       }
       return true
@@ -99,397 +93,259 @@ export default function UploadChallenge({ challenge, onComplete, onBack }: Uploa
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const fileExt = getFileExtension(file.name)
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-    const filePath = `challenge-submissions/${fileName}`
-
-    const { data, error } = await supabase.storage
-      .from('uploads')
-      .upload(filePath, file, {
-        onUploadProgress: (progress) => {
-          setUploadProgress(prev => ({
-            ...prev,
-            [file.name]: (progress.loaded / progress.total) * 100
-          }))
-        }
-      })
-
-    if (error) throw error
-    return filePath
-  }
-
   const handleSubmit = async () => {
     if (selectedFiles.length === 0) {
-      alert('Sila pilih sekurang-kurangnya satu fail untuk dimuat naik')
+      alert('Sila pilih sekurang-kurangnya satu file untuk dimuat naik.')
       return
     }
 
     setUploading(true)
-
+    
     try {
-      // Upload all files
-      const uploadPromises = selectedFiles.map(uploadFile)
-      const filePaths = await Promise.all(uploadPromises)
-
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
-      // Save submission to database
-      const { error: submissionError } = await supabase
-        .from('challenge_submissions')
-        .insert({
-          challenge_id: challenge.id,
-          user_id: user.id,
-          submission_type: 'upload',
-          submission_data: {
-            files: selectedFiles.map((file, index) => ({
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              path: filePaths[index]
-            })),
-            notes: submissionNotes
-          },
-          status: 'pending'
-        })
+      const uploadedFiles = []
+      
+      for (const file of selectedFiles) {
+        const fileName = `${Date.now()}_${file.name}`
+        const filePath = `challenge_submissions/${user.id}/${challenge.id}/${fileName}`
+        
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }))
+        
+        const { data, error } = await supabase.storage
+          .from('challenge-uploads')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
 
-      if (submissionError) throw submissionError
+        if (error) throw error
+        
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }))
+        uploadedFiles.push({
+          name: file.name,
+          path: data.path,
+          size: file.size,
+          type: file.type
+        })
+      }
+
+      // Submit to database
+      await supabase.from('challenge_submissions').insert({
+        challenge_id: challenge.id,
+        user_id: user.id,
+        submission_type: 'upload',
+        submission_data: {
+          files: uploadedFiles,
+          notes: submissionNotes
+        },
+        status: 'pending'
+      })
 
       setSubmitted(true)
       onComplete(true)
+      
     } catch (error) {
       console.error('Upload error:', error)
-      alert('Ralat semasa memuat naik. Sila cuba lagi.')
+      alert('Ralat semasa memuat naik file. Sila cuba lagi.')
     } finally {
       setUploading(false)
     }
   }
 
-  const getFileIcon = (filename: string) => {
-    const ext = getFileExtension(filename)
-    switch (ext) {
-      case 'pdf': return '📄'
-      case 'doc':
-      case 'docx': return '📝'
-      case 'txt': return '📃'
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif': return '🖼️'
-      case 'zip':
-      case 'rar': return '📦'
-      case 'mp4':
-      case 'avi':
-      case 'mov': return '🎥'
-      case 'mp3':
-      case 'wav': return '🎵'
-      default: return '📁'
-    }
-  }
-
   if (submitted) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-neon-green to-electric-blue rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-white" />
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700 p-8 text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaCheckCircle className="w-8 h-8 text-white" />
           </div>
-          
-          <h1 className="text-3xl font-bold text-gradient-green mb-4">
-            Fail Berjaya Dihantar!
-          </h1>
-          
-          <p className="text-gray-300 text-lg mb-6">
-            Terima kasih! Fail anda telah dihantar dan sedang menunggu semakan.
+          <h2 className="text-2xl font-bold text-white mb-2">Fail Berjaya Dihantar!</h2>
+          <p className="text-gray-300 mb-6">
+            Submission anda telah diterima dan sedang menunggu semakan.
           </p>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-gradient mb-1">{selectedFiles.length}</div>
-              <div className="text-gray-400 text-sm">Fail Dihantar</div>
-            </div>
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-gradient mb-1">
-                {formatFileSize(selectedFiles.reduce((total, file) => total + file.size, 0))}
+          
+          <div className="grid md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-400 mb-1">
+                {selectedFiles.length}
               </div>
-              <div className="text-gray-400 text-sm">Jumlah Saiz</div>
+              <div className="text-sm text-gray-400">Fail Dihantar</div>
             </div>
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-gradient mb-1">{challenge.xp_reward}</div>
-              <div className="text-gray-400 text-sm">XP Menunggu</div>
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-yellow-400 mb-1">
+                Pending
+              </div>
+              <div className="text-sm text-gray-400">Status</div>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-purple-400 mb-1">
+                {challenge.xp_reward}
+              </div>
+              <div className="text-sm text-gray-400">XP (Selepas Semakan)</div>
             </div>
           </div>
 
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-6 mb-8">
-            <h3 className="text-blue-400 font-semibold mb-2 flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Status Semakan
-            </h3>
-            <p className="text-blue-200 text-sm">
-              Fail anda sedang dalam proses semakan oleh pengajar. Anda akan menerima notifikasi 
-              apabila semakan selesai dan markah telah diberikan.
-            </p>
-          </div>
-
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={onBack}
-              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
-            >
-              Kembali ke Senarai
-            </button>
-          </div>
+          <button
+            onClick={onBack}
+            className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300"
+          >
+            Kembali ke Senarai
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Upload Header */}
-      <div className="glass-dark rounded-2xl p-6 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gradient mb-2">{challenge.title}</h1>
-            <p className="text-gray-300">{challenge.description}</p>
-          </div>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-700">
+          <h1 className="text-xl font-bold text-white mb-2">{challenge.title}</h1>
+          <p className="text-gray-400 mb-4">{challenge.description}</p>
           
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gradient">{selectedFiles.length}</div>
-              <div className="text-gray-400 text-sm">Fail Dipilih</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gradient">{challenge.xp_reward}</div>
-              <div className="text-gray-400 text-sm">XP</div>
-            </div>
+          {/* Instructions */}
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-400 mb-2">Arahan:</h3>
+            <p className="text-gray-300 text-sm whitespace-pre-line">
+              {challenge.content.instructions}
+            </p>
           </div>
         </div>
-      </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
         {/* Upload Area */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Instructions */}
-          <div className="glass-dark rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <File className="w-6 h-6" />
-              Arahan Tugasan
-            </h2>
-            <div 
-              className="text-gray-300 leading-relaxed prose prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ 
-                __html: challenge.content.instructions.replace(/\n/g, '<br />') 
-              }}
+        <div className="p-6">
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              dragActive 
+                ? 'border-blue-500 bg-blue-500/10' 
+                : 'border-gray-600 hover:border-gray-500'
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <FaUpload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
+              Seret dan lepas fail di sini
+            </h3>
+            <p className="text-gray-400 mb-4">atau</p>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Pilih Fail
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              accept={allowedTypes.map(type => `.${type}`).join(',')}
+            />
+            
+            <div className="mt-4 text-sm text-gray-400">
+              <p>Jenis fail yang dibenarkan: {allowedTypes.join(', ')}</p>
+              <p>Saiz maksimum: {formatFileSize(maxFileSize)}</p>
+            </div>
+          </div>
+
+          {/* Selected Files */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-semibold text-white mb-3">Fail Dipilih:</h3>
+              <div className="space-y-2">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3">
+                    <div className="flex items-center gap-3">
+                      <FaFile className="w-5 h-5 text-blue-400" />
+                      <div>
+                        <div className="font-medium text-white">{file.name}</div>
+                        <div className="text-sm text-gray-400">{formatFileSize(file.size)}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {uploadProgress[file.name] !== undefined && (
+                        <div className="w-20 bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress[file.name]}%` }}
+                          />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                        disabled={uploading}
+                      >
+                        <FaTimes className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Submission Notes */}
+          <div className="mt-6">
+            <label className="block font-medium text-white mb-2">
+              Nota Tambahan (Pilihan):
+            </label>
+            <textarea
+              value={submissionNotes}
+              onChange={(e) => setSubmissionNotes(e.target.value)}
+              placeholder="Tambah sebarang nota atau penjelasan untuk submission anda..."
+              className="w-full h-24 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 resize-none"
+              disabled={uploading}
             />
           </div>
 
-          {/* File Upload Area */}
-          <div className="glass-dark rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Upload className="w-6 h-6" />
-              Muat Naik Fail
-            </h2>
-
-            {/* Drag & Drop Area */}
-            <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
-                dragActive 
-                  ? 'border-electric-blue bg-electric-blue/10' 
-                  : 'border-gray-600 hover:border-gray-500'
-              }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
+          {/* Submit Button */}
+          <div className="mt-6 flex gap-4">
+            <button
+              onClick={onBack}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
+              disabled={uploading}
             >
-              <div className="text-6xl mb-4">📁</div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                Seret fail ke sini atau klik untuk pilih
-              </h3>
-              <p className="text-gray-400 mb-4">
-                Jenis fail yang dibenarkan: {allowedTypes.join(', ').toUpperCase()}
-              </p>
-              <p className="text-gray-400 text-sm mb-6">
-                Saiz maksimum: {formatFileSize(maxFileSize)}
-              </p>
-              
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-3 bg-gradient-to-r from-electric-blue to-neon-cyan text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300"
-              >
-                Pilih Fail
-              </button>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                className="hidden"
-                accept={allowedTypes.map(type => `.${type}`).join(',')}
-              />
-            </div>
-
-            {/* Selected Files */}
-            {selectedFiles.length > 0 && (
-              <div className="mt-6">
-                <h3 className="font-semibold text-white mb-4">Fail Dipilih ({selectedFiles.length})</h3>
-                <div className="space-y-3">
-                  {selectedFiles.map((file, index) => (
-                    <div key={index} className="glass rounded-lg p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{getFileIcon(file.name)}</span>
-                        <div>
-                          <div className="font-medium text-white">{file.name}</div>
-                          <div className="text-sm text-gray-400">
-                            {formatFileSize(file.size)} • {getFileExtension(file.name).toUpperCase()}
-                          </div>
-                          {uploadProgress[file.name] && (
-                            <div className="w-32 bg-gray-600 rounded-full h-2 mt-1">
-                              <div 
-                                className="bg-electric-blue h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress[file.name]}%` }}
-                              ></div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <button
-                        onClick={() => removeFile(index)}
-                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                        disabled={uploading}
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Submission Notes */}
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Nota Tambahan (Pilihan)
-              </label>
-              <textarea
-                value={submissionNotes}
-                onChange={(e) => setSubmissionNotes(e.target.value)}
-                placeholder="Tambah sebarang nota atau penjelasan untuk tugasan ini..."
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-electric-blue focus:outline-none resize-none"
-                rows={4}
-                disabled={uploading}
-              />
-            </div>
-
-            {/* Submit Button */}
-            <div className="mt-6 flex gap-4">
-              <button
-                onClick={onBack}
-                className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-500 transition-colors"
-                disabled={uploading}
-              >
-                Kembali
-              </button>
-              
-              <button
-                onClick={handleSubmit}
-                disabled={selectedFiles.length === 0 || uploading}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-neon-green to-electric-blue text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {uploading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Memuat naik...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-5 h-5" />
-                    Hantar Tugasan
-                  </>
-                )}
-              </button>
-            </div>
+              Kembali
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={selectedFiles.length === 0 || uploading}
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+            >
+              {uploading ? 'Memuat naik...' : 'Hantar Submission'}
+            </button>
           </div>
         </div>
 
-        {/* Upload Info */}
-        <div className="space-y-6">
-          {/* File Requirements */}
-          <div className="glass-dark rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Award className="w-5 h-5" />
-              Keperluan Fail
-            </h3>
-            
-            <div className="space-y-3 text-sm">
-              <div>
-                <span className="text-gray-400">Jenis dibenarkan:</span>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {allowedTypes.map(type => (
-                    <span key={type} className="px-2 py-1 bg-electric-blue/20 text-electric-blue rounded text-xs">
-                      .{type.toUpperCase()}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-400">Saiz maksimum:</span>
-                <span className="text-white font-medium">{formatFileSize(maxFileSize)}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-400">Bilangan fail:</span>
-                <span className="text-white font-medium">Tanpa had</span>
-              </div>
+        {/* File Requirements */}
+        <div className="p-6 border-t border-gray-700 bg-gray-800/30">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-semibold text-blue-400 mb-2">Keperluan Fail</h3>
+              <ul className="text-gray-300 space-y-1 text-sm">
+                <li>• Jenis fail: {allowedTypes.join(', ')}</li>
+                <li>• Saiz maksimum: {formatFileSize(maxFileSize)}</li>
+                <li>• Boleh upload multiple files</li>
+                <li>• Pastikan fail tidak rosak</li>
+              </ul>
             </div>
-          </div>
-
-          {/* Upload Tips */}
-          <div className="glass-dark rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Eye className="w-5 h-5" />
-              Tips Muat Naik
-            </h3>
             
-            <ul className="text-gray-300 space-y-2 text-sm">
-              <li>• Pastikan fail dalam format yang betul</li>
-              <li>• Periksa saiz fail sebelum muat naik</li>
-              <li>• Beri nama fail yang jelas dan mudah faham</li>
-              <li>• Tambah nota jika perlu penjelasan tambahan</li>
-              <li>• Pastikan sambungan internet stabil</li>
-            </ul>
-          </div>
-
-          {/* Submission Status */}
-          <div className="glass-dark rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Proses Semakan
-            </h3>
-            
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-electric-blue rounded-full"></div>
-                <span className="text-gray-300">1. Hantar tugasan</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-gray-600 rounded-full"></div>
-                <span className="text-gray-400">2. Semakan pengajar</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-gray-600 rounded-full"></div>
-                <span className="text-gray-400">3. Markah diberikan</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-gray-600 rounded-full"></div>
-                <span className="text-gray-400">4. XP dikreditkan</span>
-              </div>
+            <div>
+              <h3 className="font-semibold text-blue-400 mb-2">Proses Semakan</h3>
+              <ul className="text-gray-300 space-y-1 text-sm">
+                <li>• Submission akan disemak secara manual</li>
+                <li>• XP akan diberikan selepas semakan</li>
+                <li>• Anda akan menerima notifikasi hasil</li>
+                <li>• Boleh resubmit jika diperlukan</li>
+              </ul>
             </div>
           </div>
         </div>
