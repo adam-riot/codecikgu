@@ -9,8 +9,11 @@ const poppins = Poppins({ subsets: ["latin"], weight: ["400", "700"], variable: 
 const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik" })
 
 export const metadata: Metadata = {
-  title: "CodeCikgu",
-  description: "Platform Pembelajaran Sains Komputer Tingkatan 4 & 5",
+  title: 'CodeCikgu',
+  description: 'Platform pembelajaran Sains Komputer yang interaktif',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
