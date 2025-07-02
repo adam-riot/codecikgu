@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
+import CreateChallenge from '@/components/CreateChallenge'
 
 interface Profile {
   id: string
@@ -48,6 +49,7 @@ interface Challenge {
   due_date?: string
   evaluation_type: 'automatic' | 'manual'
   content?: any
+  pass_criteria?: any
   challenge_submissions?: { count: number }[]
 }
 
@@ -60,6 +62,7 @@ export default function DashboardAdmin() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('users')
   const [showAddChallengeModal, setShowAddChallengeModal] = useState(false)
+  const [showCreateChallengeWizard, setShowCreateChallengeWizard] = useState(false)
   
   // Form states
   const [newGanjaran, setNewGanjaran] = useState({
@@ -135,7 +138,7 @@ export default function DashboardAdmin() {
         setGanjaran(ganjaranData)
       }
 
-      // Fetch challenges
+      // Fetch challenges with submission counts
       const { data: challengesData } = await supabase
         .from('challenges')
         .select(`
@@ -294,6 +297,16 @@ export default function DashboardAdmin() {
     }
   }
 
+  const getChallengeStats = () => {
+    const quizCount = challenges.filter(c => c.type === 'quiz').length
+    const videoCount = challenges.filter(c => c.type === 'video').length
+    const readingCount = challenges.filter(c => c.type === 'reading').length
+    const uploadCount = challenges.filter(c => c.type === 'upload').length
+    const totalSubmissions = challenges.reduce((sum, c) => sum + (c.challenge_submissions?.[0]?.count || 0), 0)
+    
+    return { quizCount, videoCount, readingCount, uploadCount, totalSubmissions }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
@@ -305,6 +318,7 @@ export default function DashboardAdmin() {
   }
 
   const stats = getStats()
+  const challengeStats = getChallengeStats()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
@@ -470,50 +484,88 @@ export default function DashboardAdmin() {
 
           {activeTab === 'challenges' && (
             <div className="space-y-6">
-              {/* Challenges Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-dark rounded-xl p-6">
+              {/* Enhanced Challenges Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="glass-dark rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">Jumlah Cabaran</p>
-                      <p className="text-2xl font-bold text-white">{stats.totalChallenges}</p>
+                      <p className="text-gray-400 text-xs">Total Cabaran</p>
+                      <p className="text-xl font-bold text-white">{stats.totalChallenges}</p>
                     </div>
-                    <div className="text-2xl">🏆</div>
+                    <div className="text-xl">🏆</div>
                   </div>
                 </div>
-                <div className="glass-dark rounded-xl p-6">
+                <div className="glass-dark rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">Cabaran Aktif</p>
-                      <p className="text-2xl font-bold text-white">{stats.activeChallenges}</p>
+                      <p className="text-gray-400 text-xs">Aktif</p>
+                      <p className="text-xl font-bold text-white">{stats.activeChallenges}</p>
                     </div>
-                    <div className="text-2xl">✅</div>
+                    <div className="text-xl">✅</div>
                   </div>
                 </div>
-                <div className="glass-dark rounded-xl p-6">
+                <div className="glass-dark rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-400 text-sm">Total XP Tersedia</p>
-                      <p className="text-2xl font-bold text-white">
-                        {challenges.reduce((sum, c) => sum + c.xp_reward, 0)}
-                      </p>
+                      <p className="text-gray-400 text-xs">Kuiz</p>
+                      <p className="text-xl font-bold text-white">{challengeStats.quizCount}</p>
                     </div>
-                    <div className="text-2xl">⭐</div>
+                    <div className="text-xl">📝</div>
+                  </div>
+                </div>
+                <div className="glass-dark rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-xs">Video</p>
+                      <p className="text-xl font-bold text-white">{challengeStats.videoCount}</p>
+                    </div>
+                    <div className="text-xl">🎥</div>
+                  </div>
+                </div>
+                <div className="glass-dark rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-xs">Bacaan</p>
+                      <p className="text-xl font-bold text-white">{challengeStats.readingCount}</p>
+                    </div>
+                    <div className="text-xl">📖</div>
+                  </div>
+                </div>
+                <div className="glass-dark rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-xs">Upload</p>
+                      <p className="text-xl font-bold text-white">{challengeStats.uploadCount}</p>
+                    </div>
+                    <div className="text-xl">📤</div>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Actions */}
+              {/* Enhanced Quick Actions */}
               <div className="glass-dark rounded-xl p-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h3 className="text-xl font-bold text-white">Pengurusan Cabaran</h3>
-                  <button
-                    onClick={() => setShowAddChallengeModal(true)}
-                    className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300 flex items-center space-x-2"
-                  >
-                    <span>➕</span>
-                    <span>Tambah Cabaran Baru</span>
-                  </button>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => setShowCreateChallengeWizard(true)}
+                      className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300 flex items-center space-x-2"
+                    >
+                      <span>🧙‍♂️</span>
+                      <span>Wizard Cabaran</span>
+                    </button>
+                    <button
+                      onClick={() => setShowAddChallengeModal(true)}
+                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg transition-all duration-300 flex items-center space-x-2"
+                    >
+                      <span>➕</span>
+                      <span>Tambah Pantas</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 text-sm text-gray-400">
+                  <p>💡 <strong>Wizard Cabaran:</strong> Cipta cabaran lengkap dengan soalan kuiz, video URL, atau kandungan bacaan</p>
+                  <p>⚡ <strong>Tambah Pantas:</strong> Cipta cabaran asas dengan cepat (boleh edit kemudian)</p>
                 </div>
               </div>
 
@@ -531,12 +583,20 @@ export default function DashboardAdmin() {
                     <div className="text-6xl mb-4">🏆</div>
                     <h3 className="text-xl font-bold text-gray-300 mb-2">Tiada Cabaran</h3>
                     <p className="text-gray-500 mb-6">Belum ada cabaran yang dicipta. Mulakan dengan menambah cabaran pertama!</p>
-                    <button
-                      onClick={() => setShowAddChallengeModal(true)}
-                      className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300"
-                    >
-                      Tambah Cabaran Pertama
-                    </button>
+                    <div className="flex justify-center gap-4">
+                      <button
+                        onClick={() => setShowCreateChallengeWizard(true)}
+                        className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300"
+                      >
+                        🧙‍♂️ Guna Wizard
+                      </button>
+                      <button
+                        onClick={() => setShowAddChallengeModal(true)}
+                        className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg transition-all duration-300"
+                      >
+                        ➕ Tambah Pantas
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-700/50">
@@ -554,6 +614,11 @@ export default function DashboardAdmin() {
                               }`}>
                                 {challenge.is_active ? 'Aktif' : 'Tidak Aktif'}
                               </span>
+                              {challenge.content && Object.keys(challenge.content).length > 0 && (
+                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                  Lengkap
+                                </span>
+                              )}
                             </div>
                             <p className="text-gray-300 text-sm mb-3">{challenge.description}</p>
                             <div className="flex flex-wrap gap-4 text-sm text-gray-400">
@@ -572,6 +637,10 @@ export default function DashboardAdmin() {
                               <span className="flex items-center gap-1">
                                 <span>🏷️</span>
                                 <span>{getChallengeTypeName(challenge.type)}</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span>📊</span>
+                                <span>{challenge.challenge_submissions?.[0]?.count || 0} submissions</span>
                               </span>
                               {challenge.due_date && (
                                 <span className="flex items-center gap-1">
@@ -739,7 +808,7 @@ export default function DashboardAdmin() {
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-                  {ganjaran.map((reward) => (
+                  {ganjaran.map((reward ) => (
                     <div key={reward.id} className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50 hover:border-electric-blue/50 transition-all duration-300">
                       {reward.imej_url && (
                         <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-gradient-to-br from-electric-blue/20 to-neon-cyan/20 flex items-center justify-center">
@@ -768,12 +837,12 @@ export default function DashboardAdmin() {
         </div>
       </div>
 
-      {/* Add Challenge Modal */}
+      {/* Quick Add Challenge Modal (Original) */}
       {showAddChallengeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="glass-dark rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-white">Tambah Cabaran Baru</h3>
+              <h3 className="text-2xl font-bold text-white">Tambah Cabaran Pantas</h3>
               <button
                 onClick={() => setShowAddChallengeModal(false)}
                 className="text-gray-400 hover:text-white transition-colors"
@@ -925,7 +994,17 @@ export default function DashboardAdmin() {
           </div>
         </div>
       )}
+
+      {/* Enhanced Challenge Creation Wizard */}
+      {showCreateChallengeWizard && (
+        <CreateChallenge
+          onClose={() => setShowCreateChallengeWizard(false)}
+          onSuccess={() => {
+            setShowCreateChallengeWizard(false)
+            fetchData()
+          }}
+        />
+      )}
     </div>
   )
 }
-
