@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { supabase } from '@/utils/supabase'
-import { CheckCircle, XCircle, Clock, Award, RotateCcw, ArrowRight } from 'lucide-react'
+// OLD (Lucide)
+import { Play, Pause, Volume2 } from 'lucide-react'
+
+// NEW (React Icons)
+import { FaPlay, FaPause, FaVolumeUp } from 'react-icons/fa'
+import { MdQuiz, MdVideoLibrary, MdUpload } from 'react-icons/md'
+
 
 interface Question {
   id: string

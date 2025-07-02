@@ -1,7 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { CheckCircle, BookOpen, Clock, Award, Eye, Scroll } from 'lucide-react'
+// OLD (Lucide)
+import { Play, Pause, Volume2 } from 'lucide-react'
+
+// NEW (React Icons)
+import { FaPlay, FaPause, FaVolumeUp } from 'react-icons/fa'
+import { MdQuiz, MdVideoLibrary, MdUpload } from 'react-icons/md'
+
 
 interface Challenge {
   id: string
