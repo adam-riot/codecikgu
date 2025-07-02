@@ -44,14 +44,15 @@ export default function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
-              <span className="text-dark-black font-bold text-sm">C</span>
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-electric-blue to-neon-cyan bg-clip-text text-transparent">
-              CodeCikgu
-            </span>
-          </Link>
+         {/* Logo */}
+<Link href="/" className="flex items-center space-x-2 group">
+  <div className="w-8 h-8 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
+    <img src="/favicon.svg" alt="CodeCikgu Logo" className="w-8 h-8 rounded-lg" />
+  </div>
+  <span className="text-2xl font-bold bg-gradient-to-r from-electric-blue to-neon-cyan bg-clip-text text-transparent">
+    CodeCikgu
+  </span>
+</Link>
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
