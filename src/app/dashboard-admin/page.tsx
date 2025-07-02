@@ -35,13 +35,31 @@ interface Ganjaran {
   imej_url: string
 }
 
+interface Challenge {
+  id: string
+  title: string
+  description: string
+  type: 'quiz' | 'video' | 'reading' | 'upload'
+  subject: string
+  tingkatan: string
+  xp_reward: number
+  is_active: boolean
+  created_at: string
+  due_date?: string
+  evaluation_type: 'automatic' | 'manual'
+  content?: any
+  challenge_submissions?: { count: number }[]
+}
+
 export default function DashboardAdmin() {
   const router = useRouter()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [xpLogs, setXpLogs] = useState<XPLog[]>([])
   const [ganjaran, setGanjaran] = useState<Ganjaran[]>([])
+  const [challenges, setChallenges] = useState<Challenge[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('users')
+  const [showAddChallengeModal, setShowAddChallengeModal] = useState(false)
   
   // Form states
   const [newGanjaran, setNewGanjaran] = useState({
@@ -49,6 +67,18 @@ export default function DashboardAdmin() {
     deskripsi: '',
     syarat_xp: 0,
     imej_url: ''
+  })
+
+  const [newChallenge, setNewChallenge] = useState({
+    title: '',
+    description: '',
+    type: 'quiz' as 'quiz' | 'video' | 'reading' | 'upload',
+    subject: '',
+    tingkatan: '',
+    xp_reward: 0,
+    due_date: '',
+    evaluation_type: 'automatic' as 'automatic' | 'manual',
+    content: {}
   })
 
   useEffect(() => {
@@ -105,6 +135,19 @@ export default function DashboardAdmin() {
         setGanjaran(ganjaranData)
       }
 
+      // Fetch challenges
+      const { data: challengesData } = await supabase
+        .from('challenges')
+        .select(`
+          *,
+          challenge_submissions(count)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (challengesData) {
+        setChallenges(challengesData)
+      }
+
     } catch (error) {
       console.error('Error fetching data:', error)
     }
@@ -137,6 +180,40 @@ export default function DashboardAdmin() {
     }
   }
 
+  const handleAddChallenge = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const { error } = await supabase
+        .from('challenges')
+        .insert([{
+          ...newChallenge,
+          is_active: true
+        }])
+
+      if (error) throw error
+
+      // Reset form
+      setNewChallenge({
+        title: '',
+        description: '',
+        type: 'quiz',
+        subject: '',
+        tingkatan: '',
+        xp_reward: 0,
+        due_date: '',
+        evaluation_type: 'automatic',
+        content: {}
+      })
+
+      setShowAddChallengeModal(false)
+      await fetchData()
+      
+    } catch (error) {
+      console.error('Error adding challenge:', error)
+    }
+  }
+
   const handleDeleteGanjaran = async (id: string) => {
     if (!confirm('Adakah anda pasti ingin memadam ganjaran ini?')) return
 
@@ -154,13 +231,67 @@ export default function DashboardAdmin() {
     }
   }
 
+  const handleToggleChallengeStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('challenges')
+        .update({ is_active: !currentStatus })
+        .eq('id', id)
+
+      if (error) throw error
+
+      await fetchData()
+    } catch (error) {
+      console.error('Error updating challenge status:', error)
+    }
+  }
+
+  const handleDeleteChallenge = async (id: string) => {
+    if (!confirm('Adakah anda pasti ingin memadam cabaran ini?')) return
+
+    try {
+      const { error } = await supabase
+        .from('challenges')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      await fetchData()
+    } catch (error) {
+      console.error('Error deleting challenge:', error)
+    }
+  }
+
   const getStats = () => {
     const totalUsers = profiles.length
     const totalStudents = profiles.filter(p => p.role === 'murid').length
     const totalPublic = profiles.filter(p => p.role === 'awam').length
     const totalXP = profiles.reduce((sum, p) => sum + (p.xp || 0), 0)
+    const totalChallenges = challenges.length
+    const activeChallenges = challenges.filter(c => c.is_active).length
     
-    return { totalUsers, totalStudents, totalPublic, totalXP }
+    return { totalUsers, totalStudents, totalPublic, totalXP, totalChallenges, activeChallenges }
+  }
+
+  const getChallengeTypeIcon = (type: string) => {
+    switch (type) {
+      case 'quiz': return '📝'
+      case 'video': return '🎥'
+      case 'reading': return '📖'
+      case 'upload': return '📤'
+      default: return '🏆'
+    }
+  }
+
+  const getChallengeTypeName = (type: string) => {
+    switch (type) {
+      case 'quiz': return 'Kuiz'
+      case 'video': return 'Video'
+      case 'reading': return 'Bacaan'
+      case 'upload': return 'Muat Naik'
+      default: return 'Cabaran'
+    }
   }
 
   if (loading) {
@@ -247,6 +378,16 @@ export default function DashboardAdmin() {
                 👥 Pengguna
               </button>
               <button
+                onClick={() => setActiveTab('challenges')}
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'challenges'
+                    ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
+                    : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
+                }`}
+              >
+                🏆 Cabaran
+              </button>
+              <button
                 onClick={() => setActiveTab('xp-logs')}
                 className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
                   activeTab === 'xp-logs'
@@ -327,6 +468,146 @@ export default function DashboardAdmin() {
             </div>
           )}
 
+          {activeTab === 'challenges' && (
+            <div className="space-y-6">
+              {/* Challenges Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-dark rounded-xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Jumlah Cabaran</p>
+                      <p className="text-2xl font-bold text-white">{stats.totalChallenges}</p>
+                    </div>
+                    <div className="text-2xl">🏆</div>
+                  </div>
+                </div>
+                <div className="glass-dark rounded-xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Cabaran Aktif</p>
+                      <p className="text-2xl font-bold text-white">{stats.activeChallenges}</p>
+                    </div>
+                    <div className="text-2xl">✅</div>
+                  </div>
+                </div>
+                <div className="glass-dark rounded-xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-400 text-sm">Total XP Tersedia</p>
+                      <p className="text-2xl font-bold text-white">
+                        {challenges.reduce((sum, c) => sum + c.xp_reward, 0)}
+                      </p>
+                    </div>
+                    <div className="text-2xl">⭐</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="glass-dark rounded-xl p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <h3 className="text-xl font-bold text-white">Pengurusan Cabaran</h3>
+                  <button
+                    onClick={() => setShowAddChallengeModal(true)}
+                    className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300 flex items-center space-x-2"
+                  >
+                    <span>➕</span>
+                    <span>Tambah Cabaran Baru</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Challenges List */}
+              <div className="glass-dark rounded-2xl overflow-hidden">
+                <div className="p-6 border-b border-gray-700/50">
+                  <h2 className="text-2xl font-bold text-primary flex items-center">
+                    <span className="mr-3">🏆</span>
+                    Senarai Cabaran
+                  </h2>
+                </div>
+                
+                {challenges.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <div className="text-6xl mb-4">🏆</div>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Tiada Cabaran</h3>
+                    <p className="text-gray-500 mb-6">Belum ada cabaran yang dicipta. Mulakan dengan menambah cabaran pertama!</p>
+                    <button
+                      onClick={() => setShowAddChallengeModal(true)}
+                      className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300"
+                    >
+                      Tambah Cabaran Pertama
+                    </button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-700/50">
+                    {challenges.map((challenge) => (
+                      <div key={challenge.id} className="p-6 hover:bg-electric-blue/5 transition-all duration-300">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-2xl">{getChallengeTypeIcon(challenge.type)}</span>
+                              <h3 className="text-lg font-bold text-white">{challenge.title}</h3>
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                challenge.is_active 
+                                  ? 'bg-neon-green/20 text-neon-green border border-neon-green/30'
+                                  : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                              }`}>
+                                {challenge.is_active ? 'Aktif' : 'Tidak Aktif'}
+                              </span>
+                            </div>
+                            <p className="text-gray-300 text-sm mb-3">{challenge.description}</p>
+                            <div className="flex flex-wrap gap-4 text-sm text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <span>📚</span>
+                                <span>{challenge.subject}</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span>🎓</span>
+                                <span>Tingkatan {challenge.tingkatan}</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span>⭐</span>
+                                <span>{challenge.xp_reward} XP</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span>🏷️</span>
+                                <span>{getChallengeTypeName(challenge.type)}</span>
+                              </span>
+                              {challenge.due_date && (
+                                <span className="flex items-center gap-1">
+                                  <span>📅</span>
+                                  <span>{new Date(challenge.due_date).toLocaleDateString('ms-MY')}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleChallengeStatus(challenge.id, challenge.is_active)}
+                              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+                                challenge.is_active
+                                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
+                                  : 'bg-neon-green/20 text-neon-green hover:bg-neon-green/30 border border-neon-green/30'
+                              }`}
+                            >
+                              {challenge.is_active ? 'Nyahaktif' : 'Aktifkan'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteChallenge(challenge.id)}
+                              className="px-4 py-2 rounded-lg font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all duration-300"
+                            >
+                              Padam
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'xp-logs' && (
             <div className="glass-dark rounded-2xl overflow-hidden">
               <div className="p-6 border-b border-gray-700/50">
@@ -349,18 +630,24 @@ export default function DashboardAdmin() {
                     {xpLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-electric-blue/5 transition-all duration-300">
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-100">{log.profiles?.name || 'Unknown'}</div>
-                          <div className="text-sm text-gray-400">{log.profiles?.email}</div>
+                          <div className="font-medium text-gray-100">{log.profiles?.name || 'Pengguna Tidak Diketahui'}</div>
+                          <div className="text-gray-400 text-sm">{log.profiles?.email}</div>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="text-gray-300 max-w-xs">{log.aktiviti}</div>
+                          <div className="text-gray-300">{log.aktiviti}</div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="font-bold text-neon-green">+{log.mata}</div>
+                          <span className="font-bold text-electric-blue">+{log.mata}</span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="text-gray-300 text-sm">
-                            {new Date(log.created_at).toLocaleDateString('ms-MY')}
+                          <div className="text-gray-400 text-sm">
+                            {new Date(log.created_at).toLocaleDateString('ms-MY', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
                         </td>
                       </tr>
@@ -372,108 +659,272 @@ export default function DashboardAdmin() {
           )}
 
           {activeTab === 'rewards' && (
-            <div className="space-y-8">
-              {/* Add New Reward Form */}
-              <div className="glass-dark rounded-2xl p-8 card-hover">
-                <h2 className="text-2xl font-bold text-primary mb-6 flex items-center">
-                  <span className="mr-3">➕</span>
-                  Tambah Ganjaran Baru
-                </h2>
-                <form onSubmit={handleAddGanjaran} className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              {/* Add Reward Form */}
+              <div className="glass-dark rounded-2xl p-6">
+                <h3 className="text-xl font-bold text-white mb-6">Tambah Ganjaran Baru</h3>
+                <form onSubmit={handleAddGanjaran} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Ganjaran</label>
+                    <label className="block text-gray-300 text-sm font-medium mb-2">
+                      Nama Ganjaran
+                    </label>
                     <input
                       type="text"
-                      required
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
                       value={newGanjaran.nama}
-                      onChange={(e) => setNewGanjaran(prev => ({ ...prev, nama: e.target.value }))}
-                      placeholder="Contoh: Lencana Pemula"
+                      onChange={(e) => setNewGanjaran({...newGanjaran, nama: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                      placeholder="Contoh: Badge Pemula"
+                      required
                     />
                   </div>
+                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Syarat XP</label>
+                    <label className="block text-gray-300 text-sm font-medium mb-2">
+                      Syarat XP
+                    </label>
                     <input
                       type="number"
-                      required
-                      min="0"
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
                       value={newGanjaran.syarat_xp}
-                      onChange={(e) => setNewGanjaran(prev => ({ ...prev, syarat_xp: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => setNewGanjaran({...newGanjaran, syarat_xp: parseInt(e.target.value)})}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
                       placeholder="100"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Deskripsi</label>
-                    <textarea
                       required
-                      rows={3}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
-                      value={newGanjaran.deskripsi}
-                      onChange={(e) => setNewGanjaran(prev => ({ ...prev, deskripsi: e.target.value }))}
-                      placeholder="Deskripsi ganjaran..."
                     />
                   </div>
+                  
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">URL Imej (Opsional)</label>
+                    <label className="block text-gray-300 text-sm font-medium mb-2">
+                      Deskripsi
+                    </label>
+                    <textarea
+                      value={newGanjaran.deskripsi}
+                      onChange={(e) => setNewGanjaran({...newGanjaran, deskripsi: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                      placeholder="Deskripsi ganjaran..."
+                      rows={3}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-300 text-sm font-medium mb-2">
+                      URL Imej
+                    </label>
                     <input
                       type="url"
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
                       value={newGanjaran.imej_url}
-                      onChange={(e) => setNewGanjaran(prev => ({ ...prev, imej_url: e.target.value }))}
-                      placeholder="https://example.com/image.jpg"
+                      onChange={(e) => setNewGanjaran({...newGanjaran, imej_url: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                      placeholder="https://example.com/badge.png"
                     />
                   </div>
+                  
                   <div className="md:col-span-2">
-                    <button type="submit" className="btn-primary">
-                      ➕ Tambah Ganjaran
+                    <button
+                      type="submit"
+                      className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300"
+                    >
+                      Tambah Ganjaran
                     </button>
                   </div>
                 </form>
               </div>
 
-              {/* Existing Rewards */}
-              <div className="glass-dark rounded-2xl p-8 card-hover">
-                <h2 className="text-2xl font-bold text-primary mb-6 flex items-center">
-                  <span className="mr-3">🎁</span>
-                  Ganjaran Sedia Ada
-                </h2>
-                {ganjaran.length > 0 ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {ganjaran.map((reward) => (
-                      <div key={reward.id} className="glass rounded-xl p-6 border border-electric-blue/30 card-hover">
-                        <div className="flex justify-between items-start mb-4">
-                          <h3 className="text-lg font-semibold text-primary">{reward.nama}</h3>
-                          <button
-                            onClick={() => handleDeleteGanjaran(reward.id)}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                          >
-                            🗑️
-                          </button>
+              {/* Rewards List */}
+              <div className="glass-dark rounded-2xl overflow-hidden">
+                <div className="p-6 border-b border-gray-700/50">
+                  <h2 className="text-2xl font-bold text-primary flex items-center">
+                    <span className="mr-3">🎁</span>
+                    Senarai Ganjaran
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                  {ganjaran.map((reward) => (
+                    <div key={reward.id} className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50 hover:border-electric-blue/50 transition-all duration-300">
+                      {reward.imej_url && (
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-gradient-to-br from-electric-blue/20 to-neon-cyan/20 flex items-center justify-center">
+                          <img src={reward.imej_url} alt={reward.nama} className="w-full h-full object-cover" />
                         </div>
-                        <p className="text-gray-300 text-sm mb-4">{reward.deskripsi}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-electric-blue bg-electric-blue/20 px-2 py-1 rounded border border-electric-blue/30">
-                            {reward.syarat_xp} XP
-                          </span>
-                          {reward.imej_url && (
-                            <span className="text-xs text-neon-green">🖼️ Ada Imej</span>
-                          )}
-                        </div>
+                      )}
+                      <h3 className="text-lg font-bold text-white text-center mb-2">{reward.nama}</h3>
+                      <p className="text-gray-300 text-sm text-center mb-4">{reward.deskripsi}</p>
+                      <div className="text-center mb-4">
+                        <span className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-3 py-1 rounded-full text-sm font-medium">
+                          {reward.syarat_xp} XP
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-400 py-8">
-                    <div className="text-4xl mb-4">🎁</div>
-                    <div>Tiada ganjaran tersedia. Tambah ganjaran pertama!</div>
-                  </div>
-                )}
+                      <button
+                        onClick={() => handleDeleteGanjaran(reward.id)}
+                        className="w-full bg-red-500/20 text-red-400 px-4 py-2 rounded-lg font-medium hover:bg-red-500/30 border border-red-500/30 transition-all duration-300"
+                      >
+                        Padam
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Add Challenge Modal */}
+      {showAddChallengeModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="glass-dark rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-white">Tambah Cabaran Baru</h3>
+              <button
+                onClick={() => setShowAddChallengeModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddChallenge} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Tajuk Cabaran
+                  </label>
+                  <input
+                    type="text"
+                    value={newChallenge.title}
+                    onChange={(e) => setNewChallenge({...newChallenge, title: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                    placeholder="Contoh: Kuiz Asas Python"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Jenis Cabaran
+                  </label>
+                  <select
+                    value={newChallenge.type}
+                    onChange={(e) => setNewChallenge({...newChallenge, type: e.target.value as any})}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-electric-blue transition-colors"
+                    required
+                  >
+                    <option value="quiz">📝 Kuiz</option>
+                    <option value="video">🎥 Video</option>
+                    <option value="reading">📖 Bacaan</option>
+                    <option value="upload">📤 Muat Naik</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Subjek
+                  </label>
+                  <input
+                    type="text"
+                    value={newChallenge.subject}
+                    onChange={(e) => setNewChallenge({...newChallenge, subject: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                    placeholder="Contoh: Sains Komputer"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Tingkatan
+                  </label>
+                  <select
+                    value={newChallenge.tingkatan}
+                    onChange={(e) => setNewChallenge({...newChallenge, tingkatan: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-electric-blue transition-colors"
+                    required
+                  >
+                    <option value="">Pilih Tingkatan</option>
+                    <option value="1">Tingkatan 1</option>
+                    <option value="2">Tingkatan 2</option>
+                    <option value="3">Tingkatan 3</option>
+                    <option value="4">Tingkatan 4</option>
+                    <option value="5">Tingkatan 5</option>
+                    <option value="6">Tingkatan 6</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Ganjaran XP
+                  </label>
+                  <input
+                    type="number"
+                    value={newChallenge.xp_reward}
+                    onChange={(e) => setNewChallenge({...newChallenge, xp_reward: parseInt(e.target.value)})}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                    placeholder="50"
+                    min="1"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">
+                    Tarikh Tamat (Opsional)
+                  </label>
+                  <input
+                    type="date"
+                    value={newChallenge.due_date}
+                    onChange={(e) => setNewChallenge({...newChallenge, due_date: e.target.value})}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-electric-blue transition-colors"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">
+                  Deskripsi
+                </label>
+                <textarea
+                  value={newChallenge.description}
+                  onChange={(e) => setNewChallenge({...newChallenge, description: e.target.value})}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors"
+                  placeholder="Deskripsi cabaran..."
+                  rows={4}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-2">
+                  Jenis Penilaian
+                </label>
+                <select
+                  value={newChallenge.evaluation_type}
+                  onChange={(e) => setNewChallenge({...newChallenge, evaluation_type: e.target.value as any})}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-electric-blue transition-colors"
+                  required
+                >
+                  <option value="automatic">Automatik</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </div>
+              
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddChallengeModal(false)}
+                  className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-700 transition-all duration-300"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-electric-blue/25 transition-all duration-300"
+                >
+                  Tambah Cabaran
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
