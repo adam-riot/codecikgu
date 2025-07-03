@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/utils/supabase'
-import { FaTimes, FaSearch, FaTrash, FaEdit, FaCalendar, FaCode, FaFileAlt, FaDownload, FaStar } from 'react-icons/fa'
+import { FaTimes, FaSearch, FaTrash, FaEdit, FaCalendar, FaCode, FaFileAlt, FaStar } from 'react-icons/fa'
 
 interface Project {
   id: string

@@ -1,10 +1,10 @@
-
 "use client"
 
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 export default function Navbar() {
   const router = useRouter()
@@ -43,18 +43,15 @@ export default function Navbar() {
     <nav className="bg-gradient-to-r from-dark-black via-gray-900 to-dark-black backdrop-blur-lg border-b border-electric-blue/20 sticky top-0 z-50 shadow-lg shadow-electric-blue/10">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-         {/* Logo */}
-<Link href="/" className="flex items-center space-x-2 group">
-  <div className="w-8 h-8 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
-    <img src="/favicon.svg" alt="CodeCikgu Logo" className="w-8 h-8 rounded-lg" />
-  </div>
-  <span className="text-2xl font-bold bg-gradient-to-r from-electric-blue to-neon-cyan bg-clip-text text-transparent">
-    CodeCikgu
-  </span>
-</Link>
+          <Link href="/" className="flex items-center space-x-2 group">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
+              <Image src="/favicon.svg" alt="CodeCikgu Logo" width={32} height={32} className="w-8 h-8 rounded-lg" />
+            </div>
+            <span className="text-2xl font-bold bg-gradient-to-r from-electric-blue to-neon-cyan bg-clip-text text-transparent">
+              CodeCikgu
+            </span>
+          </Link>
           
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <Link href="/" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group">
               <span>Laman Utama</span>
@@ -70,49 +67,37 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* User Actions */}
           <div className="hidden md:flex items-center space-x-4">
             {!loading && user ? (
               <>
-                  {user.user_metadata?.role === 'murid' && (
-                  <Link href="/dashboard-murid" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-electric-blue/25">
+                {user.user_metadata?.role === 'murid' && (
+                  <Link href="/dashboard-murid" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300">
                     Dashboard Murid
                   </Link>
                 )}
                 {user.user_metadata?.role === 'awam' && (
-                  <Link href="/dashboard-awam" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-electric-blue/25">
+                  <Link href="/dashboard-awam" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300">
                     Dashboard Awam
                   </Link>
                 )}
                 {user.user_metadata?.role === 'admin' && (
-                  <Link href="/dashboard-admin" className="px-4 py-2 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-neon-green/25">
+                  <Link href="/dashboard-admin" className="px-4 py-2 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300">
                     Dashboard Admin
                   </Link>
                 )}
-                <button 
-                  onClick={handleSignOut} 
-                  className="px-4 py-2 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25"
-                >
+                <button onClick={handleSignOut} className="px-4 py-2 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300">
                   Log Keluar
                 </button>
               </>
             ) : (
               <>
-                <Link href="/daftar" className="text-gray-300 hover:text-electric-blue transition-all duration-300">
-                  Daftar
-                </Link>
-                <Link href="/login" className="px-4 py-2 bg-gradient-to-r from-electric-blue to-neon-cyan text-dark-black font-semibold rounded-lg hover:shadow-lg hover:shadow-electric-blue/50 transition-all duration-300 transform hover:scale-105">
-                  Log Masuk
-                </Link>
+                <Link href="/daftar" className="text-gray-300 hover:text-electric-blue transition-all duration-300">Daftar</Link>
+                <Link href="/login" className="px-4 py-2 bg-gradient-to-r from-electric-blue to-neon-cyan text-dark-black font-semibold rounded-lg hover:shadow-lg hover:shadow-electric-blue/50 transition-all duration-300">Log Masuk</Link>
               </>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-gray-300 hover:text-electric-blue transition-colors duration-300"
-          >
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-gray-300 hover:text-electric-blue">
             <div className="w-6 h-6 flex flex-col justify-center items-center">
               <span className={`bg-current block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${mobileMenuOpen ? 'rotate-45 translate-y-1' : '-translate-y-0.5'}`}></span>
               <span className={`bg-current block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm my-0.5 ${mobileMenuOpen ? 'opacity-0' : 'opacity-100'}`}></span>
@@ -121,51 +106,23 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         <div className={`md:hidden transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
           <div className="py-4 space-y-4 border-t border-electric-blue/20">
-            <Link href="/" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Laman Utama
-            </Link>
-            <Link href="/about" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Tentang Kami
-            </Link>
-            <Link href="/leaderboard" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Leaderboard
-            </Link>
-            
+            <Link href="/" className="block text-gray-300 hover:text-electric-blue py-2">Laman Utama</Link>
+            <Link href="/about" className="block text-gray-300 hover:text-electric-blue py-2">Tentang Kami</Link>
+            <Link href="/leaderboard" className="block text-gray-300 hover:text-electric-blue py-2">Leaderboard</Link>
             {!loading && user ? (
               <>
-                {user.user_metadata?.role === 'murid' && (
-                  <Link href="/dashboard-murid" className="block text-electric-blue py-2">
-                    Dashboard Murid
-                  </Link>
-                )}
-                {user.user_metadata?.role === 'awam' && (
-                  <Link href="/dashboard-awam" className="block text-electric-blue py-2">
-                    Dashboard Awam
-                  </Link>
-                )}
-                {user.user_metadata?.role === 'admin' && (
-                  <Link href="/dashboard-admin" className="block text-neon-green py-2">
-                    Dashboard Admin
-                  </Link>
-                )}
-                <button 
-                  onClick={handleSignOut} 
-                  className="block text-red-400 py-2 w-full text-left"
-                >
-                  Log Keluar
-                </button>
+                {user.user_metadata?.role === 'murid' && <Link href="/dashboard-murid" className="block text-electric-blue py-2">Dashboard Murid</Link>}
+                {/* --- INI ADALAH PEMBETULANNYA --- */}
+                {user.user_metadata?.role === 'awam' && <Link href="/dashboard-awam" className="block text-electric-blue py-2">Dashboard Awam</Link>}
+                {user.user_metadata?.role === 'admin' && <Link href="/dashboard-admin" className="block text-neon-green py-2">Dashboard Admin</Link>}
+                <button onClick={handleSignOut} className="block text-red-400 py-2 w-full text-left">Log Keluar</button>
               </>
             ) : (
               <>
-                <Link href="/daftar" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-                  Daftar
-                </Link>
-                <Link href="/login" className="block text-electric-blue py-2">
-                  Log Masuk
-                </Link>
+                <Link href="/daftar" className="block text-gray-300 hover:text-electric-blue py-2">Daftar</Link>
+                <Link href="/login" className="block text-electric-blue py-2">Log Masuk</Link>
               </>
             )}
           </div>
@@ -174,6 +131,3 @@ export default function Navbar() {
     </nav>
   )
 }
-
-
-
