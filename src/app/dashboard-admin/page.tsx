@@ -1,340 +1,402 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
-import { useRouter } from 'next/navigation'
+import Navbar from '@/components/Navbar'
+import Link from 'next/link'
+import { FaPlus, FaChalkboardTeacher, FaUsers, FaTrophy, FaCode } from 'react-icons/fa'
 import CreateChallenge from '@/components/CreateChallenge'
-import Image from 'next/image'
-import { Profile, XPLog, Ganjaran, Challenge } from '@/types' // Import dari types/index.ts
+
+interface Challenge {
+  id: string
+  title: string
+  description: string
+  type: 'quiz' | 'video' | 'reading' | 'upload'
+  subject: string
+  tingkatan: string
+  xp_reward: number
+  created_at: string
+  challenge_submissions?: { count: number }[]
+}
+
+interface User {
+  id: string
+  name: string
+  email: string
+  tingkatan: string
+  total_xp: number
+}
 
 export default function DashboardAdmin() {
-  const router = useRouter()
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [xpLogs, setXpLogs] = useState<XPLog[]>([])
-  const [ganjaran, setGanjaran] = useState<Ganjaran[]>([])
   const [challenges, setChallenges] = useState<Challenge[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('users')
-  const [showAddChallengeModal, setShowAddChallengeModal] = useState(false)
-  const [showCreateChallengeWizard, setShowCreateChallengeWizard] = useState(false)
-  
-  const [newGanjaran, setNewGanjaran] = useState({
-    nama: '',
-    deskripsi: '',
-    syarat_xp: 0,
-    imej_url: ''
-  })
-
-  const [newChallenge, setNewChallenge] = useState({
-    title: '',
-    description: '',
-    type: 'quiz' as 'quiz' | 'video' | 'reading' | 'upload',
-    subject: '',
-    tingkatan: '',
-    xp_reward: 0,
-    due_date: '',
-    evaluation_type: 'automatic' as 'automatic' | 'manual',
-    content: {}
-  })
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || user.email !== 'adamsofi@codecikgu.com') {
-        router.push('/login');
-        return;
-      }
-
-      const { data: profilesData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-      if (profilesData) setProfiles(profilesData);
-
-      const { data: xpLogsData } = await supabase.from('xp_log').select('*, profiles(name, email)').order('created_at', { ascending: false }).limit(50);
-      if (xpLogsData) setXpLogs(xpLogsData as XPLog[]);
-
-      const { data: ganjaranData } = await supabase.from('ganjaran').select('*').order('syarat_xp', { ascending: true });
-      if (ganjaranData) setGanjaran(ganjaranData);
-
-      const { data: challengesData } = await supabase.from('challenges').select('*, challenge_submissions(count)').order('created_at', { ascending: false });
-      if (challengesData) setChallenges(challengesData as Challenge[]);
-
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+  const [users, setUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [activeTab, setActiveTab] = useState('challenges')
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleAddGanjaran = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await supabase.from('ganjaran').insert([newGanjaran]);
-      setNewGanjaran({ nama: '', deskripsi: '', syarat_xp: 0, imej_url: '' });
-      fetchData();
-    } catch (error) {
-      console.error('Error adding ganjaran:', error);
-    }
-  };
-
-  const handleAddChallenge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await supabase.from('challenges').insert([{ ...newChallenge, is_active: true }]);
-      setNewChallenge({ title: '', description: '', type: 'quiz', subject: '', tingkatan: '', xp_reward: 0, due_date: '', evaluation_type: 'automatic', content: {} });
-      setShowAddChallengeModal(false);
-      fetchData();
-    } catch (error) {
-      console.error('Error adding challenge:', error);
-    }
-  };
-
-  const handleDeleteGanjaran = async (id: string) => {
-    if (confirm('Adakah anda pasti ingin memadam ganjaran ini?')) {
+    const fetchData = async () => {
       try {
-        await supabase.from('ganjaran').delete().eq('id', id);
-        fetchData();
+        // Fetch challenges with submission count
+        const { data: challengesData, error: challengesError } = await supabase
+          .from('challenges')
+          .select(`
+            *,
+            challenge_submissions:challenge_submissions(count)
+          `)
+          .order('created_at', { ascending: false })
+        
+        if (challengesError) throw challengesError
+        setChallenges(challengesData || [])
+        
+        // Fetch users
+        const { data: usersData, error: usersError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('total_xp', { ascending: false })
+          .limit(10)
+        
+        if (usersError) throw usersError
+        setUsers(usersData || [])
       } catch (error) {
-        console.error('Error deleting ganjaran:', error);
+        console.error('Error fetching data:', error)
+      } finally {
+        setIsLoading(false)
       }
     }
-  };
+    
+    fetchData()
+  }, [])
 
-  const handleToggleChallengeStatus = async (id: string, currentStatus: boolean) => {
-    try {
-      await supabase.from('challenges').update({ is_active: !currentStatus }).eq('id', id);
-      fetchData();
-    } catch (error) {
-      console.error('Error updating challenge status:', error);
+  const handleChallengeCreated = async () => {
+    setShowCreateModal(false)
+    
+    // Refresh challenges
+    const { data, error } = await supabase
+      .from('challenges')
+      .select(`
+        *,
+        challenge_submissions:challenge_submissions(count)
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (!error && data) {
+      setChallenges(data)
     }
-  };
-
-  const handleDeleteChallenge = async (id: string) => {
-    if (confirm('Adakah anda pasti ingin memadam cabaran ini?')) {
-      try {
-        await supabase.from('challenges').delete().eq('id', id);
-        fetchData();
-      } catch (error) {
-        console.error('Error deleting challenge:', error);
-      }
-    }
-  };
-
-  const getStats = useCallback(() => ({
-    totalUsers: profiles.length,
-    totalStudents: profiles.filter(p => p.role === 'murid').length,
-    totalPublic: profiles.filter(p => p.role === 'awam').length,
-    totalXP: profiles.reduce((sum, p) => sum + (p.xp || 0), 0),
-    totalChallenges: challenges.length,
-    activeChallenges: challenges.filter(c => c.is_active).length,
-  }), [profiles, challenges]);
-
-  const getChallengeTypeIcon = useCallback((type: string) => {
-    const icons: { [key: string]: string } = { quiz: '📝', video: '🎥', reading: '📖', upload: '📤' };
-    return icons[type] || '🏆';
-  }, []);
-
-  const getChallengeTypeName = useCallback((type: string) => {
-    const names: { [key: string]: string } = { quiz: 'Kuiz', video: 'Video', reading: 'Bacaan', upload: 'Muat Naik' };
-    return names[type] || 'Cabaran';
-  }, []);
-
-  const getChallengeStats = useCallback(() => ({
-    quizCount: challenges.filter(c => c.type === 'quiz').length,
-    videoCount: challenges.filter(c => c.type === 'video').length,
-    readingCount: challenges.filter(c => c.type === 'reading').length,
-    uploadCount: challenges.filter(c => c.type === 'upload').length,
-    totalSubmissions: challenges.reduce((sum, c) => sum + (c.challenge_submissions?.[0]?.count || 0), 0),
-  }), [challenges]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="text-white text-2xl">Memuatkan Dashboard Admin...</div>
-      </div>
-    );
   }
 
-  const stats = getStats();
-  const challengeStats = getChallengeStats();
+  const getChallengeIcon = (type: string) => {
+    switch (type) {
+      case 'quiz':
+        return '📝'
+      case 'video':
+        return '🎬'
+      case 'reading':
+        return '📚'
+      case 'upload':
+        return '📤'
+      default:
+        return '📋'
+    }
+  }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black text-white">
-      <div className="container mx-auto p-4">
-        <h1 className="text-4xl font-bold mb-8 text-center">Dashboard Admin</h1>
-        
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-800/50 p-6 rounded-lg">Total Pengguna: {stats.totalUsers}</div>
-          <div className="bg-gray-800/50 p-6 rounded-lg">Murid: {stats.totalStudents}</div>
-          <div className="bg-gray-800/50 p-6 rounded-lg">Pengguna Awam: {stats.totalPublic}</div>
-          <div className="bg-gray-800/50 p-6 rounded-lg">Total XP: {stats.totalXP}</div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex space-x-4 mb-8">
-          <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded ${activeTab === 'users' ? 'bg-blue-600' : 'bg-gray-700'}`}>Pengguna</button>
-          <button onClick={() => setActiveTab('challenges')} className={`px-4 py-2 rounded ${activeTab === 'challenges' ? 'bg-blue-600' : 'bg-gray-700'}`}>Cabaran</button>
-          <button onClick={() => setActiveTab('xp-logs')} className={`px-4 py-2 rounded ${activeTab === 'xp-logs' ? 'bg-blue-600' : 'bg-gray-700'}`}>Log XP</button>
-          <button onClick={() => setActiveTab('rewards')} className={`px-4 py-2 rounded ${activeTab === 'rewards' ? 'bg-blue-600' : 'bg-gray-700'}`}>Ganjaran</button>
-        </div>
-
-        {/* Tab Content */}
-        <div>
-          {activeTab === 'users' && (
-            <div className="bg-gray-800/50 p-6 rounded-lg">
-              <h2 className="text-2xl font-bold mb-4">Senarai Pengguna</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left">Nama</th>
-                      <th className="p-2 text-left">Email</th>
-                      <th className="p-2 text-left">Role</th>
-                      <th className="p-2 text-left">XP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {profiles.map(profile => (
-                      <tr key={profile.id}>
-                        <td className="p-2">{profile.name}</td>
-                        <td className="p-2">{profile.email}</td>
-                        <td className="p-2">{profile.role}</td>
-                        <td className="p-2">{profile.xp}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'challenges' && (
-            <div className="bg-gray-800/50 p-6 rounded-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">Senarai Cabaran</h2>
-                <div>
-                  <button onClick={() => setShowCreateChallengeWizard(true)} className="bg-green-600 px-4 py-2 rounded mr-2">Tambah (Wizard)</button>
-                  <button onClick={() => setShowAddChallengeModal(true)} className="bg-blue-500 px-4 py-2 rounded">Tambah Pantas</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <p>Kuiz: {challengeStats.quizCount}</p>
-                  <p>Video: {challengeStats.videoCount}</p>
-                  <p>Bacaan: {challengeStats.readingCount}</p>
-                  <p>Upload: {challengeStats.uploadCount}</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left">Ikon</th>
-                      <th className="p-2 text-left">Tajuk</th>
-                      <th className="p-2 text-left">Jenis</th>
-                      <th className="p-2 text-left">Status</th>
-                      <th className="p-2 text-left">Tindakan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {challenges.map(challenge => (
-                      <tr key={challenge.id}>
-                        <td className="p-2">{getChallengeTypeIcon(challenge.type)}</td>
-                        <td className="p-2">{challenge.title}</td>
-                        <td className="p-2">{getChallengeTypeName(challenge.type)}</td>
-                        <td className="p-2">{challenge.is_active ? 'Aktif' : 'Tidak Aktif'}</td>
-                        <td className="p-2">
-                          <button onClick={() => handleToggleChallengeStatus(challenge.id, challenge.is_active)} className="bg-yellow-600 px-2 py-1 rounded mr-2">Toggle</button>
-                          <button onClick={() => handleDeleteChallenge(challenge.id)} className="bg-red-600 px-2 py-1 rounded">Padam</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'xp-logs' && (
-            <div className="bg-gray-800/50 p-6 rounded-lg">
-              <h2 className="text-2xl font-bold mb-4">Log XP</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left">Pengguna</th>
-                      <th className="p-2 text-left">Aktiviti</th>
-                      <th className="p-2 text-left">Mata</th>
-                      <th className="p-2 text-left">Tarikh</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {xpLogs.map(log => (
-                      <tr key={log.id}>
-                        <td className="p-2">{log.profiles?.name}</td>
-                        <td className="p-2">{log.aktiviti}</td>
-                        <td className="p-2">{log.mata}</td>
-                        <td className="p-2">{new Date(log.created_at).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'rewards' && (
-            <div className="bg-gray-800/50 p-6 rounded-lg">
-              <h2 className="text-2xl font-bold mb-4">Ganjaran</h2>
-              <form onSubmit={handleAddGanjaran} className="mb-8 space-y-4">
-                <input type="text" placeholder="Nama Ganjaran" value={newGanjaran.nama} onChange={e => setNewGanjaran({...newGanjaran, nama: e.target.value})} className="w-full p-2 bg-gray-700 rounded" />
-                <input type="number" placeholder="Syarat XP" value={newGanjaran.syarat_xp} onChange={e => setNewGanjaran({...newGanjaran, syarat_xp: parseInt(e.target.value)})} className="w-full p-2 bg-gray-700 rounded" />
-                <input type="text" placeholder="URL Imej" value={newGanjaran.imej_url} onChange={e => setNewGanjaran({...newGanjaran, imej_url: e.target.value})} className="w-full p-2 bg-gray-700 rounded" />
-                <textarea placeholder="Deskripsi" value={newGanjaran.deskripsi} onChange={e => setNewGanjaran({...newGanjaran, deskripsi: e.target.value})} className="w-full p-2 bg-gray-700 rounded"></textarea>
-                <button type="submit" className="bg-blue-600 px-4 py-2 rounded">Tambah Ganjaran</button>
-              </form>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {ganjaran.map(item => (
-                  <div key={item.id} className="bg-gray-700 p-4 rounded">
-                    <Image src={item.imej_url} alt={item.nama} width={100} height={100} />
-                    <h3 className="font-bold">{item.nama}</h3>
-                    <p>{item.deskripsi}</p>
-                    <p>Syarat: {item.syarat_xp} XP</p>
-                    <button onClick={() => handleDeleteGanjaran(item.id)} className="bg-red-600 px-2 py-1 rounded mt-2">Padam</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+        <Navbar userRole="admin" />
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       </div>
+    )
+  }
 
-      {/* Modal Section */}
-      {showAddChallengeModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-900 p-8 rounded-lg w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">Tambah Cabaran Pantas</h2>
-            <form onSubmit={handleAddChallenge} className="space-y-4">
-              <input type="text" placeholder="Tajuk" value={newChallenge.title} onChange={e => setNewChallenge({...newChallenge, title: e.target.value})} className="w-full p-2 bg-gray-800 rounded" />
-              <textarea placeholder="Deskripsi" value={newChallenge.description} onChange={e => setNewChallenge({...newChallenge, description: e.target.value})} className="w-full p-2 bg-gray-800 rounded"></textarea>
-              <button type="submit" className="bg-blue-600 px-4 py-2 rounded">Tambah</button>
-              <button type="button" onClick={() => setShowAddChallengeModal(false)} className="bg-gray-600 px-4 py-2 rounded ml-2">Batal</button>
-            </form>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+      <Navbar userRole="admin" />
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-white">Dashboard Admin</h1>
+          <div className="flex space-x-4">
+            <Link 
+              href="/playground"
+              className="bg-gradient-to-r from-neon-green to-electric-blue hover:from-neon-green/80 hover:to-electric-blue/80 text-white px-4 py-2 rounded-lg flex items-center transition-all duration-300"
+            >
+              <FaCode className="mr-2" /> Playground
+            </Link>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+            >
+              <FaPlus className="mr-2" /> Cipta Cabaran
+            </button>
+          </div>
+        </div>
+        
+        {/* Quick Access Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Link href="/playground" className="glass-dark rounded-xl p-6 hover:bg-gray-800 transition group">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <FaCode className="h-8 w-8 text-neon-green" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white mb-1">🚀 CodeCikgu Playground</h3>
+                <p className="text-gray-400">Akses editor kod untuk menguji dan menulis kod dalam pelbagai bahasa</p>
+                <p className="text-sm text-electric-blue mt-2">Klik untuk membuka playground →</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link href="/leaderboard" className="glass-dark rounded-xl p-6 hover:bg-gray-800 transition group">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                <FaTrophy className="h-8 w-8 text-electric-blue" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white mb-1">🏆 Leaderboard</h3>
+                <p className="text-gray-400">Pantau prestasi pelajar dan ranking XP</p>
+                <p className="text-sm text-electric-blue mt-2">Lihat ranking →</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="glass-dark rounded-xl p-6">
+            <div className="flex items-center mb-2">
+              <div className="bg-blue-900/30 p-3 rounded-lg mr-4">
+                <FaChalkboardTeacher className="h-6 w-6 text-blue-400" />
+              </div>
+              <h3 className="text-white font-medium">Cabaran</h3>
+            </div>
+            <p className="text-3xl font-bold text-white">{challenges.length}</p>
+          </div>
+          
+          <div className="glass-dark rounded-xl p-6">
+            <div className="flex items-center mb-2">
+              <div className="bg-green-900/30 p-3 rounded-lg mr-4">
+                <FaUsers className="h-6 w-6 text-green-400" />
+              </div>
+              <h3 className="text-white font-medium">Pelajar</h3>
+            </div>
+            <p className="text-3xl font-bold text-white">{users.length}</p>
+          </div>
+          
+          <div className="glass-dark rounded-xl p-6">
+            <div className="flex items-center mb-2">
+              <div className="bg-purple-900/30 p-3 rounded-lg mr-4">
+                <FaCode className="h-6 w-6 text-purple-400" />
+              </div>
+              <h3 className="text-white font-medium">Playground</h3>
+            </div>
+            <Link href="/playground" className="text-blue-400 hover:underline text-sm">
+              Lihat Playground
+            </Link>
+          </div>
+          
+          <div className="glass-dark rounded-xl p-6">
+            <div className="flex items-center mb-2">
+              <div className="bg-yellow-900/30 p-3 rounded-lg mr-4">
+                <FaTrophy className="h-6 w-6 text-yellow-400" />
+              </div>
+              <h3 className="text-white font-medium">Leaderboard</h3>
+            </div>
+            <Link href="/leaderboard" className="text-blue-400 hover:underline text-sm">
+              Lihat Leaderboard
+            </Link>
+          </div>
+        </div>
+        
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="border-b border-gray-800">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('challenges')}
+                className={`${
+                  activeTab === 'challenges'
+                    ? 'border-electric-blue text-electric-blue'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+              >
+                Cabaran
+              </button>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`${
+                  activeTab === 'users'
+                    ? 'border-electric-blue text-electric-blue'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+              >
+                Pelajar
+              </button>
+              <button
+                onClick={() => setActiveTab('submissions')}
+                className={`${
+                  activeTab === 'submissions'
+                    ? 'border-electric-blue text-electric-blue'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+              >
+                Penyerahan
+              </button>
+            </nav>
+          </div>
+        </div>
+        
+        {/* Tab content */}
+        {activeTab === 'challenges' && (
+          <div className="glass-dark rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-800">
+                <thead className="bg-gray-800/50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Cabaran
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Subjek
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Tingkatan
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      XP
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Penyerahan
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Tindakan
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {challenges.map((challenge) => (
+                    <tr key={challenge.id} className="hover:bg-gray-800/50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 text-2xl mr-3">{getChallengeIcon(challenge.type)}</div>
+                          <div>
+                            <div className="text-sm font-medium text-white">{challenge.title}</div>
+                            <div className="text-sm text-gray-400">{challenge.type}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {challenge.subject}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {challenge.tingkatan}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {challenge.xp_reward}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {challenge.challenge_submissions?.[0]?.count || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <Link href={`/challenges/${challenge.id}`} className="text-blue-400 hover:text-blue-300 mr-3">
+                          Lihat
+                        </Link>
+                        <button className="text-red-400 hover:text-red-300">
+                          Padam
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'users' && (
+          <div className="glass-dark rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-800">
+                <thead className="bg-gray-800/50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Pelajar
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Tingkatan
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      XP
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Tindakan
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {users.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-800/50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-white">{user.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {user.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {user.tingkatan}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {user.total_xp || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button className="text-blue-400 hover:text-blue-300 mr-3">
+                          Lihat
+                        </button>
+                        <button className="text-red-400 hover:text-red-300">
+                          Padam
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'submissions' && (
+          <div className="glass-dark rounded-xl p-6 text-center">
+            <p className="text-gray-400">Tiada penyerahan untuk disemak.</p>
+          </div>
+        )}
+      </main>
+      
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-white">Wizard Cipta Cabaran</h2>
+              <button 
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6">
+              <CreateChallenge 
+                onClose={() => setShowCreateModal(false)} 
+                onChallengeCreated={handleChallengeCreated} 
+              />
+            </div>
           </div>
         </div>
       )}
-
-      {showCreateChallengeWizard && (
-        <CreateChallenge 
-          onClose={() => setShowCreateChallengeWizard(false)} 
-          onChallengeCreated={() => {
-            setShowCreateChallengeWizard(false);
-            fetchData();
-          }}
-        />
-      )}
     </div>
-  );
+  )
 }
+

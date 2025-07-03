@@ -3,310 +3,400 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { BookOpen, Video, FileText, Upload, Trophy, Star, Clock, CheckCircle, Code } from 'lucide-react'
 import Link from 'next/link'
 
-// --- Interfaces ---
-interface Profile {
-  id: string; name: string; email: string; sekolah: string; tingkatan: string; xp: number;
-}
-interface Progress {
-  id: string; topik: string; selesai: boolean;
-}
-interface Ganjaran {
-  id: string; nama: string; deskripsi: string; syarat_xp: number; imej_url: string;
-}
-
-// Define more specific types for challenge content and pass criteria
-interface QuizQuestion {
-  id: string;
-  question_text: string;
-  options: string[];
-  correct_answer: string;
-}
-
-interface QuizContent {
-  questions?: QuizQuestion[];
-}
-
-interface VideoContent {
-  video_url?: string;
-}
-
-interface ReadingContent {
-  text_content?: string;
-}
-
-interface UploadContent {
-  allowed_file_types?: string[];
-  max_file_size?: number;
-  instructions?: string;
-}
-
-type ChallengeContent = QuizContent | VideoContent | ReadingContent | UploadContent;
-
-interface PassCriteria {
-  min_score?: number;
-  min_percentage?: number;
-  min_watch_percentage?: number;
-}
-
 interface Challenge {
-  id: string;
-  title: string;
-  description: string;
-  type: 'quiz' | 'video' | 'reading' | 'upload';
-  subject: string;
-  tingkatan: string;
-  xp_reward: number;
-  content: ChallengeContent;
-  pass_criteria: PassCriteria;
-  is_active: boolean;
-  due_date?: string;
+  id: string
+  title: string
+  description: string
+  type: 'quiz' | 'video' | 'reading' | 'upload'
+  subject: string
+  tingkatan: string
+  xp_reward: number
+  deadline: string | null
+  is_active: boolean
+  created_at: string
+  submission?: {
+    id: string
+    score: number
+    max_score: number
+    passed: boolean
+    xp_earned: number
+    submitted_at: string
+  }
 }
 
-// --- Komponen Utama ---
-export default function DashboardMurid() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [progress, setProgress] = useState<Progress[]>([]);
-  const [ganjaran, setGanjaran] = useState<Ganjaran[]>([]);
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+interface UserStats {
+  total_xp: number
+  completed_challenges: number
+  total_challenges: number
+  average_score: number
+}
 
-  const topics = [
-    { name: 'Pengenalan Sains Komputer', xp: 100, icon: '💻' }, { name: 'Sistem Nombor', xp: 150, icon: '🔢' }, { name: 'Asas Pemrograman', xp: 200, icon: '⚡' }, { name: 'Struktur Data', xp: 250, icon: '🗂️' }, { name: 'Algoritma', xp: 300, icon: '🧠' }, { name: 'Pangkalan Data', xp: 200, icon: '🗄️' }
-  ];
+export default function DashboardMurid() {
+  const router = useRouter()
+  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [userStats, setUserStats] = useState<UserStats>({
+    total_xp: 0,
+    completed_challenges: 0,
+    total_challenges: 0,
+    average_score: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('available')
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
       if (!user) {
-        router.push('/login');
-        return;
+        router.push('/login')
+        return
       }
 
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (profileData) setProfile(profileData);
+      setUser(user)
+      await fetchData(user.id)
+    }
 
-      const { data: progressData } = await supabase.from('progress').select('*').eq('user_id', user.id);
-      if (progressData) setProgress(progressData);
+    checkAuth()
+  }, [router])
 
-      const { data: ganjaranData } = await supabase.from('ganjaran').select('*').order('syarat_xp', { ascending: true });
-      if (ganjaranData) setGanjaran(ganjaranData);
-      
-      // Fetch active challenges
+  const fetchData = async (userId: string) => {
+    try {
+      // Fetch challenges with user submissions
       const { data: challengesData } = await supabase
         .from('challenges')
-        .select('*')
+        .select(`
+          *,
+          challenge_submissions!left (
+            id,
+            score,
+            max_score,
+            passed,
+            xp_earned,
+            submitted_at
+          )
+        `)
         .eq('is_active', true)
-        .order('created_at', { ascending: false });
-      
-      if (challengesData) setChallenges(challengesData);
-      
-      setLoading(false);
-    };
-    fetchData();
-  }, [router]);
+        .eq('challenge_submissions.user_id', userId)
+        .order('created_at', { ascending: false })
 
-  const getXPLevel = (xp: number) => {
-    if (xp >= 1000) return { level: 'Expert', color: 'from-purple-500 to-pink-500', icon: '👑' };
-    if (xp >= 500) return { level: 'Advanced', color: 'from-neon-green to-electric-blue', icon: '⭐' };
-    if (xp >= 200) return { level: 'Intermediate', color: 'from-electric-blue to-neon-cyan', icon: '🚀' };
-    return { level: 'Beginner', color: 'from-gray-500 to-gray-700', icon: '🌱' };
-  };
+      if (challengesData) {
+        const formattedChallenges = challengesData.map(challenge => ({
+          ...challenge,
+          submission: challenge.challenge_submissions?.[0] || null
+        }))
+        setChallenges(formattedChallenges)
+      }
 
-  const getProgressPercentage = () => {
-    if (topics.length === 0) return 0;
-    const completedTopics = progress.filter(p => p.selesai).length;
-    return Math.round((completedTopics / topics.length) * 100);
-  };
+      // Fetch user statistics
+      const { data: statsData } = await supabase
+        .rpc('get_user_challenge_stats', { user_uuid: userId })
 
-  const getAvailableRewards = () => {
-    if (!profile) return [];
-    return ganjaran.filter(g => profile.xp >= g.syarat_xp);
-  };
+      if (statsData && statsData.length > 0) {
+        setUserStats(statsData[0])
+      }
 
-  const getChallengeTypeIcon = (type: string) => {
-    switch (type) {
-      case 'quiz': return '📝';
-      case 'video': return '🎬';
-      case 'reading': return '📚';
-      case 'upload': return '📤';
-      default: return '🏆';
+    } catch (error) {
+      console.error('Error fetching data:', error)
     }
-  };
+    setLoading(false)
+  }
 
-  const formatDueDate = (dateString?: string) => {
-    if (!dateString) return 'Tiada tarikh akhir';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' });
-  };
+  const getChallengeIcon = (type: string) => {
+    switch (type) {
+      case 'quiz': return BookOpen
+      case 'video': return Video
+      case 'reading': return FileText
+      case 'upload': return Upload
+      default: return BookOpen
+    }
+  }
+
+  const getChallengeTypeLabel = (type: string) => {
+    switch (type) {
+      case 'quiz': return '📝 Kuiz'
+      case 'video': return '🎥 Video'
+      case 'reading': return '📖 Bacaan'
+      case 'upload': return '📤 Upload'
+      default: return type
+    }
+  }
+
+  const getStatusBadge = (challenge: Challenge) => {
+    if (challenge.submission) {
+      if (challenge.submission.passed) {
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Selesai
+          </span>
+        )
+      } else {
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+            <Clock className="w-3 h-3 mr-1" />
+            Perlu Diperbaiki
+          </span>
+        )
+      }
+    }
+    
+    if (challenge.deadline) {
+      const isExpired = new Date(challenge.deadline) < new Date()
+      if (isExpired) {
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+            Tamat Tempoh
+          </span>
+        )
+      }
+    }
+    
+    return (
+      <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+        Tersedia
+      </span>
+    )
+  }
+
+  const handleStartChallenge = (challengeId: string, type: string) => {
+    router.push(`/challenges/${challengeId}?type=${type}`)
+  }
+
+  const filteredChallenges = challenges.filter(challenge => {
+    if (activeTab === 'available') {
+      return !challenge.submission || !challenge.submission.passed
+    } else if (activeTab === 'completed') {
+      return challenge.submission && challenge.submission.passed
+    }
+    return true
+  })
 
   if (loading) {
-    return <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center"><div className="glass-dark rounded-2xl p-8 text-center"><div className="text-2xl text-gradient loading-dots">Memuat dashboard</div></div></div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
+        <div className="glass-dark rounded-2xl p-8 text-center">
+          <div className="text-2xl text-gradient loading-dots">Memuat dashboard murid</div>
+        </div>
+      </div>
+    )
   }
-  if (!profile) {
-    return <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center"><div className="glass-dark rounded-2xl p-8 text-center"><div className="text-xl text-red-400">Profil tidak ditemui.</div></div></div>;
-  }
-
-  const levelInfo = getXPLevel(profile.xp);
-  const progressPercentage = getProgressPercentage();
-  const availableRewards = getAvailableRewards();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+      {/* Hero Section */}
       <section className="relative py-16 overflow-hidden bg-circuit">
         <div className="absolute inset-0 bg-grid opacity-10"></div>
+        <div className="absolute top-10 right-10 w-40 h-40 bg-gradient-to-br from-electric-blue/20 to-neon-cyan/20 rounded-full blur-xl animate-float"></div>
+        <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-br from-neon-green/20 to-electric-blue/20 rounded-full blur-xl animate-float" style={{animationDelay: '3s'}}></div>
+
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-3xl md:text-5xl font-bold mb-4 text-gradient">Selamat Datang, {profile.name}!</h1>
-            <p className="text-lg md:text-xl text-gray-300 mb-8">{profile.sekolah} • Tingkatan {profile.tingkatan}</p>
-            <div className="glass-dark rounded-2xl p-6 neon-glow">
-              <div className="flex items-center justify-center mb-4">
-                <div className={`w-16 h-16 bg-gradient-to-br ${levelInfo.color} rounded-full flex items-center justify-center mr-4`}><span className="text-2xl">{levelInfo.icon}</span></div>
-                <div><div className="text-2xl font-bold text-gradient">{profile.xp} XP</div><div className={`text-sm bg-gradient-to-r ${levelInfo.color} bg-clip-text text-transparent font-semibold`}>{levelInfo.level}</div></div>
+          <div className="max-w-6xl mx-auto">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gradient text-center">
+              🎓 Dashboard Murid
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-300 text-center mb-8">
+              Jelajahi cabaran dan tingkatkan kemahiran anda
+            </p>
+            
+            {/* Quick Access Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <Link href="/playground" className="glass-dark rounded-xl p-6 card-hover neon-glow-green group">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                    <Code className="w-8 h-8 text-neon-green" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">🚀 CodeCikgu Playground</h3>
+                    <p className="text-gray-400">Tulis, edit dan jalankan kod dalam pelbagai bahasa pengaturcaraan</p>
+                  </div>
+                </div>
+              </Link>
+              
+              <Link href="/leaderboard" className="glass-dark rounded-xl p-6 card-hover neon-glow group">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                    <Trophy className="w-8 h-8 text-electric-blue" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">🏆 Leaderboard</h3>
+                    <p className="text-gray-400">Lihat kedudukan anda dalam ranking dan bersaing dengan rakan</p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+            
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow">
+                <div className="text-3xl md:text-4xl font-bold text-gradient mb-2">
+                  {userStats.total_xp}
+                </div>
+                <div className="text-gray-400">Total XP</div>
+                <div className="text-2xl mt-2">⭐</div>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-3 mb-2"><div className="bg-gradient-to-r from-electric-blue to-neon-cyan h-3 rounded-full" style={{ width: `${progressPercentage}%` }}></div></div>
-              <div className="text-sm text-gray-400">Kemajuan: {progressPercentage}%</div>
+              
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow-green">
+                <div className="text-3xl md:text-4xl font-bold text-gradient-green mb-2">
+                  {userStats.completed_challenges}
+                </div>
+                <div className="text-gray-400">Selesai</div>
+                <div className="text-2xl mt-2">✅</div>
+              </div>
+              
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow-cyan">
+                <div className="text-3xl md:text-4xl font-bold text-gradient mb-2">
+                  {userStats.total_challenges}
+                </div>
+                <div className="text-gray-400">Jumlah Cabaran</div>
+                <div className="text-2xl mt-2">🏆</div>
+              </div>
+              
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow">
+                <div className="text-3xl md:text-4xl font-bold text-gradient mb-2">
+                  {userStats.average_score.toFixed(0)}%
+                </div>
+                <div className="text-gray-400">Purata Skor</div>
+                <div className="text-2xl mt-2">📊</div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="glass-dark rounded-2xl p-2 mb-8 max-w-4xl mx-auto">
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setActiveTab('overview')} className={`px-4 py-3 rounded-lg font-medium transition-all ${activeTab === 'overview' ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white' : 'text-gray-400 hover:bg-electric-blue/10'}`}>Gambaran Keseluruhan</button>
-            <button onClick={() => setActiveTab('challenges')} className={`px-4 py-3 rounded-lg font-medium transition-all ${activeTab === 'challenges' ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white' : 'text-gray-400 hover:bg-electric-blue/10'}`}>Cabaran</button>
-            <button onClick={() => setActiveTab('rewards')} className={`px-4 py-3 rounded-lg font-medium transition-all ${activeTab === 'rewards' ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white' : 'text-gray-400 hover:bg-electric-blue/10'}`}>Ganjaran</button>
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Tab Navigation */}
+          <div className="glass-dark rounded-2xl p-2 mb-8">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveTab('available')}
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'available'
+                    ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
+                    : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
+                }`}
+              >
+                🎯 Cabaran Tersedia
+              </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'completed'
+                    ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
+                    : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
+                }`}
+              >
+                ✅ Selesai
+              </button>
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'all'
+                    ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
+                    : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
+                }`}
+              >
+                📋 Semua
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="max-w-6xl mx-auto">
-          {activeTab === 'overview' && (
-            <div className="glass-dark rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-gradient mb-6">Gambaran Keseluruhan</h2>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="glass rounded-xl p-6 border border-electric-blue/30">
-                  <h3 className="text-lg font-semibold text-electric-blue mb-4">Kemajuan Anda</h3>
-                  <div className="space-y-4">
-                    {topics.map((topic, index) => (
-                      <div key={index} className="flex items-center">
-                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mr-3">
-                          <span className="text-lg">{topic.icon}</span>
+          {/* Challenges Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredChallenges.map((challenge) => {
+              const IconComponent = getChallengeIcon(challenge.type)
+              return (
+                <div key={challenge.id} className="glass-dark rounded-xl overflow-hidden card-hover">
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-electric-blue/20 rounded-lg">
+                          <IconComponent className="w-6 h-6 text-electric-blue" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm text-gray-300">{topic.name}</span>
-                            <span className="text-xs text-neon-cyan">{topic.xp} XP</span>
-                          </div>
-                          <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div className="bg-gradient-to-r from-electric-blue to-neon-cyan h-2 rounded-full" 
-                                 style={{ width: progress.find(p => p.topik === topic.name)?.selesai ? '100%' : '0%' }}></div>
-                          </div>
+                        <div>
+                          <span className="text-xs text-gray-400">{getChallengeTypeLabel(challenge.type)}</span>
+                          <div className="text-sm text-gray-300">{challenge.subject}</div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="glass rounded-xl p-6 border border-neon-green/30">
-                  <h3 className="text-lg font-semibold text-neon-green mb-4">Cabaran Terkini</h3>
-                  {challenges.length > 0 ? (
-                    <div className="space-y-4">
-                      {challenges.slice(0, 3).map(challenge => (
-                        <div key={challenge.id} className="flex items-start p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors">
-                          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mr-3">
-                            <span className="text-lg">{getChallengeTypeIcon(challenge.type)}</span>
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-white">{challenge.title}</h4>
-                            <p className="text-sm text-gray-400 mb-1">{challenge.subject} • {challenge.xp_reward} XP</p>
-                            <p className="text-xs text-gray-500">Tarikh Akhir: {formatDueDate(challenge.due_date)}</p>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="text-center mt-4">
-                        <button 
-                          onClick={() => setActiveTab('challenges')}
-                          className="text-sm text-neon-green hover:text-neon-cyan transition-colors"
-                        >
-                          Lihat Semua Cabaran →
-                        </button>
-                      </div>
+                      {getStatusBadge(challenge)}
                     </div>
-                  ) : (
-                    <p className="text-gray-400 text-center py-4">Tiada cabaran aktif buat masa ini.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'challenges' && (
-            <div className="glass-dark rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-gradient-blue mb-6">Cabaran Aktif</h2>
-              {challenges.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {challenges.map(challenge => (
-                    <Link href={`/challenges/${challenge.id}`} key={challenge.id}>
-                      <div className="glass rounded-xl p-6 border border-electric-blue/30 hover:border-electric-blue/60 transition-all cursor-pointer h-full flex flex-col">
-                        <div className="flex items-center mb-4">
-                          <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mr-3">
-                            <span className="text-2xl">{getChallengeTypeIcon(challenge.type)}</span>
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-white">{challenge.title}</h3>
-                            <p className="text-sm text-gray-400">{challenge.subject} • Tingkatan {challenge.tingkatan}</p>
-                          </div>
-                        </div>
-                        <p className="text-gray-300 text-sm mb-4 flex-grow">{challenge.description}</p>
-                        <div className="flex justify-between items-center mt-auto pt-4 border-t border-gray-700">
-                          <span className="text-neon-cyan font-medium">{challenge.xp_reward} XP</span>
-                          <span className="text-xs text-gray-500">Tarikh Akhir: {formatDueDate(challenge.due_date)}</span>
-                        </div>
+                    <h3 className="text-lg font-bold text-white mb-2">{challenge.title}</h3>
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">{challenge.description}</p>
+
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <Star className="w-4 h-4 text-neon-green" />
+                        <span className="text-neon-green font-semibold">{challenge.xp_reward} XP</span>
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="text-5xl mb-4">🏆</div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Tiada Cabaran Aktif</h3>
-                  <p className="text-gray-400">Cabaran baru akan datang tidak lama lagi. Sila tunggu pengumuman dari guru anda.</p>
-                </div>
-              )}
-            </div>
-          )}
+                      <div className="text-xs text-gray-400">{challenge.tingkatan}</div>
+                    </div>
 
-          {activeTab === 'rewards' && (
-            <div className="glass-dark rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-gradient-green mb-6">Ganjaran Anda</h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {availableRewards.map((reward) => (
-                  <div key={reward.id} className="glass rounded-xl p-6 border border-neon-green/30">
-                    {reward.imej_url && (
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden flex items-center justify-center">
-                        <Image src={reward.imej_url} alt={reward.nama} width={64} height={64} className="w-full h-full object-cover" />
+                    {challenge.deadline && (
+                      <div className="flex items-center space-x-2 mb-4 text-xs text-gray-400">
+                        <Clock className="w-3 h-3" />
+                        <span>Tamat: {new Date(challenge.deadline).toLocaleDateString('ms-MY')}</span>
                       </div>
                     )}
-                    <h3 className="text-lg font-semibold text-neon-green text-center">{reward.nama}</h3>
-                    <p className="text-gray-300 text-sm text-center">{reward.deskripsi}</p>
+
+                    {challenge.submission && (
+                      <div className="bg-gray-800/50 rounded-lg p-3 mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-400">Skor Terakhir:</span>
+                          <span className="text-white font-semibold">
+                            {challenge.submission.score}/{challenge.submission.max_score}
+                          </span>
+                        </div>
+                        {challenge.submission.passed && (
+                          <div className="flex items-center justify-between text-sm mt-1">
+                            <span className="text-gray-400">XP Diperoleh:</span>
+                            <span className="text-neon-green font-semibold">+{challenge.submission.xp_earned}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleStartChallenge(challenge.id, challenge.type)}
+                      className="w-full btn-primary"
+                      disabled={challenge.deadline && new Date(challenge.deadline) < new Date()}
+                    >
+                      {challenge.submission && challenge.submission.passed 
+                        ? 'Lihat Semula' 
+                        : challenge.submission 
+                        ? 'Cuba Lagi' 
+                        : 'Mula Cabaran'
+                      }
+                    </button>
                   </div>
-                ))}
-                {availableRewards.length === 0 && (
-                  <div className="col-span-full text-center py-8">
-                    <p className="text-gray-400">Dapatkan lebih banyak XP untuk membuka ganjaran!</p>
-                  </div>
-                )}
-              </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {filteredChallenges.length === 0 && (
+            <div className="glass-dark rounded-xl p-12 text-center">
+              <Trophy className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-gray-300 mb-2">
+                {activeTab === 'available' ? 'Tiada cabaran tersedia' : 
+                 activeTab === 'completed' ? 'Belum ada cabaran selesai' : 
+                 'Tiada cabaran dijumpai'}
+              </h3>
+              <p className="text-gray-400">
+                {activeTab === 'available' ? 'Semua cabaran telah diselesaikan atau belum ada cabaran baru.' : 
+                 activeTab === 'completed' ? 'Mulakan cabaran pertama anda untuk melihat kemajuan di sini.' : 
+                 'Tiada cabaran tersedia pada masa ini.'}
+              </p>
             </div>
           )}
         </div>
       </div>
     </div>
-  );
+  )
 }
 

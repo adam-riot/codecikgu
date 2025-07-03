@@ -2,329 +2,322 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
+import { useRouter } from 'next/navigation'
+import { BookOpen, Video, FileText, Upload, Trophy, Star, Clock, CheckCircle, Code, Users, Award } from 'lucide-react'
 import Link from 'next/link'
 
-interface Post {
+interface Challenge {
   id: string
   title: string
-  content: string
+  description: string
+  type: 'quiz' | 'video' | 'reading' | 'upload'
+  subject: string
+  tingkatan: string
+  xp_reward: number
+  deadline: string | null
+  is_active: boolean
   created_at: string
-  author_id: string
+}
+
+interface LeaderboardEntry {
+  id: string
+  name: string
+  total_xp: number
+  tingkatan: string
 }
 
 export default function DashboardAwam() {
-  const [posts, setPosts] = useState<Post[]>([])
+  const router = useRouter()
+  const [challenges, setChallenges] = useState<Challenge[]>([])
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      setUser(user)
+      await fetchData()
+    }
+
+    checkAuth()
+  }, [router])
+
+  const fetchData = async () => {
+    try {
+      // Fetch public challenges (limited view)
+      const { data: challengesData } = await supabase
+        .from('challenges')
+        .select('id, title, description, type, subject, tingkatan, xp_reward, deadline, is_active, created_at')
+        .eq('is_active', true)
         .order('created_at', { ascending: false })
+        .limit(6)
+
+      if (challengesData) {
+        setChallenges(challengesData)
+      }
+
+      // Fetch top leaderboard (public view)
+      const { data: leaderboardData } = await supabase
+        .from('profiles')
+        .select('id, name, total_xp, tingkatan')
+        .order('total_xp', { ascending: false })
         .limit(5)
 
-      if (error) {
-        console.error('Error fetching posts:', error)
-      } else {
-        setPosts(data || [])
+      if (leaderboardData) {
+        setLeaderboard(leaderboardData)
       }
-      setLoading(false)
+
+    } catch (error) {
+      console.error('Error fetching data:', error)
     }
+    setLoading(false)
+  }
 
-    fetchPosts()
-  }, [])
-
-  const publicMaterials = [
-    {
-      title: 'Pengenalan Sains Komputer',
-      description: 'Ketahui asas-asas Sains Komputer dan kepentingannya dalam dunia moden.',
-      icon: '💻',
-      status: 'open',
-      color: 'from-electric-blue to-neon-cyan'
-    },
-    {
-      title: 'Sejarah Komputer',
-      description: 'Pelajari evolusi teknologi komputer dari masa ke masa.',
-      icon: '📚',
-      status: 'open',
-      color: 'from-neon-green to-electric-blue'
-    },
-    {
-      title: 'Asas Pemrograman',
-      description: 'Modul pembelajaran interaktif untuk asas pemrograman.',
-      icon: '⚡',
-      status: 'restricted',
-      color: 'from-gray-600 to-gray-800'
-    },
-    {
-      title: 'Struktur Data',
-      description: 'Pembelajaran mendalam tentang struktur data dan algoritma.',
-      icon: '🔧',
-      status: 'restricted',
-      color: 'from-gray-600 to-gray-800'
+  const getChallengeIcon = (type: string) => {
+    switch (type) {
+      case 'quiz': return BookOpen
+      case 'video': return Video
+      case 'reading': return FileText
+      case 'upload': return Upload
+      default: return BookOpen
     }
-  ]
+  }
 
-  const quickLinks = [
-    { title: 'Tentang CodeCikgu', href: '/about', icon: '🏢' },
-    { title: 'Papan Pendahulu Global', href: '/leaderboard', icon: '🏆' },
-    { title: 'Log Masuk', href: '/login', icon: '🔐' },
-    { title: 'Hubungi Sokongan', href: 'mailto:support@codecikgu.com', icon: '📧' }
-  ]
+  const getChallengeTypeLabel = (type: string) => {
+    switch (type) {
+      case 'quiz': return '📝 Kuiz'
+      case 'video': return '🎥 Video'
+      case 'reading': return '📖 Bacaan'
+      case 'upload': return '📤 Upload'
+      default: return type
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
+        <div className="glass-dark rounded-2xl p-8 text-center">
+          <div className="text-2xl text-gradient loading-dots">Memuat dashboard awam</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
       {/* Hero Section */}
-      <section className="relative py-20 overflow-hidden bg-circuit">
+      <section className="relative py-16 overflow-hidden bg-circuit">
         <div className="absolute inset-0 bg-grid opacity-10"></div>
         <div className="absolute top-10 right-10 w-40 h-40 bg-gradient-to-br from-electric-blue/20 to-neon-cyan/20 rounded-full blur-xl animate-float"></div>
         <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-br from-neon-green/20 to-electric-blue/20 rounded-full blur-xl animate-float" style={{animationDelay: '3s'}}></div>
 
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gradient">
-            Dashboard Pengguna Awam
-          </h1>
-          <p className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
-            Selamat datang! Nikmati akses terbuka kepada kandungan <span className="text-gradient font-semibold">CodeCikgu</span>
-          </p>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-6xl mx-auto">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gradient text-center">
+              🌟 Dashboard Awam
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-300 text-center mb-8">
+              Jelajahi platform pembelajaran dan lihat prestasi komuniti
+            </p>
+            
+            {/* Quick Access Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <Link href="/playground" className="glass-dark rounded-xl p-6 card-hover neon-glow-green group">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                    <Code className="w-8 h-8 text-neon-green" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">🚀 CodeCikgu Playground</h3>
+                    <p className="text-gray-400">Tulis dan edit kod dalam pelbagai bahasa pengaturcaraan</p>
+                  </div>
+                </div>
+              </Link>
+              
+              <Link href="/leaderboard" className="glass-dark rounded-xl p-6 card-hover neon-glow group">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                    <Trophy className="w-8 h-8 text-electric-blue" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">🏆 Leaderboard</h3>
+                    <p className="text-gray-400">Lihat ranking prestasi komuniti</p>
+                  </div>
+                </div>
+              </Link>
+              
+              <Link href="/about" className="glass-dark rounded-xl p-6 card-hover neon-glow-cyan group">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-gradient-to-r from-neon-cyan/20 to-electric-blue/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                    <Users className="w-8 h-8 text-neon-cyan" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">ℹ️ Tentang Platform</h3>
+                    <p className="text-gray-400">Ketahui lebih lanjut tentang CodeCikgu</p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+            
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow">
+                <div className="text-3xl md:text-4xl font-bold text-gradient mb-2">
+                  {challenges.length}+
+                </div>
+                <div className="text-gray-400">Cabaran Tersedia</div>
+                <div className="text-2xl mt-2">📚</div>
+              </div>
+              
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow-green">
+                <div className="text-3xl md:text-4xl font-bold text-gradient-green mb-2">
+                  {leaderboard.length}+
+                </div>
+                <div className="text-gray-400">Pelajar Aktif</div>
+                <div className="text-2xl mt-2">👥</div>
+              </div>
+              
+              <div className="glass-dark rounded-xl p-6 text-center card-hover neon-glow-cyan">
+                <div className="text-3xl md:text-4xl font-bold text-gradient mb-2">
+                  {leaderboard.reduce((total, entry) => total + entry.total_xp, 0)}
+                </div>
+                <div className="text-gray-400">Total XP Komuniti</div>
+                <div className="text-2xl mt-2">⭐</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content Area */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Welcome Message */}
-            <div className="glass-dark rounded-2xl p-8 card-hover neon-glow">
-              <div className="flex items-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-full flex items-center justify-center mr-4">
-                  <span className="text-2xl">👋</span>
-                </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-gradient">Selamat Datang ke CodeCikgu!</h2>
-              </div>
-              <p className="text-gray-300 mb-6 leading-relaxed">
-                Sebagai pengguna awam, anda mempunyai akses kepada kandungan terbuka dan maklumat umum tentang platform pembelajaran Sains Komputer kami.
-              </p>
-              <div className="glass rounded-lg p-4 border border-electric-blue/30">
-                <p className="text-electric-blue font-medium flex items-center">
-                  <span className="text-2xl mr-3">💡</span>
-                  <span><strong>Tip:</strong> Untuk akses penuh kepada semua ciri pembelajaran interaktif, daftar sebagai murid menggunakan email rasmi MOE!</span>
-                </p>
-              </div>
+        <div className="max-w-7xl mx-auto">
+          {/* Challenges Preview */}
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold text-white">🎯 Cabaran Terkini</h2>
+              <p className="text-gray-400">Daftar sebagai pelajar untuk menyertai cabaran</p>
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {challenges.map((challenge) => {
+                const IconComponent = getChallengeIcon(challenge.type)
+                return (
+                  <div key={challenge.id} className="glass-dark rounded-xl overflow-hidden card-hover">
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-electric-blue/20 rounded-lg">
+                            <IconComponent className="w-6 h-6 text-electric-blue" />
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-400">{getChallengeTypeLabel(challenge.type)}</span>
+                            <div className="text-sm text-gray-300">{challenge.subject}</div>
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                          Tersedia
+                        </span>
+                      </div>
 
-            {/* Latest Posts */}
-            <div className="glass-dark rounded-2xl p-8 card-hover">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-neon-green to-electric-blue rounded-lg flex items-center justify-center mr-4">
-                  <span className="text-xl">📰</span>
-                </div>
-                <h2 className="text-2xl font-bold text-primary">Post Terkini</h2>
-              </div>
-              
-              {loading ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-400 loading-dots">Memuat post</div>
-                </div>
-              ) : posts.length > 0 ? (
-                <div className="space-y-6">
-                  {posts.map((post) => (
-                    <div key={post.id} className="glass rounded-xl p-6 border border-electric-blue/20 card-hover">
-                      <h3 className="text-xl font-semibold mb-3 text-gradient">{post.title}</h3>
-                      <p className="text-gray-300 mb-4 leading-relaxed">
-                        {post.content.length > 200 ? `${post.content.substring(0, 200)}...` : post.content}
-                      </p>
-                      <div className="flex items-center text-sm text-electric-blue">
-                        <span className="mr-2">📅</span>
-                        <span>Diterbitkan pada {new Date(post.created_at).toLocaleDateString('ms-MY')}</span>
+                      <h3 className="text-lg font-bold text-white mb-2">{challenge.title}</h3>
+                      <p className="text-gray-400 text-sm mb-4 line-clamp-2">{challenge.description}</p>
+
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <Star className="w-4 h-4 text-neon-green" />
+                          <span className="text-neon-green font-semibold">{challenge.xp_reward} XP</span>
+                        </div>
+                        <div className="text-xs text-gray-400">{challenge.tingkatan}</div>
+                      </div>
+
+                      {challenge.deadline && (
+                        <div className="flex items-center space-x-2 mb-4 text-xs text-gray-400">
+                          <Clock className="w-3 h-3" />
+                          <span>Tamat: {new Date(challenge.deadline).toLocaleDateString('ms-MY')}</span>
+                        </div>
+                      )}
+
+                      <Link
+                        href="/daftar"
+                        className="w-full btn-primary"
+                      >
+                        Daftar untuk Menyertai
+                      </Link>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Leaderboard Preview */}
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold text-white">🏆 Top Performers</h2>
+              <Link href="/leaderboard" className="text-electric-blue hover:underline">
+                Lihat Semua →
+              </Link>
+            </div>
+            
+            <div className="glass-dark rounded-xl overflow-hidden">
+              <div className="p-6">
+                <div className="space-y-4">
+                  {leaderboard.map((entry, index) => (
+                    <div key={entry.id} className="flex items-center space-x-4 p-4 bg-gray-800/30 rounded-lg">
+                      <div className="flex-shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                          index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-dark-black' :
+                          index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-dark-black' :
+                          index === 2 ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-dark-black' :
+                          'bg-gray-700 text-gray-300'
+                        }`}>
+                          {index + 1}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-medium truncate">{entry.name}</h3>
+                        <p className="text-gray-400 text-sm">Tingkatan {entry.tingkatan}</p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <div className="flex items-center space-x-2">
+                          <Star className="w-4 h-4 text-neon-green" />
+                          <span className="text-neon-green font-semibold">{entry.total_xp} XP</span>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center text-gray-400 py-8">
-                  <div className="text-4xl mb-4">📭</div>
-                  <div>Tiada post tersedia pada masa ini.</div>
-                </div>
-              )}
-            </div>
-
-            {/* Public Learning Materials */}
-            <div className="glass-dark rounded-2xl p-8 card-hover">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-lg flex items-center justify-center mr-4">
-                  <span className="text-xl">📚</span>
-                </div>
-                <h2 className="text-2xl font-bold text-primary">Bahan Pembelajaran Terbuka</h2>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                {publicMaterials.map((material) => (
-                  <div key={material.title} className={`glass rounded-xl p-6 card-hover border ${material.status === 'open' ? 'border-electric-blue/30' : 'border-gray-600/30'} ${material.status === 'restricted' ? 'opacity-60' : ''}`}>
-                    <div className="flex items-center mb-4">
-                      <div className={`w-12 h-12 bg-gradient-to-br ${material.color} rounded-lg flex items-center justify-center mr-4`}>
-                        <span className="text-xl">{material.icon}</span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-primary">{material.title}</h3>
-                    </div>
-                    <p className="text-gray-300 mb-4 text-sm leading-relaxed">
-                      {material.description}
-                    </p>
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                      material.status === 'open' 
-                        ? 'bg-neon-green/20 text-neon-green border border-neon-green/30' 
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    }`}>
-                      {material.status === 'open' ? '🔓 Terbuka' : '🔒 Murid Sahaja'}
-                    </span>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* CTA untuk Daftar Murid */}
-            <div className="glass-dark rounded-2xl p-6 card-hover neon-glow-green">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-neon-green to-electric-blue rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">🎓</span>
-                </div>
-                <h3 className="text-xl font-bold text-gradient-green mb-4">Daftar Sebagai Murid</h3>
-                <p className="text-gray-300 mb-4 text-sm">
-                  Dapatkan akses penuh kepada:
-                </p>
-                <ul className="text-sm space-y-2 mb-6 text-left">
-                  <li className="flex items-center text-gray-300">
-                    <span className="text-electric-blue mr-2">⚡</span>
-                    Pembelajaran interaktif
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <span className="text-electric-blue mr-2">🎮</span>
-                    Sistem gamifikasi XP
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <span className="text-electric-blue mr-2">🏆</span>
-                    Papan pendahulu
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <span className="text-electric-blue mr-2">🎁</span>
-                    Ganjaran dan lencana
-                  </li>
-                  <li className="flex items-center text-gray-300">
-                    <span className="text-electric-blue mr-2">📊</span>
-                    Penjejakan kemajuan
-                  </li>
-                </ul>
-                <Link href="/daftar" className="btn-primary w-full block text-center">
-                  🚀 Daftar Sekarang
-                </Link>
-              </div>
-            </div>
-
-            {/* Platform Statistics */}
-            <div className="glass-dark rounded-2xl p-6 card-hover">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-lg">📊</span>
-                </div>
-                <h3 className="text-xl font-semibold text-primary">Statistik Platform</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300 flex items-center">
-                    <span className="mr-2">👨‍🎓</span>
-                    Murid Aktif:
-                  </span>
-                  <span className="font-bold text-gradient">1,250+</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300 flex items-center">
-                    <span className="mr-2">🏫</span>
-                    Sekolah Terlibat:
-                  </span>
-                  <span className="font-bold text-gradient">85+</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300 flex items-center">
-                    <span className="mr-2">📚</span>
-                    Topik Tersedia:
-                  </span>
-                  <span className="font-bold text-gradient">24</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300 flex items-center">
-                    <span className="mr-2">🎁</span>
-                    Ganjaran:
-                  </span>
-                  <span className="font-bold text-gradient">15+</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Links */}
-            <div className="glass-dark rounded-2xl p-6 card-hover">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-neon-green to-electric-blue rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-lg">🔗</span>
-                </div>
-                <h3 className="text-xl font-semibold text-primary">Pautan Pantas</h3>
-              </div>
-              <div className="space-y-3">
-                {quickLinks.map((link) => (
-                  <Link 
-                    key={link.title}
-                    href={link.href} 
-                    className="flex items-center text-gray-300 hover:text-electric-blue transition-all duration-300 p-2 rounded-lg hover:bg-electric-blue/10"
-                  >
-                    <span className="mr-3 text-lg">{link.icon}</span>
-                    <span>{link.title}</span>
-                    <span className="ml-auto text-electric-blue">→</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Announcement */}
-            <div className="glass rounded-2xl p-6 border border-yellow-400/30 neon-glow-cyan">
-              <div className="flex items-center mb-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center mr-3">
-                  <span className="text-lg">📢</span>
-                </div>
-                <h3 className="text-lg font-semibold text-yellow-300">Pengumuman</h3>
-              </div>
-              <p className="text-yellow-200 text-sm leading-relaxed">
-                Kempen pembelajaran aktif sedang berlangsung! Daftar sekarang dan dapatkan XP berganda untuk bulan pertama.
-              </p>
+          {/* Call to Action */}
+          <div className="glass-dark rounded-xl p-8 text-center">
+            <Award className="w-16 h-16 text-electric-blue mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-white mb-4">Sertai Komuniti CodeCikgu</h3>
+            <p className="text-gray-400 mb-6 max-w-2xl mx-auto">
+              Daftar sebagai pelajar untuk menyertai cabaran, mengumpul XP, dan bersaing dengan rakan-rakan. 
+              Mulakan perjalanan pembelajaran anda hari ini!
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/daftar" className="btn-primary">
+                Daftar Sekarang
+              </Link>
+              <Link href="/login" className="btn-secondary">
+                Log Masuk
+              </Link>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Bottom CTA */}
-      <section className="py-16 bg-gradient-to-r from-electric-blue/10 via-neon-cyan/10 to-neon-green/10">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gradient">
-              Sedia untuk Mula Belajar?
-            </h2>
-            <p className="text-xl text-gray-300 mb-8">
-              Sertai ribuan murid lain yang telah memilih CodeCikgu untuk menguasai Sains Komputer!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/daftar" className="btn-primary text-lg px-8 py-4">
-                🎓 Daftar Sebagai Murid
-              </Link>
-              <Link href="/" className="btn-secondary text-lg px-8 py-4">
-                🏠 Kembali ke Laman Utama
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }
