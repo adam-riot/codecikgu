@@ -31,7 +31,27 @@ export default function ReadingChallenge({ challenge, onComplete, onBack }: Read
     return () => element?.removeEventListener('scroll', handleScroll)
   }, [isCompleted, onComplete])
 
-  const contentHtml = challenge.content.content?.replace(/\n/g, '<br />') || '';
+  // Safe access to challenge.content with proper type checking
+  const getContentHtml = (): string => {
+    if (!challenge.content) {
+      return 'Tiada kandungan tersedia.';
+    }
+
+    // Check for text_content first
+    if (typeof challenge.content.text_content === 'string') {
+      return challenge.content.text_content.replace(/\n/g, '<br />');
+    }
+
+    // Check for content property
+    const content = challenge.content as { content?: string };
+    if (typeof content.content === 'string') {
+      return content.content.replace(/\n/g, '<br />');
+    }
+
+    return 'Tiada kandungan tersedia.';
+  };
+
+  const contentHtml = getContentHtml();
 
   if (isCompleted) {
     return (
@@ -46,9 +66,14 @@ export default function ReadingChallenge({ challenge, onComplete, onBack }: Read
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-xl font-bold text-white mb-2">{challenge.title}</h1>
-      <div ref={contentRef} className="h-96 overflow-y-auto p-4 bg-gray-800 rounded" dangerouslySetInnerHTML={{ __html: contentHtml }} />
+      <div 
+        ref={contentRef} 
+        className="h-96 overflow-y-auto p-4 bg-gray-800 rounded text-white" 
+        dangerouslySetInnerHTML={{ __html: contentHtml }} 
+      />
       <div className="mt-2 text-sm text-gray-400">Kemajuan: {Math.round(readPercentage)}%</div>
       <button onClick={onBack} className="mt-4 px-6 py-2 bg-gray-600 text-white rounded">Kembali</button>
     </div>
   )
 }
+

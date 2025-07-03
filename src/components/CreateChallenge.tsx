@@ -1,191 +1,274 @@
-'use client'
+// src/components/CreateChallenge.tsx
+import { useState } from 'react';
+import { supabase } from '@/utils/supabase';
+import { Challenge, Question, ChallengeContent, ChallengePassCriteria } from '@/types'; // Import interfaces
 
-import { useState } from 'react'
-import { supabase } from '@/utils/supabase'
-import { FaTimes, FaBook, FaVideo, FaFileAlt, FaUpload, FaPlus, FaTrash } from 'react-icons/fa'
-
-// --- Interfaces ---
 interface CreateChallengeProps {
-  onClose: () => void
-  onSuccess: () => void
+  onClose: () => void;
+  onChallengeCreated: () => void;
 }
-interface Question {
-  question_text: string
-  options: string[]
-  correct_answer: string
-  points: number
-}
-type ChallengeType = 'quiz' | 'video' | 'reading' | 'upload';
 
-// --- Komponen Utama ---
-export default function CreateChallenge({ onClose, onSuccess }: CreateChallengeProps) {
+export default function CreateChallenge({ onClose, onChallengeCreated }: CreateChallengeProps) {
   const [step, setStep] = useState(1);
-  const [challengeType, setChallengeType] = useState<ChallengeType>('quiz');
+  const [challengeType, setChallengeType] = useState<'quiz' | 'video' | 'reading' | 'upload'>('quiz');
+  const [challengeData, setChallengeData] = useState<Partial<Challenge>>({
+    title: '',
+    description: '',
+    subject: '',
+    tingkatan: '',
+    xp_reward: 0,
+    due_date: '',
+    evaluation_type: 'automatic',
+    content: {},
+    pass_criteria: {},
+  });
+  const [quizQuestions, setQuizQuestions] = useState<Question[]>([]); // Specify type as Question[]
   const [loading, setLoading] = useState(false);
 
-  // --- States untuk setiap jenis cabaran ---
-  const [basicInfo, setBasicInfo] = useState({ title: '', description: '', subject: 'Sains Komputer', tingkatan: 'Tingkatan 4', xp_reward: 50, deadline: '' });
-  const [questions, setQuestions] = useState<Question[]>([{ question_text: '', options: ['', '', '', ''], correct_answer: 'A', points: 1 }]);
-  const [passCriteria, setPassCriteria] = useState({ min_score: 5 });
-  
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [videoData, setVideoData] = useState({ video_url: '', min_watch_percentage: 90 });
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [readingData, setReadingData] = useState({ content: '', completion_required: true });
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [uploadData, setUploadData] = useState({ instructions: '', allowed_file_types: ['pdf', 'doc', 'docx'], max_file_size: 10485760 });
+  const handleNext = () => setStep(prev => prev + 1);
+  const handleBack = () => setStep(prev => prev - 1);
 
-  // --- Fungsi Helper ---
-  const addQuestion = () => {
-    setQuestions([...questions, { question_text: '', options: ['', '', '', ''], correct_answer: 'A', points: 1 }]);
+  const handleAddQuestion = () => {
+    // Generate a temporary ID for new questions
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setQuizQuestions([...quizQuestions, { 
+      id: tempId,
+      question_text: '', 
+      options: ['', '', '', ''], 
+      correct_answer: '' 
+    }]);
   };
 
-  const removeQuestion = (index: number) => {
-    if (questions.length > 1) {
-      setQuestions(questions.filter((_, i) => i !== index));
+  const handleUpdateQuestion = (index: number, field: keyof Question | 'options', value: string | [number, string]) => {
+    const updatedQuestions = [...quizQuestions];
+    if (field === 'options') {
+      if (Array.isArray(value)) {
+        const [optionIndex, optionValue] = value;
+        updatedQuestions[index].options[optionIndex] = optionValue;
+      }
+    } else if (field === 'question_text') {
+      updatedQuestions[index].question_text = value as string;
+    } else if (field === 'correct_answer') {
+      updatedQuestions[index].correct_answer = value as string;
+    } else if (field === 'id') {
+      updatedQuestions[index].id = value as string;
     }
+    setQuizQuestions(updatedQuestions);
   };
 
-  const updateQuestion = (index: number, field: keyof Question, value: string | string[] | number) => {
-    const newQuestions = [...questions];
-    const questionToUpdate = { ...newQuestions[index] };
-    
-    if (field === 'options' && Array.isArray(value)) {
-      questionToUpdate.options = value;
-    } else if (field === 'points' && typeof value === 'number') {
-      questionToUpdate.points = value;
-    } else if (typeof value === 'string' && (field === 'question_text' || field === 'correct_answer')) {
-      questionToUpdate[field] = value;
-    }
-    
-    newQuestions[index] = questionToUpdate;
-    setQuestions(newQuestions);
+  const handleRemoveQuestion = (index: number) => {
+    setQuizQuestions(quizQuestions.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      let finalContent: ChallengeContent = {};
+      let finalPassCriteria: ChallengePassCriteria = {};
 
-      let content: object = {};
-      let pass_criteria: object = {};
-
-      switch (challengeType) {
-        case 'quiz':
-          content = { questions };
-          pass_criteria = { min_score: passCriteria.min_score };
-          break;
-        case 'video':
-          content = { video_url: videoData.video_url };
-          pass_criteria = { min_watch_percentage: videoData.min_watch_percentage };
-          break;
-        case 'reading':
-          content = { content: readingData.content };
-          pass_criteria = { completion_required: readingData.completion_required };
-          break;
-        case 'upload':
-          content = { instructions: uploadData.instructions, allowed_file_types: uploadData.allowed_file_types, max_file_size: uploadData.max_file_size };
-          pass_criteria = { manual_review: true };
-          break;
+      if (challengeType === 'quiz') {
+        finalContent = { questions: quizQuestions };
+        finalPassCriteria = { min_score: challengeData.pass_criteria?.min_score || 0 };
+      } else if (challengeType === 'video') {
+        finalContent = { video_url: challengeData.content?.video_url };
+        finalPassCriteria = { min_percentage: challengeData.pass_criteria?.min_percentage || 0 };
+      } else if (challengeType === 'reading') {
+        finalContent = { text_content: challengeData.content?.text_content };
+        finalPassCriteria = { min_percentage: challengeData.pass_criteria?.min_percentage || 0 };
+      } else if (challengeType === 'upload') {
+        finalContent = { allowed_file_types: challengeData.content?.allowed_file_types, max_file_size: challengeData.content?.max_file_size };
+        finalPassCriteria = {}; // No specific pass criteria for upload
       }
 
-      const { data: challenge, error: challengeError } = await supabase.from('challenges').insert({
-        title: basicInfo.title, description: basicInfo.description, type: challengeType, subject: basicInfo.subject, tingkatan: basicInfo.tingkatan, xp_reward: basicInfo.xp_reward, content, pass_criteria, deadline: basicInfo.deadline || null, created_by: user.id, evaluation_type: challengeType === 'upload' ? 'manual' : 'automatic'
-      }).select().single();
+      const { error } = await supabase.from('challenges').insert([
+        {
+          ...challengeData,
+          type: challengeType,
+          content: finalContent,
+          pass_criteria: finalPassCriteria,
+          is_active: true,
+        } as Challenge, // Cast to Challenge to satisfy type checking
+      ]);
 
-      if (challengeError) throw challengeError;
+      if (error) throw error;
 
-      if (challengeType === 'quiz' && challenge) {
-        const questionsToInsert = questions.map((q, index) => ({
-          challenge_id: challenge.id, question_text: q.question_text, options: q.options, correct_answer: q.correct_answer, points: q.points, order_index: index
-        }));
-        await supabase.from('quiz_questions').insert(questionsToInsert).throwOnError();
-      }
-
-      onSuccess();
+      onChallengeCreated();
       onClose();
     } catch (error) {
       console.error('Error creating challenge:', error);
-      alert('Ralat mencipta cabaran. Sila cuba lagi.');
+      alert('Gagal mencipta cabaran. Sila cuba lagi.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700 flex-shrink-0">
-          <h2 className="text-xl font-bold text-white">Cipta Cabaran Baru</h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg"><FaTimes className="w-5 h-5" /></button>
-        </div>
-        <div className="overflow-y-auto flex-grow">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="glass-dark rounded-2xl p-8 w-full max-w-4xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl">&times;</button>
+        <h2 className="text-3xl font-bold text-gradient mb-6 text-center">Wizard Cipta Cabaran</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           {step === 1 && (
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Pilih Jenis Cabaran</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                {[{ type: 'quiz', icon: FaBook, title: 'Kuiz MCQ', desc: 'Soalan aneka pilihan' }, { type: 'video', icon: FaVideo, title: 'Video', desc: 'Tonton video' }, { type: 'reading', icon: FaFileAlt, title: 'Bacaan', desc: 'Baca kandungan' }, { type: 'upload', icon: FaUpload, title: 'Upload', desc: 'Muat naik fail' }].map(({ type, icon: Icon, title, desc }) => (
-                  <button key={type} onClick={() => setChallengeType(type as ChallengeType)} className={`p-4 rounded-lg border-2 text-left transition-all ${challengeType === type ? 'border-blue-500 bg-blue-500/20' : 'border-gray-600 hover:border-gray-500'}`}>
-                    <Icon className={`w-8 h-8 mb-3 ${challengeType === type ? 'text-blue-400' : 'text-gray-400'}`} />
-                    <h4 className="font-medium text-white mb-1">{title}</h4>
-                    <p className="text-sm text-gray-400">{desc}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end mt-6"><button onClick={() => setStep(2)} className="px-6 py-2 bg-blue-600 text-white rounded-lg">Seterusnya</button></div>
-            </div>
-          )}
-          {step === 2 && (
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Maklumat Asas</h3>
-              <div className="space-y-4">
-                <input type="text" value={basicInfo.title} onChange={(e) => setBasicInfo({...basicInfo, title: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white" placeholder="Tajuk Cabaran" />
-                <textarea value={basicInfo.description} onChange={(e) => setBasicInfo({...basicInfo, description: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white h-24" placeholder="Penerangan" />
-                <div className="grid md:grid-cols-2 gap-4">
-                  <select value={basicInfo.subject} onChange={(e) => setBasicInfo({...basicInfo, subject: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"><option>Sains Komputer</option><option>Matematik</option></select>
-                  <select value={basicInfo.tingkatan} onChange={(e) => setBasicInfo({...basicInfo, tingkatan: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"><option>Tingkatan 4</option><option>Tingkatan 5</option></select>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <input type="number" value={basicInfo.xp_reward} onChange={(e) => setBasicInfo({...basicInfo, xp_reward: parseInt(e.target.value)})} className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white" />
-                  <input type="datetime-local" value={basicInfo.deadline} onChange={(e) => setBasicInfo({...basicInfo, deadline: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white" />
-                </div>
-              </div>
-              <div className="flex justify-between mt-6"><button onClick={() => setStep(1)} className="px-6 py-2 bg-gray-600 text-white rounded-lg">Kembali</button><button onClick={() => setStep(3)} className="px-6 py-2 bg-blue-600 text-white rounded-lg">Seterusnya</button></div>
-            </div>
-          )}
-          {step === 3 && (
-            <div className="p-6">
-              {challengeType === 'quiz' && (
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4">Langkah 1: Maklumat Asas</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Setup Kuiz</h3>
-                  {questions.map((q, qIndex) => (
-                    <div key={qIndex} className="bg-gray-800/50 p-4 mb-4 rounded-lg">
-                      <div className="flex justify-between items-center mb-3"><h4 className="font-medium text-white">Soalan {qIndex + 1}</h4>{questions.length > 1 && <button onClick={() => removeQuestion(qIndex)} className="p-1 text-red-400"><FaTrash /></button>}</div>
-                      <div className="space-y-3">
-                        <input type="text" value={q.question_text} onChange={(e) => updateQuestion(qIndex, 'question_text', e.target.value)} placeholder="Soalan" className="w-full p-2 bg-gray-700 rounded-lg" />
-                        {q.options.map((opt, oIndex) => (
-                          <div key={oIndex} className="flex gap-2">
-                            <span className="p-2 bg-gray-700 rounded-lg">{String.fromCharCode(65 + oIndex)}</span>
-                            <input type="text" value={opt} onChange={(e) => { const newOpts = [...q.options]; newOpts[oIndex] = e.target.value; updateQuestion(qIndex, 'options', newOpts); }} placeholder={`Pilihan ${String.fromCharCode(65 + oIndex)}`} className="flex-1 p-2 bg-gray-700 rounded-lg" />
-                          </div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Tajuk Cabaran</label>
+                  <input type="text" value={challengeData.title} onChange={e => setChallengeData({ ...challengeData, title: e.target.value })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Jenis Cabaran</label>
+                  <select value={challengeType} onChange={e => setChallengeType(e.target.value as 'quiz' | 'video' | 'reading' | 'upload')} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" required>
+                    <option value="quiz">Kuiz (MCQ)</option>
+                    <option value="video">Video</option>
+                    <option value="reading">Bacaan</option>
+                    <option value="upload">Muat Naik Fail</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Subjek</label>
+                  <input type="text" value={challengeData.subject} onChange={e => setChallengeData({ ...challengeData, subject: e.target.value })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Tingkatan</label>
+                  <input type="text" value={challengeData.tingkatan} onChange={e => setChallengeData({ ...challengeData, tingkatan: e.target.value })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Ganjaran XP</label>
+                  <input type="number" value={challengeData.xp_reward} onChange={e => setChallengeData({ ...challengeData, xp_reward: parseInt(e.target.value) })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" required />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Tarikh Akhir (Pilihan)</label>
+                  <input type="date" value={challengeData.due_date} onChange={e => setChallengeData({ ...challengeData, due_date: e.target.value })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-gray-300 text-sm font-medium mb-1">Deskripsi</label>
+                <textarea value={challengeData.description} onChange={e => setChallengeData({ ...challengeData, description: e.target.value })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" rows={3} required></textarea>
+              </div>
+              <div className="flex justify-end mt-6">
+                <button type="button" onClick={handleNext} className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium">Seterusnya</button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4">Langkah 2: Kandungan Cabaran</h3>
+              
+              {challengeType === 'quiz' && (
+                <div className="space-y-4">
+                  {quizQuestions.map((q, qIndex) => (
+                    <div key={q.id} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                      <label className="block text-gray-300 text-sm font-medium mb-1">Soalan {qIndex + 1}</label>
+                      <input type="text" value={q.question_text} onChange={e => handleUpdateQuestion(qIndex, 'question_text', e.target.value)} className="w-full px-3 py-2 bg-gray-700 rounded-lg mb-2" required />
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        {q.options.map((opt: string, optIndex: number) => (
+                          <input key={optIndex} type="text" value={opt} onChange={e => handleUpdateQuestion(qIndex, 'options', [optIndex, e.target.value])} className="w-full px-3 py-2 bg-gray-700 rounded-lg" placeholder={`Pilihan ${optIndex + 1}`} required />
                         ))}
-                        <div className="flex gap-4">
-                          <select value={q.correct_answer} onChange={(e) => updateQuestion(qIndex, 'correct_answer', e.target.value)} className="p-2 bg-gray-700 rounded-lg"><option>A</option><option>B</option><option>C</option><option>D</option></select>
-                          <input type="number" value={q.points} onChange={(e) => updateQuestion(qIndex, 'points', parseInt(e.target.value))} className="w-20 p-2 bg-gray-700 rounded-lg" />
-                        </div>
                       </div>
+                      <label className="block text-gray-300 text-sm font-medium mb-1">Jawapan Betul</label>
+                      <select value={q.correct_answer} onChange={e => handleUpdateQuestion(qIndex, 'correct_answer', e.target.value)} className="w-full px-3 py-2 bg-gray-700 rounded-lg" required>
+                        <option value="">Pilih Jawapan Betul</option>
+                        {q.options.map((opt: string, optIndex: number) => (
+                          <option key={optIndex} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => handleRemoveQuestion(qIndex)} className="mt-2 bg-red-600 px-3 py-1 rounded-lg text-sm">Buang Soalan</button>
                     </div>
                   ))}
-                  <button onClick={addQuestion} className="w-full p-3 border-2 border-dashed border-gray-600 rounded-lg text-gray-400 flex items-center justify-center gap-2"><FaPlus /> Tambah Soalan</button>
-                  <div className="mt-6 p-4 bg-gray-800/50 rounded-lg"><label className="block text-sm mb-1">Markah Lulus</label><input type="number" value={passCriteria.min_score} onChange={(e) => setPassCriteria({ min_score: parseInt(e.target.value) })} className="w-32 p-2 bg-gray-700 rounded-lg" /></div>
+                  <button type="button" onClick={handleAddQuestion} className="bg-blue-600 px-4 py-2 rounded-lg text-white">Tambah Soalan</button>
+                  <label className="block text-gray-300 text-sm font-medium mt-4 mb-1">Markah Minimum Lulus (%)</label>
+                  <input type="number" value={challengeData.pass_criteria?.min_score || ''} onChange={e => setChallengeData({ ...challengeData, pass_criteria: { ...challengeData.pass_criteria, min_score: parseInt(e.target.value) } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" placeholder="Contoh: 70" />
                 </div>
               )}
-              <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-6 py-2 bg-gray-600 text-white rounded-lg">Kembali</button><button onClick={handleSubmit} disabled={loading} className="px-6 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">{loading ? 'Mencipta...' : 'Cipta Cabaran'}</button></div>
+
+              {challengeType === 'video' && (
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">URL Video (YouTube/Vimeo)</label>
+                  <input type="text" value={challengeData.content?.video_url || ''} onChange={e => setChallengeData({ ...challengeData, content: { ...challengeData.content, video_url: e.target.value } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" required />
+                  <label className="block text-gray-300 text-sm font-medium mt-4 mb-1">Peratus Tontonan Minimum Lulus (%)</label>
+                  <input type="number" value={challengeData.pass_criteria?.min_percentage || ''} onChange={e => setChallengeData({ ...challengeData, pass_criteria: { ...challengeData.pass_criteria, min_percentage: parseInt(e.target.value) } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" placeholder="Contoh: 80" />
+                </div>
+              )}
+
+              {challengeType === 'reading' && (
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Kandungan Bacaan (HTML/Markdown)</label>
+                  <textarea value={challengeData.content?.text_content || ''} onChange={e => setChallengeData({ ...challengeData, content: { ...challengeData.content, text_content: e.target.value } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" rows={10} required></textarea>
+                  <label className="block text-gray-300 text-sm font-medium mt-4 mb-1">Peratus Bacaan Minimum Lulus (%)</label>
+                  <input type="number" value={challengeData.pass_criteria?.min_percentage || ''} onChange={e => setChallengeData({ ...challengeData, pass_criteria: { ...challengeData.pass_criteria, min_percentage: parseInt(e.target.value) } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" placeholder="Contoh: 90" />
+                </div>
+              )}
+
+              {challengeType === 'upload' && (
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-1">Jenis Fail Dibenarkan (koma dipisahkan)</label>
+                  <input type="text" value={challengeData.content?.allowed_file_types?.join(',')} onChange={e => setChallengeData({ ...challengeData, content: { ...challengeData.content, allowed_file_types: e.target.value.split(',').map(s => s.trim()) } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" placeholder="pdf, docx, jpg" />
+                  <label className="block text-gray-300 text-sm font-medium mt-4 mb-1">Saiz Fail Maksimum (MB)</label>
+                  <input type="number" value={challengeData.content?.max_file_size ? challengeData.content.max_file_size / (1024 * 1024) : ''} onChange={e => setChallengeData({ ...challengeData, content: { ...challengeData.content, max_file_size: parseInt(e.target.value) * 1024 * 1024 } })} className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg" placeholder="Contoh: 10" />
+                </div>
+              )}
+
+              <div className="flex justify-between mt-6">
+                <button type="button" onClick={handleBack} className="bg-gray-600 text-white px-6 py-3 rounded-lg font-medium">Kembali</button>
+                <button type="button" onClick={handleNext} className="bg-gradient-to-r from-electric-blue to-neon-cyan text-white px-6 py-3 rounded-lg font-medium">Seterusnya</button>
+              </div>
             </div>
           )}
-        </div>
+
+          {step === 3 && (
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4">Langkah 3: Semak & Cipta</h3>
+              <div className="bg-gray-800/50 p-6 rounded-lg space-y-3">
+                <p><strong>Tajuk:</strong> {challengeData.title}</p>
+                <p><strong>Deskripsi:</strong> {challengeData.description}</p>
+                <p><strong>Jenis:</strong> {challengeType}</p>
+                <p><strong>Subjek:</strong> {challengeData.subject}</p>
+                <p><strong>Tingkatan:</strong> {challengeData.tingkatan}</p>
+                <p><strong>Ganjaran XP:</strong> {challengeData.xp_reward}</p>
+                {challengeData.due_date && <p><strong>Tarikh Akhir:</strong> {challengeData.due_date}</p>}
+                
+                {challengeType === 'quiz' && (
+                  <div>
+                    <p><strong>Soalan Kuiz:</strong> {quizQuestions.length} soalan</p>
+                    <p><strong>Markah Minimum Lulus:</strong> {challengeData.pass_criteria?.min_score}%</p>
+                  </div>
+                )}
+                {challengeType === 'video' && (
+                  <div>
+                    <p><strong>URL Video:</strong> {challengeData.content?.video_url}</p>
+                    <p><strong>Peratus Tontonan Minimum:</strong> {challengeData.pass_criteria?.min_percentage}%</p>
+                  </div>
+                )}
+                {challengeType === 'reading' && (
+                  <div>
+                    <p><strong>Kandungan Bacaan:</strong> {challengeData.content?.text_content?.substring(0, 100)}...</p>
+                    <p><strong>Peratus Bacaan Minimum:</strong> {challengeData.pass_criteria?.min_percentage}%</p>
+                  </div>
+                )}
+                {challengeType === 'upload' && (
+                  <div>
+                    <p><strong>Jenis Fail Dibenarkan:</strong> {challengeData.content?.allowed_file_types?.join(', ')}</p>
+                    <p><strong>Saiz Fail Maksimum:</strong> {challengeData.content?.max_file_size ? (challengeData.content.max_file_size / (1024 * 1024)).toFixed(2) + ' MB' : 'N/A'}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-between mt-6">
+                <button type="button" onClick={handleBack} className="bg-gray-600 text-white px-6 py-3 rounded-lg font-medium">Kembali</button>
+                <button type="submit" disabled={loading} className="bg-gradient-to-r from-neon-green to-teal-500 text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50">
+                  {loading ? 'Mencipta...' : 'Cipta Cabaran'}
+                </button>
+              </div>
+            </div>
+          )}
+        </form>
       </div>
     </div>
   );
 }
+
