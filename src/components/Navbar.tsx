@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
@@ -38,12 +38,81 @@ export default function Navbar() {
     }
   }
 
+  // Role-specific navigation items
+  const getNavigationItems = () => {
+    const role = user?.user_metadata?.role
+
+    // Common items for all users
+    const commonItems = [
+      { href: '/', label: 'Laman Utama' },
+      { href: '/about', label: 'Tentang Kami' },
+      { href: '/leaderboard', label: 'Leaderboard' }
+    ]
+
+    // Role-specific items
+    const roleSpecificItems = {
+      admin: [
+        ...commonItems,
+        { href: '/playground', label: 'Playground' },
+        { href: '/nota', label: 'Nota' },
+        { href: '/dashboard-admin/nota', label: 'Urus Nota' },
+        { href: '/dashboard-admin/cabaran', label: 'Urus Cabaran' }
+      ],
+      murid: [
+        ...commonItems,
+        { href: '/playground', label: 'Playground' },
+        { href: '/nota', label: 'Nota' },
+        { href: '/cabaran', label: 'Cabaran' },
+        { href: '/profile', label: 'Profil' }
+      ],
+      awam: [
+        ...commonItems,
+        { href: '/playground', label: 'Playground' },
+        { href: '/nota', label: 'Nota' },
+        { href: '/profile', label: 'Profil' }
+      ]
+    }
+
+    return role ? roleSpecificItems[role as keyof typeof roleSpecificItems] || commonItems : commonItems
+  }
+
+  // Role-specific dashboard link
+  const getDashboardLink = () => {
+    const role = user?.user_metadata?.role
+    
+    const dashboardLinks = {
+      admin: { href: '/dashboard-admin', label: 'Dashboard Admin', color: 'neon-green' },
+      murid: { href: '/dashboard-murid', label: 'Dashboard Murid', color: 'electric-blue' },
+      awam: { href: '/dashboard-awam', label: 'Dashboard Awam', color: 'electric-blue' }
+    }
+
+    return role ? dashboardLinks[role as keyof typeof dashboardLinks] : null
+  }
+
+  // Role-specific home page link
+  const getHomeLink = () => {
+    const role = user?.user_metadata?.role
+    
+    if (!role) return '/'
+    
+    const homeLinks = {
+      admin: '/home-admin',
+      murid: '/home-murid', 
+      awam: '/home-awam'
+    }
+
+    return homeLinks[role as keyof typeof homeLinks] || '/'
+  }
+
+  const navigationItems = getNavigationItems()
+  const dashboardLink = getDashboardLink()
+
   return (
     <nav className="bg-gradient-to-r from-dark-black via-gray-900 to-dark-black backdrop-blur-lg border-b border-electric-blue/20 sticky top-0 z-50 shadow-lg shadow-electric-blue/10">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 group">
+          <Link href={getHomeLink()} className="flex items-center space-x-2 group">
             <div className="w-8 h-8 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
               <span className="text-dark-black font-bold text-sm">C</span>
             </div>
@@ -53,42 +122,33 @@ export default function Navbar() {
           </Link>
           
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group">
-              <span>Laman Utama</span>
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-electric-blue to-neon-cyan group-hover:w-full transition-all duration-300"></div>
-            </Link>
-            <Link href="/about" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group">
-              <span>Tentang Kami</span>
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-electric-blue to-neon-cyan group-hover:w-full transition-all duration-300"></div>
-            </Link>
-            <Link href="/nota" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group">
-              <span>Nota</span>
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-electric-blue to-neon-cyan group-hover:w-full transition-all duration-300"></div>
-            </Link>
-            <Link href="/leaderboard" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group">
-              <span>Leaderboard</span>
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-electric-blue to-neon-cyan group-hover:w-full transition-all duration-300"></div>
-            </Link>
+          <div className="hidden md:flex items-center space-x-6">
+            {navigationItems.map((item) => (
+              <Link 
+                key={item.href} 
+                href={item.href} 
+                className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group"
+              >
+                <span>{item.label}</span>
+                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-electric-blue to-neon-cyan group-hover:w-full transition-all duration-300"></div>
+              </Link>
+            ))}
           </div>
 
           {/* User Actions */}
           <div className="hidden md:flex items-center space-x-4">
             {!loading && user ? (
               <>
-                  {user.user_metadata?.role === 'murid' && (
-                  <Link href="/dashboard-murid" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-electric-blue/25">
-                    Dashboard Murid
-                  </Link>
-                )}
-                {user.user_metadata?.role === 'awam' && (
-                  <Link href="/dashboard-awam" className="px-4 py-2 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-electric-blue/25">
-                    Dashboard Awam
-                  </Link>
-                )}
-                {user.user_metadata?.role === 'admin' && (
-                  <Link href="/dashboard-admin" className="px-4 py-2 bg-gradient-to-r from-neon-green/20 to-electric-blue/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-neon-green/25">
-                    Dashboard Admin
+                {dashboardLink && (
+                  <Link 
+                    href={dashboardLink.href} 
+                    className={`px-4 py-2 bg-gradient-to-r ${
+                      dashboardLink.color === 'neon-green' 
+                        ? 'from-neon-green/20 to-electric-blue/20 border-neon-green/30 text-neon-green hover:bg-neon-green/30 hover:shadow-neon-green/25' 
+                        : 'from-electric-blue/20 to-neon-cyan/20 border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 hover:shadow-electric-blue/25'
+                    } border rounded-lg transition-all duration-300 hover:shadow-lg`}
+                  >
+                    {dashboardLink.label}
                   </Link>
                 )}
                 <button 
@@ -126,38 +186,35 @@ export default function Navbar() {
         {/* Mobile Menu */}
         <div className={`md:hidden transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
           <div className="py-4 space-y-4 border-t border-electric-blue/20">
-            <Link href="/" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Laman Utama
-            </Link>
-            <Link href="/about" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Tentang Kami
-            </Link>
-            <Link href="/nota" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Nota
-            </Link>
-            <Link href="/leaderboard" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
-              Leaderboard
-            </Link>
+            {navigationItems.map((item) => (
+              <Link 
+                key={item.href} 
+                href={item.href} 
+                className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
             
             {!loading && user ? (
               <>
-                {user.user_metadata?.role === 'murid' && (
-                  <Link href="/dashboard-murid" className="block text-electric-blue py-2">
-                    Dashboard Murid
-                  </Link>
-                )}
-                {user.user_metadata?.role === 'awam' && (
-                  <Link href="/dashboard-awam" className="block text-electric-blue py-2">
-                    Dashboard Awam
-                  </Link>
-                )}
-                {user.user_metadata?.role === 'admin' && (
-                  <Link href="/dashboard-admin" className="block text-neon-green py-2">
-                    Dashboard Admin
+                {dashboardLink && (
+                  <Link 
+                    href={dashboardLink.href} 
+                    className={`block py-2 ${
+                      dashboardLink.color === 'neon-green' ? 'text-neon-green' : 'text-electric-blue'
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {dashboardLink.label}
                   </Link>
                 )}
                 <button 
-                  onClick={handleSignOut} 
+                  onClick={() => {
+                    handleSignOut()
+                    setMobileMenuOpen(false)
+                  }} 
                   className="block text-red-400 py-2 w-full text-left"
                 >
                   Log Keluar
@@ -165,10 +222,18 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link href="/daftar" className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2">
+                <Link 
+                  href="/daftar" 
+                  className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
                   Daftar
                 </Link>
-                <Link href="/login" className="block text-electric-blue py-2">
+                <Link 
+                  href="/login" 
+                  className="block text-electric-blue py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
                   Log Masuk
                 </Link>
               </>

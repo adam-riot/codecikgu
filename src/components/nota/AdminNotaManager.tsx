@@ -1,23 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/utils/supabase'
-import { 
-  FileText, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Search, 
-  Upload, 
-  X, 
-  Check, 
-  AlertTriangle,
-  Download,
-  Eye
-} from 'lucide-react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// Interface untuk data nota
+// TypeScript interfaces
 interface Note {
   id: string
   title: string
@@ -28,81 +16,77 @@ interface Note {
   file_url: string
   file_size: string
   created_at: string
-  updated_at: string
 }
 
-export default function AdminNotaManager() {
-  const router = useRouter()
+interface FormData {
+  title: string
+  description: string
+  subject: string
+  tingkatan: string
+  format: string
+  file: File | null
+}
+
+interface Subject {
+  id: string
+  name: string
+}
+
+interface Option {
+  id: string
+  name: string
+}
+
+const AdminNotaManager = () => {
   const [notes, setNotes] = useState<Note[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedSubject, setSelectedSubject] = useState('semua')
-  const [selectedTingkatan, setSelectedTingkatan] = useState('semua')
-  
-  // State untuk form tambah/edit nota
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [selectedSubject, setSelectedSubject] = useState<string>('all')
+  const [selectedTingkatan, setSelectedTingkatan] = useState<string>('all')
+  const [selectedFormat, setSelectedFormat] = useState<string>('all')
+  const [showAddModal, setShowAddModal] = useState<boolean>(false)
+  const [showEditModal, setShowEditModal] = useState<boolean>(false)
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false)
   const [currentNote, setCurrentNote] = useState<Note | null>(null)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
-    subject: '',
-    tingkatan: '',
+    subject: 'Sains Komputer',
+    tingkatan: 'Tingkatan 4',
     format: 'PDF',
-    file: null as File | null
+    file: null
   })
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [formError, setFormError] = useState('')
-  const [formSuccess, setFormSuccess] = useState('')
   
-  // State untuk konfirmasi hapus
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [noteToDelete, setNoteToDelete] = useState<string | null>(null)
+  const router = useRouter()
+  const supabase = createClientComponentClient()
 
-  // Contoh data subjek
-  const subjects = [
-    { id: 'sains-komputer', name: 'Sains Komputer' },
-    { id: 'matematik', name: 'Matematik' },
-    { id: 'bahasa-melayu', name: 'Bahasa Melayu' },
-    { id: 'bahasa-inggeris', name: 'Bahasa Inggeris' },
-    { id: 'sejarah', name: 'Sejarah' },
-    { id: 'reka-bentuk', name: 'Reka Bentuk Teknologi' },
-    { id: 'sains', name: 'Sains' },
-    { id: 'pendidikan-islam', name: 'Pendidikan Islam' },
-    { id: 'prinsip-perakaunan', name: 'Prinsip Perakaunan' },
-    { id: 'ekonomi', name: 'Ekonomi' },
-    { id: 'geografi', name: 'Geografi' }
+  // Hanya subjek Sains Komputer sahaja
+  const subjects: Subject[] = [
+    { id: 'sains-komputer', name: 'Sains Komputer' }
   ]
 
-  // Contoh data tingkatan
-  const tingkatan = [
+  const tingkatanOptions: Option[] = [
     { id: 'tingkatan-4', name: 'Tingkatan 4' },
     { id: 'tingkatan-5', name: 'Tingkatan 5' }
   ]
 
-  // Contoh data format
-  const formats = ['PDF', 'PPTX', 'DOCX', 'XLSX']
+  const formatOptions: Option[] = [
+    { id: 'pdf', name: 'PDF' },
+    { id: 'pptx', name: 'PowerPoint' },
+    { id: 'docx', name: 'Word' },
+    { id: 'xlsx', name: 'Excel' }
+  ]
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user || user.email !== 'adamsofi@codecikgu.com') {
-        router.push('/login')
-        return
-      }
+    fetchNotes()
+  }, [])
 
-      await fetchNotes()
-    }
-
-    checkAuth()
-  }, [router])
-
-  const fetchNotes = async () => {
+  const fetchNotes = async (): Promise<void> => {
     try {
-      // Dalam implementasi sebenar, ini akan mengambil data dari Supabase
-      // Untuk contoh ini, kita gunakan data dummy
-      const dummyNotes: Note[] = [
+      setLoading(true)
+      
+      // Simulasi data dari Supabase
+      const mockNotes: Note[] = [
         {
           id: '1',
           title: 'Asas Pengaturcaraan Python',
@@ -110,10 +94,9 @@ export default function AdminNotaManager() {
           subject: 'Sains Komputer',
           tingkatan: 'Tingkatan 4',
           format: 'PDF',
-          file_url: '#',
+          file_url: '/notes/python-basics.pdf',
           file_size: '2.5 MB',
-          created_at: '2023-10-15',
-          updated_at: '2023-10-15'
+          created_at: '2023-10-15T00:00:00Z'
         },
         {
           id: '2',
@@ -122,10 +105,9 @@ export default function AdminNotaManager() {
           subject: 'Sains Komputer',
           tingkatan: 'Tingkatan 4',
           format: 'PDF',
-          file_url: '#',
+          file_url: '/notes/algorithms.pdf',
           file_size: '3.2 MB',
-          created_at: '2023-09-28',
-          updated_at: '2023-09-28'
+          created_at: '2023-09-28T00:00:00Z'
         },
         {
           id: '3',
@@ -134,585 +116,645 @@ export default function AdminNotaManager() {
           subject: 'Sains Komputer',
           tingkatan: 'Tingkatan 4',
           format: 'PDF',
-          file_url: '#',
+          file_url: '/notes/web-dev.pdf',
           file_size: '4.1 MB',
-          created_at: '2023-11-05',
-          updated_at: '2023-11-05'
-        },
-        {
-          id: '4',
-          title: 'Pengaturcaraan Lanjutan Python',
-          description: 'Topik lanjutan dalam pengaturcaraan Python termasuk pengecualian, pemprosesan fail, dan pengujian.',
-          subject: 'Sains Komputer',
-          tingkatan: 'Tingkatan 5',
-          format: 'PDF',
-          file_url: '#',
-          file_size: '3.2 MB',
-          created_at: '2023-10-18',
-          updated_at: '2023-10-18'
-        },
-        {
-          id: '5',
-          title: 'Pembangunan Aplikasi Web',
-          description: 'Pembangunan aplikasi web menggunakan framework moden seperti React dan Node.js.',
-          subject: 'Sains Komputer',
-          tingkatan: 'Tingkatan 5',
-          format: 'PDF',
-          file_url: '#',
-          file_size: '4.5 MB',
-          created_at: '2023-09-25',
-          updated_at: '2023-09-25'
+          created_at: '2023-11-05T00:00:00Z'
         }
       ]
       
-      setNotes(dummyNotes)
-      setLoading(false)
+      setNotes(mockNotes)
     } catch (error) {
       console.error('Error fetching notes:', error)
+    } finally {
       setLoading(false)
     }
   }
 
-  // Filter nota berdasarkan carian, subjek, dan tingkatan
-  const filteredNotes = notes.filter(note => {
-    const matchesSearch = note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          note.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesSubject = selectedSubject === 'semua' || note.subject.toLowerCase().includes(selectedSubject.toLowerCase())
-    const matchesTingkatan = selectedTingkatan === 'semua' || note.tingkatan.toLowerCase().includes(selectedTingkatan.toLowerCase())
+  const handleAddNewNote = (): void => {
+    setFormData({
+      title: '',
+      description: '',
+      subject: 'Sains Komputer',
+      tingkatan: 'Tingkatan 4',
+      format: 'PDF',
+      file: null
+    })
+    setShowAddModal(true)
+  }
+
+  const handleEditNote = (noteId: string): void => {
+    const noteToEdit = notes.find((note: Note) => note.id === noteId)
+    if (noteToEdit) {
+      setCurrentNote(noteToEdit)
+      setFormData({
+        title: noteToEdit.title,
+        description: noteToEdit.description,
+        subject: noteToEdit.subject,
+        tingkatan: noteToEdit.tingkatan,
+        format: noteToEdit.format,
+        file: null
+      })
+      setShowEditModal(true)
+    }
+  }
+
+  const handleDeleteNote = (noteId: string): void => {
+    const noteToDelete = notes.find((note: Note) => note.id === noteId)
+    if (noteToDelete) {
+      setCurrentNote(noteToDelete)
+      setShowDeleteModal(true)
+    }
+  }
+
+  const handleSubmitAdd = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault()
+    try {
+      // Simulasi penambahan nota baru
+      const newNote: Note = {
+        id: Date.now().toString(),
+        title: formData.title,
+        description: formData.description,
+        subject: formData.subject,
+        tingkatan: formData.tingkatan,
+        format: formData.format,
+        file_url: '/notes/new-note.pdf',
+        file_size: '1.0 MB',
+        created_at: new Date().toISOString()
+      }
+      
+      setNotes([...notes, newNote])
+      setShowAddModal(false)
+      alert('Nota baru berjaya ditambah!')
+    } catch (error) {
+      console.error('Error adding note:', error)
+      alert('Gagal menambah nota baru.')
+    }
+  }
+
+  const handleSubmitEdit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault()
+    if (!currentNote) return
     
-    return matchesSearch && matchesSubject && matchesTingkatan
-  })
-
-  const handleOpenForm = (note?: Note) => {
-    if (note) {
-      setIsEditing(true)
-      setCurrentNote(note)
-      setFormData({
-        title: note.title,
-        description: note.description,
-        subject: note.subject,
-        tingkatan: note.tingkatan,
-        format: note.format,
-        file: null
+    try {
+      // Simulasi pengemaskinian nota
+      const updatedNotes = notes.map((note: Note) => {
+        if (note.id === currentNote.id) {
+          return {
+            ...note,
+            title: formData.title,
+            description: formData.description,
+            subject: formData.subject,
+            tingkatan: formData.tingkatan,
+            format: formData.format
+          }
+        }
+        return note
       })
-    } else {
-      setIsEditing(false)
-      setCurrentNote(null)
-      setFormData({
-        title: '',
-        description: '',
-        subject: '',
-        tingkatan: '',
-        format: 'PDF',
-        file: null
-      })
-    }
-    setFormError('')
-    setFormSuccess('')
-    setIsFormOpen(true)
-  }
-
-  const handleCloseForm = () => {
-    setIsFormOpen(false)
-    setUploadProgress(0)
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFormData({
-        ...formData,
-        file: e.target.files[0]
-      })
+      
+      setNotes(updatedNotes)
+      setShowEditModal(false)
+      alert('Nota berjaya dikemaskini!')
+    } catch (error) {
+      console.error('Error updating note:', error)
+      alert('Gagal mengemaskini nota.')
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!currentNote) return
+    
+    try {
+      // Simulasi penghapusan nota
+      const updatedNotes = notes.filter((note: Note) => note.id !== currentNote.id)
+      setNotes(updatedNotes)
+      setShowDeleteModal(false)
+      alert('Nota berjaya dipadam!')
+    } catch (error) {
+      console.error('Error deleting note:', error)
+      alert('Gagal memadam nota.')
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0] || null
     setFormData({
       ...formData,
-      [name]: value
+      file: file
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setFormError('')
-    setFormSuccess('')
+  const filteredNotes = notes.filter((note: Note) => {
+    const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          note.description.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSubject = selectedSubject === 'all' || note.subject === selectedSubject
+    const matchesTingkatan = selectedTingkatan === 'all' || note.tingkatan === selectedTingkatan
+    const matchesFormat = selectedFormat === 'all' || note.format === selectedFormat
+    
+    return matchesSearch && matchesSubject && matchesTingkatan && matchesFormat
+  })
 
-    // Validasi form
-    if (!formData.title || !formData.description || !formData.subject || !formData.tingkatan) {
-      setFormError('Sila isi semua maklumat yang diperlukan.')
-      return
-    }
-
-    if (!isEditing && !formData.file) {
-      setFormError('Sila pilih fail untuk dimuat naik.')
-      return
-    }
-
-    try {
-      // Simulasi upload progress
-      const simulateUpload = () => {
-        let progress = 0
-        const interval = setInterval(() => {
-          progress += 10
-          setUploadProgress(progress)
-          if (progress >= 100) {
-            clearInterval(interval)
-            
-            // Simulasi penambahan/pengeditan nota
-            setTimeout(() => {
-              if (isEditing && currentNote) {
-                // Update nota sedia ada
-                const updatedNotes = notes.map(note => 
-                  note.id === currentNote.id 
-                    ? {
-                        ...note,
-                        title: formData.title,
-                        description: formData.description,
-                        subject: formData.subject,
-                        tingkatan: formData.tingkatan,
-                        format: formData.format,
-                        updated_at: new Date().toISOString().split('T')[0]
-                      }
-                    : note
-                )
-                setNotes(updatedNotes)
-                setFormSuccess('Nota telah berjaya dikemaskini!')
-              } else {
-                // Tambah nota baru
-                const newNote: Note = {
-                  id: (notes.length + 1).toString(),
-                  title: formData.title,
-                  description: formData.description,
-                  subject: formData.subject,
-                  tingkatan: formData.tingkatan,
-                  format: formData.format,
-                  file_url: '#',
-                  file_size: formData.file ? `${(formData.file.size / (1024 * 1024)).toFixed(1)} MB` : '0 MB',
-                  created_at: new Date().toISOString().split('T')[0],
-                  updated_at: new Date().toISOString().split('T')[0]
-                }
-                setNotes([newNote, ...notes])
-                setFormSuccess('Nota telah berjaya ditambah!')
-              }
-              
-              // Reset form selepas 2 saat
-              setTimeout(() => {
-                handleCloseForm()
-              }, 2000)
-            }, 500)
-          }
-        }, 200)
-      }
-
-      simulateUpload()
-    } catch (error) {
-      console.error('Error submitting note:', error)
-      setFormError('Ralat semasa memproses nota. Sila cuba lagi.')
-      setUploadProgress(0)
-    }
-  }
-
-  const handleDeleteConfirm = (noteId: string) => {
-    setNoteToDelete(noteId)
-    setDeleteConfirmOpen(true)
-  }
-
-  const handleDelete = async () => {
-    if (!noteToDelete) return
-
-    try {
-      // Simulasi penghapusan nota
-      const updatedNotes = notes.filter(note => note.id !== noteToDelete)
-      setNotes(updatedNotes)
-      setDeleteConfirmOpen(false)
-      setNoteToDelete(null)
-    } catch (error) {
-      console.error('Error deleting note:', error)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="text-2xl text-gradient loading-dots">Memuat pengurusan nota</div>
-        </div>
-      </div>
-    )
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString)
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
-      {/* Hero Section */}
-      <section className="relative py-12 overflow-hidden bg-circuit">
-        <div className="absolute inset-0 bg-grid opacity-10"></div>
-        <div className="absolute top-10 right-10 w-40 h-40 bg-gradient-to-br from-neon-green/20 to-electric-blue/20 rounded-full blur-xl animate-float"></div>
-        <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-br from-electric-blue/20 to-neon-cyan/20 rounded-full blur-xl animate-float" style={{animationDelay: '3s'}}></div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-6xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gradient">
-              🛠️ Pengurusan Nota
-            </h1>
-            <p className="text-xl text-gray-300 mb-8">
-              Tambah, edit, dan urus nota pembelajaran untuk pelajar
-            </p>
-            
-            <button
-              onClick={() => handleOpenForm()}
-              className="btn-primary flex items-center"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              <span>Tambah Nota Baru</span>
-            </button>
+    <div className="min-h-screen bg-circuit dark:bg-gray-900 text-white">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gradient">Pengurusan Nota</h1>
+            <p className="text-gray-400 mt-2">Tambah, edit, dan padam nota untuk pelajar</p>
           </div>
+          <Link 
+            href="/dashboard-admin" 
+            className="btn-primary flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            </svg>
+            Kembali ke Dashboard Admin
+          </Link>
         </div>
-      </section>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-7xl mx-auto">
-          {/* Search and Filter */}
-          <div className="glass-dark rounded-xl p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Search */}
+        {/* Action Button */}
+        <div className="mb-6 flex justify-end">
+          <button 
+            onClick={handleAddNewNote}
+            className="btn-primary flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Tambah Nota Baru
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="glass-dark rounded-xl p-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-sm font-medium text-gray-400 mb-1">Cari Nota</label>
               <div className="relative">
                 <input
                   type="text"
                   placeholder="Cari nota..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100 pl-10"
+                  className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              </div>
-              
-              {/* Subject Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Subjek</label>
-                <select
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
+                <svg
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <option value="semua">Semua Subjek</option>
-                  {subjects.map(subject => (
-                    <option key={subject.id} value={subject.id}>{subject.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Tingkatan Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Tingkatan</label>
-                <select
-                  value={selectedTingkatan}
-                  onChange={(e) => setSelectedTingkatan(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
-                >
-                  <option value="semua">Semua Tingkatan</option>
-                  {tingkatan.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
               </div>
             </div>
-          </div>
-          
-          {/* Notes Table */}
-          <div className="glass-dark rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20">
-                  <tr>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Tajuk</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden md:table-cell">Subjek</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden sm:table-cell">Tingkatan</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Format</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider hidden lg:table-cell">Tarikh</th>
-                    <th className="px-4 py-4 text-left text-xs font-medium text-electric-blue uppercase tracking-wider">Tindakan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700/50">
-                  {filteredNotes.map((note) => (
-                    <tr key={note.id} className="hover:bg-electric-blue/5 transition-all duration-300">
-                      <td className="px-4 py-4">
-                        <div className="font-medium text-gray-100">{note.title}</div>
-                        <div className="text-sm text-gray-400 max-w-xs truncate">{note.description}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
-                        <div className="text-gray-300 text-sm">{note.subject}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
-                        <div className="text-gray-300 text-sm">{note.tingkatan}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-electric-blue/20 text-electric-blue border border-electric-blue/30">
-                          {note.format}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
-                        <div className="text-gray-300 text-sm">
-                          {new Date(note.updated_at).toLocaleDateString('ms-MY')}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleOpenForm(note)}
-                            className="p-1 text-neon-green hover:bg-neon-green/10 rounded"
-                            title="Edit"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteConfirm(note.id)}
-                            className="p-1 text-red-400 hover:bg-red-400/10 rounded"
-                            title="Padam"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                          <a 
-                            href={note.file_url} 
-                            className="p-1 text-electric-blue hover:bg-electric-blue/10 rounded"
-                            title="Muat Turun"
-                          >
-                            <Download className="w-5 h-5" />
-                          </a>
-                          <a 
-                            href={note.file_url} 
-                            className="p-1 text-neon-cyan hover:bg-neon-cyan/10 rounded"
-                            title="Lihat"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Tingkatan</label>
+              <select
+                className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={selectedTingkatan}
+                onChange={(e) => setSelectedTingkatan(e.target.value)}
+              >
+                <option value="all">Semua Tingkatan</option>
+                {tingkatanOptions.map((option: Option) => (
+                  <option key={option.id} value={option.name}>{option.name}</option>
+                ))}
+              </select>
             </div>
-
-            {filteredNotes.length === 0 && (
-              <div className="p-8 text-center">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-300 mb-2">
-                  Tiada nota dijumpai
-                </h3>
-                <p className="text-gray-400 mb-6">
-                  Cuba carian lain atau tukar filter untuk melihat nota yang tersedia.
-                </p>
-                <button
-                  onClick={() => handleOpenForm()}
-                  className="btn-primary inline-flex items-center"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  <span>Tambah Nota Baru</span>
-                </button>
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Format</label>
+              <select
+                className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={selectedFormat}
+                onChange={(e) => setSelectedFormat(e.target.value)}
+              >
+                <option value="all">Semua Format</option>
+                {formatOptions.map((option: Option) => (
+                  <option key={option.id} value={option.name}>{option.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
+
+        {/* Notes List */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-gray-400 loading-dots">Memuat nota</p>
+          </div>
+        ) : filteredNotes.length === 0 ? (
+          <div className="text-center py-12 glass-dark rounded-xl">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="text-xl font-semibold mb-2">Tiada Nota Ditemui</h3>
+            <p className="text-gray-400 mb-6">Tiada nota yang sepadan dengan kriteria carian anda.</p>
+            <button 
+              onClick={handleAddNewNote}
+              className="btn-primary"
+            >
+              Tambah Nota Baru
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredNotes.map((note: Note) => (
+              <div key={note.id} className="glass-dark rounded-xl overflow-hidden">
+                <div className="p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-blue-900/50 text-blue-300 mb-2">
+                        {note.subject}
+                      </span>
+                      <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-purple-900/50 text-purple-300 mb-2 ml-2">
+                        {note.tingkatan}
+                      </span>
+                      <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-red-900/50 text-red-300 mb-2 ml-2">
+                        {note.format}
+                      </span>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => handleEditNote(note.id)}
+                        className="text-blue-500 hover:text-blue-300 transition"
+                        title="Edit Nota"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteNote(note.id)}
+                        className="text-red-500 hover:text-red-300 transition"
+                        title="Padam Nota"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-xl font-semibold mt-2">{note.title}</h3>
+                  <p className="text-gray-400 mt-2 line-clamp-2">{note.description}</p>
+                  
+                  <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+                    <span>Saiz: {note.file_size}</span>
+                    <span>Tarikh: {formatDate(note.created_at)}</span>
+                  </div>
+                </div>
+                
+                <div className="flex border-t border-gray-700">
+                  <a 
+                    href={note.file_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center py-3 text-blue-400 hover:bg-blue-900/20 transition"
+                  >
+                    <span className="flex items-center justify-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                      Muat Turun
+                    </span>
+                  </a>
+                  <a 
+                    href={note.file_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center py-3 text-green-400 hover:bg-green-900/20 transition border-l border-gray-700"
+                  >
+                    <span className="flex items-center justify-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                      Lihat
+                    </span>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Add/Edit Note Modal */}
-      {isFormOpen && (
+      {/* Add Note Modal */}
+      {showAddModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="glass-dark rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-700/50 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-primary">
-                {isEditing ? 'Edit Nota' : 'Tambah Nota Baru'}
-              </h2>
-              <button
-                onClick={handleCloseForm}
-                className="p-1 text-gray-400 hover:text-white"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6">
-              {formError && (
-                <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 flex items-start">
-                  <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                  <p>{formError}</p>
-                </div>
-              )}
+          <div className="bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gradient">Tambah Nota Baru</h2>
+                <button 
+                  onClick={() => setShowAddModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
               
-              {formSuccess && (
-                <div className="mb-6 p-4 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 flex items-start">
-                  <Check className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                  <p>{formSuccess}</p>
-                </div>
-              )}
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Tajuk Nota</label>
+              <form onSubmit={handleSubmitAdd}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Tajuk Nota</label>
                   <input
                     type="text"
-                    name="title"
+                    className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={formData.title}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
-                    placeholder="Contoh: Asas Pengaturcaraan Python"
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    required
                   />
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Deskripsi</label>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Deskripsi</label>
                   <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={3}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
-                    placeholder="Deskripsi ringkas tentang nota ini..."
-                  />
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    required
+                  ></textarea>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Subjek</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Subjek</label>
                     <select
-                      name="subject"
+                      className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={formData.subject}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
+                      onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                      required
                     >
-                      <option value="">Pilih Subjek</option>
-                      {subjects.map(subject => (
+                      {subjects.map((subject: Subject) => (
                         <option key={subject.id} value={subject.name}>{subject.name}</option>
                       ))}
                     </select>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Tingkatan</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Tingkatan</label>
                     <select
-                      name="tingkatan"
+                      className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={formData.tingkatan}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
+                      onChange={(e) => setFormData({...formData, tingkatan: e.target.value})}
+                      required
                     >
-                      <option value="">Pilih Tingkatan</option>
-                      {tingkatan.map(t => (
-                        <option key={t.id} value={t.name}>{t.name}</option>
+                      {tingkatanOptions.map((option: Option) => (
+                        <option key={option.id} value={option.name}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Format</label>
+                    <select
+                      className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={formData.format}
+                      onChange={(e) => setFormData({...formData, format: e.target.value})}
+                      required
+                    >
+                      {formatOptions.map((option: Option) => (
+                        <option key={option.id} value={option.name}>{option.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Format</label>
-                  <select
-                    name="format"
-                    value={formData.format}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-electric-blue/50 text-gray-100"
-                  >
-                    {formats.map(format => (
-                      <option key={format} value={format}>{format}</option>
-                    ))}
-                  </select>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Fail Nota</label>
+                  <div className="flex items-center justify-center w-full">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-700 border-gray-600 hover:bg-gray-600">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        {formData.file ? (
+                          <p className="mb-2 text-sm text-gray-300">{formData.file.name}</p>
+                        ) : (
+                          <>
+                            <p className="mb-2 text-sm text-gray-300">Klik untuk muat naik fail</p>
+                            <p className="text-xs text-gray-500">PDF, PPTX, DOCX, XLSX (Maks. 10MB)</p>
+                          </>
+                        )}
+                      </div>
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        onChange={handleFileChange}
+                        accept=".pdf,.pptx,.docx,.xlsx"
+                        required
+                      />
+                    </label>
+                  </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    {isEditing ? 'Muat Naik Fail Baru (Pilihan)' : 'Muat Naik Fail'}
-                  </label>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex-1 flex items-center justify-center px-4 py-3 bg-gray-800/50 border border-electric-blue/30 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors">
-                      <Upload className="w-5 h-5 mr-2 text-electric-blue" />
-                      <span className="text-gray-300">
-                        {formData.file ? formData.file.name : 'Pilih fail...'}
-                      </span>
-                      <input
-                        type="file"
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition"
+                  >
+                    Tambah Nota
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Note Modal */}
+      {showEditModal && currentNote && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gradient">Edit Nota</h2>
+                <button 
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <form onSubmit={handleSubmitEdit}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Tajuk Nota</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    required
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Deskripsi</label>
+                  <textarea
+                    className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={3}
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    required
+                  ></textarea>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Subjek</label>
+                    <select
+                      className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={formData.subject}
+                      onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                      required
+                    >
+                      {subjects.map((subject: Subject) => (
+                        <option key={subject.id} value={subject.name}>{subject.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Tingkatan</label>
+                    <select
+                      className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={formData.tingkatan}
+                      onChange={(e) => setFormData({...formData, tingkatan: e.target.value})}
+                      required
+                    >
+                      {tingkatanOptions.map((option: Option) => (
+                        <option key={option.id} value={option.name}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Format</label>
+                    <select
+                      className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={formData.format}
+                      onChange={(e) => setFormData({...formData, format: e.target.value})}
+                      required
+                    >
+                      {formatOptions.map((option: Option) => (
+                        <option key={option.id} value={option.name}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Fail Nota</label>
+                  <div className="flex items-center justify-center w-full">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-700 border-gray-600 hover:bg-gray-600">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        {formData.file ? (
+                          <p className="mb-2 text-sm text-gray-300">{formData.file.name}</p>
+                        ) : (
+                          <>
+                            <p className="mb-2 text-sm text-gray-300">Klik untuk muat naik fail baru</p>
+                            <p className="text-xs text-gray-500">Fail sedia ada: {currentNote.file_url.split('/').pop()}</p>
+                          </>
+                        )}
+                      </div>
+                      <input 
+                        type="file" 
+                        className="hidden" 
                         onChange={handleFileChange}
-                        className="hidden"
                         accept=".pdf,.pptx,.docx,.xlsx"
                       />
                     </label>
-                    {formData.file && (
-                      <button
-                        type="button"
-                        onClick={() => setFormData({...formData, file: null})}
-                        className="p-2 text-red-400 hover:bg-red-400/10 rounded"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    )}
                   </div>
-                  {formData.file && (
-                    <p className="mt-2 text-sm text-gray-400">
-                      Saiz: {(formData.file.size / (1024 * 1024)).toFixed(2)} MB
-                    </p>
-                  )}
                 </div>
                 
-                {uploadProgress > 0 && (
-                  <div>
-                    <div className="flex justify-between text-sm text-gray-400 mb-2">
-                      <span>Muat Naik</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-electric-blue to-neon-cyan h-2 rounded-full" 
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="mt-8 flex justify-end space-x-4">
-                <button
-                  type="button"
-                  onClick={handleCloseForm}
-                  className="px-4 py-2 bg-gray-700/50 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={uploadProgress > 0 && uploadProgress < 100}
-                >
-                  {isEditing ? 'Kemaskini Nota' : 'Tambah Nota'}
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition"
+                  >
+                    Simpan Perubahan
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmOpen && (
+      {showDeleteModal && currentNote && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="glass-dark rounded-xl w-full max-w-md">
-            <div className="p-6 text-center">
-              <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">Padam Nota</h3>
-              <p className="text-gray-300 mb-6">
-                Adakah anda pasti ingin memadam nota ini? Tindakan ini tidak boleh dibatalkan.
-              </p>
-              <div className="flex justify-center space-x-4">
+          <div className="bg-gray-800 rounded-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-red-500">Padam Nota</h2>
+                <button 
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-300 mb-4">Adakah anda pasti mahu memadam nota ini?</p>
+                <div className="bg-gray-700 p-4 rounded-lg">
+                  <h3 className="font-semibold">{currentNote.title}</h3>
+                  <p className="text-gray-400 text-sm mt-1">{currentNote.subject} • {currentNote.tingkatan}</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
                 <button
-                  onClick={() => setDeleteConfirmOpen(false)}
-                  className="px-4 py-2 bg-gray-700/50 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition"
                 >
                   Batal
                 </button>
                 <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300"
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 transition"
                 >
-                  Ya, Padam
+                  Padam
                 </button>
               </div>
             </div>
@@ -722,4 +764,6 @@ export default function AdminNotaManager() {
     </div>
   )
 }
+
+export default AdminNotaManager
 
