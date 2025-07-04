@@ -6,17 +6,10 @@ import { useRouter } from 'next/navigation'
 import CodeEditor from '@/components/playground/CodeEditor'
 import ProjectManager from '@/components/playground/ProjectManager'
 import { Code, Save, Download, FolderOpen, Settings, Play, Square } from 'lucide-react'
+import { Project } from '@/types' // Import Project type from shared types file
 
-interface Project {
-  id: string
-  title: string
-  language: string
-  code: string
-  theme: string
-  is_public: boolean
-  created_at: string
-  updated_at: string
-}
+// Global variable to store Monaco Editor instance
+let globalMonacoEditor: any = null
 
 export default function PlaygroundPage() {
   const router = useRouter()
@@ -38,9 +31,6 @@ export default function PlaygroundPage() {
   const [output, setOutput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState('')
-
-  // Ref to get current code from Monaco Editor
-  const editorRef = useRef<any>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -102,7 +92,8 @@ export default function PlaygroundPage() {
       theme: 'vs-dark',
       is_public: false,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      user_id: user?.id
     }
     setCurrentProject(newProject)
     setCode(newProject.code)
@@ -123,11 +114,14 @@ export default function PlaygroundPage() {
     setError('')
   }
 
-  // Function to get current code from Monaco Editor
-  const getCurrentCodeFromEditor = () => {
-    if (editorRef.current && editorRef.current.getValue) {
-      return editorRef.current.getValue()
+  // Function to get current code directly from Monaco Editor
+  const getCurrentCodeFromMonaco = () => {
+    if (globalMonacoEditor && globalMonacoEditor.getValue) {
+      const currentCode = globalMonacoEditor.getValue()
+      console.log('Monaco Editor Code:', currentCode) // Debug log
+      return currentCode
     }
+    console.log('Fallback to state code:', code) // Debug log
     return code // fallback to state
   }
 
@@ -136,8 +130,8 @@ export default function PlaygroundPage() {
     setError('')
     setOutput('')
 
-    // Get current code from editor
-    const currentCode = getCurrentCodeFromEditor()
+    // Get current code from Monaco Editor
+    const currentCode = getCurrentCodeFromMonaco()
 
     try {
       if (language === 'javascript') {
@@ -274,8 +268,8 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
   const handleAutoSave = async () => {
     if (!currentProject || !user) return
 
-    // Get current code from editor
-    const currentCode = getCurrentCodeFromEditor()
+    // Get current code from Monaco Editor
+    const currentCode = getCurrentCodeFromMonaco()
 
     try {
       const updatedProject = {
@@ -320,8 +314,8 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
 
     setSaving(true)
     
-    // Get current code from editor
-    const currentCode = getCurrentCodeFromEditor()
+    // Get current code from Monaco Editor
+    const currentCode = getCurrentCodeFromMonaco()
     
     try {
       const projectData = {
@@ -370,13 +364,17 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
   }
 
   const handleDownload = () => {
-    // Get current code from Monaco Editor
-    const currentCode = getCurrentCodeFromEditor()
+    // Get current code DIRECTLY from Monaco Editor
+    const currentCode = getCurrentCodeFromMonaco()
+    
+    console.log('Download - Current Code from Monaco:', currentCode) // Debug log
+    console.log('Download - Language:', language) // Debug log
+    console.log('Download - FileName:', fileName) // Debug log
     
     const fileExtension = getFileExtension(language)
     const downloadFileName = `${fileName}.${fileExtension}`
     
-    // Create blob with current code from editor
+    // Create blob with current code from Monaco Editor
     const blob = new Blob([currentCode], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -387,8 +385,14 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    // Show confirmation
-    setOutput(`📥 Fail ${downloadFileName} telah dimuat turun dengan kod terkini dari editor.`)
+    // Show confirmation with code preview
+    const preview = currentCode.length > 100 ? currentCode.substring(0, 100) + '...' : currentCode
+    setOutput(`📥 Fail ${downloadFileName} telah dimuat turun!
+
+Kod yang dimuat turun:
+${preview}
+
+Jumlah aksara: ${currentCode.length}`)
   }
 
   const getFileExtension = (lang: string) => {
@@ -423,46 +427,17 @@ function greet(name) {
     return \`Hello, \${name}!\`;
 }
 
-console.log(greet("World"));
-
-// Try some calculations
-const a = 5;
-const b = 3;
-console.log(\`\${a} + \${b} = \${a + b}\`);
-
-// Work with arrays
-const fruits = ["apple", "banana", "orange"];
-console.log("My favorite fruits:");
-fruits.forEach(fruit => console.log("- " + fruit));`,
+console.log(greet("World"));`,
       'html': `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CodeCikgu Project</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .container {
-            background: rgba(255,255,255,0.1);
-            padding: 30px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚀 Welcome to CodeCikgu!</h1>
-        <p>Start building your amazing web project here.</p>
-        <button onclick="alert('Hello from CodeCikgu!')">Click Me!</button>
-    </div>
+    <h1>🚀 Welcome to CodeCikgu!</h1>
+    <p>Start building your amazing web project here.</p>
 </body>
 </html>`,
       'css': `/* Welcome to CodeCikgu Playground! */
@@ -473,31 +448,6 @@ body {
     margin: 0;
     padding: 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-}
-
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 30px;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    backdrop-filter: blur(10px);
-}
-
-h1 {
-    color: #333;
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.card {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
-    border-left: 4px solid #667eea;
 }`,
       'python': `# Welcome to CodeCikgu Playground!
 # Write your Python code here
@@ -507,88 +457,14 @@ print("Hello, CodeCikgu!")
 def greet(name):
     return f"Hello, {name}!"
 
-print(greet("World"))
-
-# Example: Simple calculator
-def add(a, b):
-    return a + b
-
-def multiply(a, b):
-    return a * b
-
-# Test the functions
-result1 = add(5, 3)
-result2 = multiply(4, 6)
-
-print(f"5 + 3 = {result1}")
-print(f"4 × 6 = {result2}")
-
-# Work with lists
-fruits = ["apple", "banana", "orange", "grape"]
-print("\\nMy favorite fruits:")
-for i, fruit in enumerate(fruits, 1):
-    print(f"{i}. {fruit}")`,
+print(greet("World"))`,
       'java': `// Welcome to CodeCikgu Playground!
 // Write your Java code here
 
-public class HelloMalaysia {
+public class HelloWorld {
     public static void main(String[] args) {
         System.out.println("Hello, CodeCikgu!");
-        System.out.println("Selamat datang ke Malaysia!");
-        
-        String message = greet("World");
-        System.out.println(message);
-        
-        // Simple calculations
-        int a = 10;
-        int b = 5;
-        System.out.println(a + " + " + b + " = " + (a + b));
-        System.out.println(a + " × " + b + " = " + (a * b));
-        
-        // Array example
-        String[] cities = {"Kuala Lumpur", "Penang", "Johor Bahru", "Kota Kinabalu"};
-        System.out.println("\\nMajor cities in Malaysia:");
-        for (int i = 0; i < cities.length; i++) {
-            System.out.println((i + 1) + ". " + cities[i]);
-        }
     }
-    
-    public static String greet(String name) {
-        return "Hello, " + name + "!";
-    }
-}`,
-      'cpp': `// Welcome to CodeCikgu Playground!
-// Write your C++ code here
-
-#include <iostream>
-#include <string>
-#include <vector>
-
-using namespace std;
-
-string greet(string name) {
-    return "Hello, " + name + "!";
-}
-
-int main() {
-    cout << "Hello, CodeCikgu!" << endl;
-    cout << "Selamat datang ke C++!" << endl;
-    cout << greet("World") << endl;
-    
-    // Simple calculations
-    int a = 15;
-    int b = 7;
-    cout << a << " + " << b << " = " << (a + b) << endl;
-    cout << a << " - " << b << " = " << (a - b) << endl;
-    
-    // Vector example
-    vector<string> languages = {"C++", "Java", "Python", "JavaScript"};
-    cout << "\\nProgramming languages:" << endl;
-    for (int i = 0; i < languages.size(); i++) {
-        cout << (i + 1) << ". " << languages[i] << endl;
-    }
-    
-    return 0;
 }`,
       'php': `<?php
 // Welcome to CodeCikgu Playground!
@@ -602,34 +478,15 @@ function greet($name) {
 }
 
 echo greet("World") . "\\n";
-
-// Simple calculations
-$a = 20;
-$b = 8;
-echo "$a + $b = " . ($a + $b) . "\\n";
-echo "$a ÷ $b = " . ($a / $b) . "\\n";
-
-// Array example
-$foods = ["Nasi Lemak", "Rendang", "Satay", "Laksa"];
-echo "\\nMalaysian foods:\\n";
-foreach ($foods as $index => $food) {
-    echo ($index + 1) . ". $food\\n";
-}
-
-// Associative array
-$student = [
-    "name" => "Ahmad",
-    "age" => 17,
-    "grade" => "Form 5"
-];
-
-echo "\\nStudent Info:\\n";
-echo "Name: " . $student["name"] . "\\n";
-echo "Age: " . $student["age"] . "\\n";
-echo "Grade: " . $student["grade"] . "\\n";
 ?>`
     }
     return defaultCodes[lang] || '// Start coding here...'
+  }
+
+  // Function to register Monaco Editor instance
+  const registerMonacoEditor = (editor: any) => {
+    globalMonacoEditor = editor
+    console.log('Monaco Editor registered:', editor) // Debug log
   }
 
   if (loading) {
@@ -830,7 +687,7 @@ echo "Grade: " . $student["grade"] . "\\n";
               theme={theme}
               onChange={setCode}
               fileName={fileName}
-              ref={editorRef}
+              onEditorMount={registerMonacoEditor}
             />
           </div>
 
@@ -870,7 +727,7 @@ echo "Grade: " . $student["grade"] . "\\n";
           projects={projects}
           onClose={() => setShowProjectManager(false)}
           onSelectProject={loadProject}
-          onDeleteProject={(projectId) => {
+          onDeleteProject={(projectId: string) => {
             setProjects(projects.filter(p => p.id !== projectId))
           }}
         />

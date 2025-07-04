@@ -1,267 +1,139 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/utils/supabase'
-import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes } from 'react-icons/fa'
-
-interface Project {
-  id: string
-  name: string
-  user_id: string
-  created_at: string
-  updated_at: string
-  language: string
-  content: string
-}
+import { X, Trash2, FolderOpen } from 'lucide-react'
+import { Project } from '@/types' // Import Project type from shared types file
 
 interface ProjectManagerProps {
+  projects: Project[]
+  onClose: () => void
   onSelectProject: (project: Project) => void
-  selectedProjectId?: string
+  onDeleteProject: (projectId: string) => void
 }
 
-export default function ProjectManager({ onSelectProject, selectedProjectId }: ProjectManagerProps) {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [userId, setUserId] = useState<string | null>(null)
+export default function ProjectManager({ projects, onClose, onSelectProject, onDeleteProject }: ProjectManagerProps) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchUserAndProjects = async () => {
-      try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        
-        setUserId(user.id)
-        
-        // Fetch user's projects
-        const { data, error } = await supabase
-          .from('playground_projects')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-        
-        if (error) throw error
-        
-        setProjects(data || [])
-        
-        // If there are projects and none is selected, select the first one
-        if (data && data.length > 0 && !selectedProjectId) {
-          onSelectProject(data[0])
-        }
-      } catch (error) {
-        console.error('Error fetching projects:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchUserAndProjects()
-  }, [onSelectProject, selectedProjectId])
+  const filteredProjects = projects.filter(project => 
+    project.title.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-  const createNewProject = async () => {
-    if (!newProjectName.trim() || !userId) return
-    
+  const handleDeleteProject = async (projectId: string) => {
     try {
-      const newProject = {
-        name: newProjectName.trim(),
-        user_id: userId,
-        language: 'javascript',
-        content: '// Projek baru\n\nconsole.log("Hello, world!");'
-      }
-      
-      const { data, error } = await supabase
-        .from('playground_projects')
-        .insert(newProject)
-        .select()
-        .single()
-      
-      if (error) throw error
-      
-      setProjects([data, ...projects])
-      setNewProjectName('')
-      setIsCreating(false)
-      
-      // Select the newly created project
-      onSelectProject(data)
-    } catch (error) {
-      console.error('Error creating project:', error)
-    }
-  }
-
-  const updateProjectName = async (id: string) => {
-    if (!editName.trim()) return
-    
-    try {
+      setIsDeleting(projectId)
       const { error } = await supabase
-        .from('playground_projects')
-        .update({ name: editName.trim() })
-        .eq('id', id)
-      
-      if (error) throw error
-      
-      setProjects(projects.map(p => 
-        p.id === id ? { ...p, name: editName.trim() } : p
-      ))
-      
-      setEditingId(null)
-    } catch (error) {
-      console.error('Error updating project name:', error)
-    }
-  }
-
-  const deleteProject = async (id: string) => {
-    if (!confirm('Adakah anda pasti mahu padam projek ini?')) return
-    
-    try {
-      const { error } = await supabase
-        .from('playground_projects')
+        .from('code_projects')
         .delete()
-        .eq('id', id)
-      
+        .eq('id', projectId)
+
       if (error) throw error
       
-      const updatedProjects = projects.filter(p => p.id !== id)
-      setProjects(updatedProjects)
-      
-      // If the deleted project was selected, select another one
-      if (id === selectedProjectId && updatedProjects.length > 0) {
-        onSelectProject(updatedProjects[0])
-      }
+      onDeleteProject(projectId)
     } catch (error) {
       console.error('Error deleting project:', error)
+      alert('Ralat memadam projek. Sila cuba lagi.')
+    } finally {
+      setIsDeleting(null)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-4">
-        <div className="animate-pulse h-6 bg-gray-700 rounded w-3/4 mb-4"></div>
-        <div className="animate-pulse h-6 bg-gray-700 rounded w-1/2 mb-4"></div>
-        <div className="animate-pulse h-6 bg-gray-700 rounded w-2/3 mb-4"></div>
-      </div>
-    )
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('ms-MY', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-900 p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">Projek Saya</h2>
-        {!isCreating && (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h2 className="text-xl font-bold text-white">Projek Anda</h2>
           <button 
-            onClick={() => setIsCreating(true)}
-            className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700"
+            onClick={onClose}
+            className="text-gray-400 hover:text-white"
           >
-            <FaPlus />
+            <X className="w-5 h-5" />
           </button>
-        )}
-      </div>
-      
-      {isCreating && (
-        <div className="mb-4 p-3 bg-gray-800 rounded-lg">
-          <div className="flex items-center mb-2">
-            <input
-              type="text"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder="Nama projek baru"
-              className="flex-1 p-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div className="flex justify-end space-x-2">
-            <button 
-              onClick={() => setIsCreating(false)}
-              className="p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
-            >
-              Batal
-            </button>
-            <button 
-              onClick={createNewProject}
-              className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              disabled={!newProjectName.trim()}
-            >
-              Cipta
-            </button>
-          </div>
         </div>
-      )}
-      
-      <div className="space-y-2">
-        {projects.length === 0 ? (
-          <div className="text-center p-4 text-gray-400">
-            Tiada projek. Cipta projek baru untuk mula.
-          </div>
-        ) : (
-          projects.map(project => (
-            <div 
-              key={project.id}
-              className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                project.id === selectedProjectId 
-                  ? 'bg-blue-700 hover:bg-blue-600' 
-                  : 'bg-gray-800 hover:bg-gray-700'
-              }`}
-            >
-              {editingId === project.id ? (
-                <div className="flex items-center">
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 p-1 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-                    autoFocus
-                  />
-                  <button 
-                    onClick={() => updateProjectName(project.id)}
-                    className="ml-2 p-1 text-green-400 hover:text-green-300"
-                  >
-                    <FaSave />
-                  </button>
-                  <button 
-                    onClick={() => setEditingId(null)}
-                    className="ml-1 p-1 text-gray-400 hover:text-gray-300"
-                  >
-                    <FaTimes />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div 
-                    className="flex-1 truncate"
-                    onClick={() => onSelectProject(project)}
-                  >
-                    {project.name}
-                  </div>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(project.id);
-                        setEditName(project.name);
-                      }}
-                      className="p-1 text-gray-400 hover:text-white"
-                    >
-                      <FaEdit />
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteProject(project.id);
-                      }}
-                      className="p-1 text-gray-400 hover:text-red-400"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
-                </div>
-              )}
+        
+        <div className="p-4 border-b border-gray-700">
+          <input
+            type="text"
+            placeholder="Cari projek..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded text-white focus:border-electric-blue focus:outline-none"
+          />
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          {filteredProjects.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              {searchTerm ? 'Tiada projek ditemui.' : 'Tiada projek. Cipta projek baru untuk bermula.'}
             </div>
-          ))
-        )}
+          ) : (
+            <div className="divide-y divide-gray-700">
+              {filteredProjects.map(project => (
+                <div key={project.id} className="p-4 hover:bg-gray-800/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-white">{project.title}</h3>
+                      <div className="flex items-center text-sm text-gray-400 mt-1">
+                        <span className="mr-3">{getLanguageDisplayName(project.language)}</span>
+                        <span>{formatDate(project.updated_at)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => onSelectProject(project)}
+                        className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700"
+                      >
+                        <FolderOpen className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProject(project.id)}
+                        disabled={isDeleting === project.id}
+                        className="p-2 text-gray-400 hover:text-red-500 rounded hover:bg-gray-700 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
+}
+
+function getLanguageDisplayName(language: string) {
+  const names: Record<string, string> = {
+    'javascript': 'JavaScript',
+    'typescript': 'TypeScript',
+    'html': 'HTML',
+    'css': 'CSS',
+    'python': 'Python',
+    'java': 'Java',
+    'cpp': 'C++',
+    'c': 'C',
+    'php': 'PHP',
+    'sql': 'SQL',
+    'xml': 'XML',
+    'json': 'JSON',
+    'markdown': 'Markdown',
+    'yaml': 'YAML',
+    'shell': 'Shell'
+  }
+  return names[language] || language
 }
 

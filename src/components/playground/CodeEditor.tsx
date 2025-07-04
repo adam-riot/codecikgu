@@ -9,6 +9,7 @@ interface CodeEditorProps {
   theme: string
   onChange: (value: string) => void
   fileName: string
+  onEditorMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void
 }
 
 interface CodeEditorRef {
@@ -17,7 +18,7 @@ interface CodeEditorRef {
 }
 
 const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(
-  ({ code, language, theme, onChange, fileName }, ref) => {
+  ({ code, language, theme, onChange, fileName, onEditorMount }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null)
     const monacoRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
@@ -58,7 +59,7 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(
           mouseWheelZoom: true,
           smoothScrolling: true,
           cursorBlinking: 'blink',
-          cursorSmoothCaretAnimation: true,
+          cursorSmoothCaretAnimation: 'on',
           renderWhitespace: 'selection',
           renderControlCharacters: false,
           fontLigatures: true,
@@ -101,6 +102,11 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(
           acceptSuggestionOnEnter: 'on',
           accessibilitySupport: 'auto'
         })
+
+        // Call the onEditorMount callback to register the editor instance
+        if (onEditorMount) {
+          onEditorMount(monacoRef.current)
+        }
 
         // Listen for content changes
         monacoRef.current.onDidChangeModelContent(() => {
