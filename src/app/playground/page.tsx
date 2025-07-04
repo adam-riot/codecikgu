@@ -3,13 +3,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
-import CodeEditor from '@/components/playground/CodeEditor'
-import ProjectManager from '@/components/playground/ProjectManager'
+import dynamic from 'next/dynamic'
 import { Code, Save, Download, FolderOpen, Settings, Play, Square } from 'lucide-react'
 import { Project } from '@/types' // Import Project type from shared types file
 
-// Global variable to store Monaco Editor instance
-let globalMonacoEditor: any = null
+// Import CodeEditor with SSR disabled
+const CodeEditor = dynamic(
+  () => import('@/components/playground/CodeEditor'),
+  { ssr: false } // Disable server-side rendering
+)
+
+// Import ProjectManager with SSR disabled
+const ProjectManager = dynamic(
+  () => import('@/components/playground/ProjectManager'),
+  { ssr: false } // Disable server-side rendering
+)
+
+// Global variable to store Monaco Editor instance - only in browser
+let globalMonacoEditor: any
+if (typeof window !== 'undefined') {
+  globalMonacoEditor = null
+}
 
 export default function PlaygroundPage() {
   const router = useRouter()
@@ -116,6 +130,9 @@ export default function PlaygroundPage() {
 
   // Function to get current code directly from Monaco Editor
   const getCurrentCodeFromMonaco = () => {
+    // Check if we're in the browser
+    if (typeof window === 'undefined') return code
+    
     if (globalMonacoEditor && globalMonacoEditor.getValue) {
       const currentCode = globalMonacoEditor.getValue()
       console.log('Monaco Editor Code:', currentCode) // Debug log
@@ -153,6 +170,13 @@ export default function PlaygroundPage() {
   const runJavaScript = async (jsCode: string) => {
     return new Promise((resolve, reject) => {
       try {
+        // Check if we're in the browser
+        if (typeof window === 'undefined') {
+          setOutput('JavaScript execution only available in browser')
+          resolve('JavaScript execution only available in browser')
+          return
+        }
+        
         // Capture console.log output
         const originalLog = console.log
         const originalError = console.error
@@ -364,6 +388,9 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
   }
 
   const handleDownload = () => {
+    // Check if we're in the browser
+    if (typeof window === 'undefined') return
+    
     // Get current code DIRECTLY from Monaco Editor
     const currentCode = getCurrentCodeFromMonaco()
     
@@ -485,6 +512,8 @@ echo greet("World") . "\\n";
 
   // Function to register Monaco Editor instance
   const registerMonacoEditor = (editor: any) => {
+    if (typeof window === 'undefined') return
+    
     globalMonacoEditor = editor
     console.log('Monaco Editor registered:', editor) // Debug log
   }
@@ -681,14 +710,16 @@ echo greet("World") . "\\n";
         <div className="flex-1 flex flex-col">
           {/* Editor */}
           <div className="flex-1">
-            <CodeEditor
-              code={code}
-              language={language}
-              theme={theme}
-              onChange={setCode}
-              fileName={fileName}
-              onEditorMount={registerMonacoEditor}
-            />
+            {typeof window !== 'undefined' && (
+              <CodeEditor
+                code={code}
+                language={language}
+                theme={theme}
+                onChange={setCode}
+                fileName={fileName}
+                onEditorMount={registerMonacoEditor}
+              />
+            )}
           </div>
 
           {/* Output Panel */}
@@ -722,7 +753,7 @@ echo greet("World") . "\\n";
       </div>
 
       {/* Project Manager Modal */}
-      {showProjectManager && (
+      {showProjectManager && typeof window !== 'undefined' && (
         <ProjectManager
           projects={projects}
           onClose={() => setShowProjectManager(false)}
