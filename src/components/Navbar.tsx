@@ -1,6 +1,7 @@
 "use client"
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabase, getUserRole, type CustomUser } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -120,8 +121,14 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href={getHomeLink()} className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-all duration-300">
-              <span className="text-dark-black font-bold text-sm">C</span>
+            <div className="w-8 h-8 transform group-hover:scale-110 transition-all duration-300">
+              <Image
+                src="/favicon.svg"
+                alt="CodeCikgu Logo"
+                width={32}
+                height={32}
+                className="w-full h-full"
+              />
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-electric-blue to-neon-cyan bg-clip-text text-transparent">
               CodeCikgu
