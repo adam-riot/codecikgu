@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import Navbar from '@/components/Navbar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -16,14 +17,14 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://codecikgu.com'),
+  metadataBase: new URL('https://codecikgu.vercel.app' ),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: 'CodeCikgu - Platform Pembelajaran Sains Komputer',
     description: 'Platform pembelajaran Sains Komputer yang interaktif untuk murid Tingkatan 4 & 5. Belajar dengan cara yang menyeronokkan dan dapatkan ganjaran!',
-    url: 'https://codecikgu.com',
+    url: 'https://codecikgu.vercel.app',
     siteName: 'CodeCikgu',
     images: [
       {
@@ -73,18 +74,13 @@ export const metadata: Metadata = {
   },
   manifest: '/manifest.json',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: light )', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
   viewport: {
     width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
-  },
-  verification: {
-    google: 'your-google-verification-code',
-    yandex: 'your-yandex-verification-code',
-    yahoo: 'your-yahoo-verification-code',
   },
 }
 
@@ -116,9 +112,11 @@ export default function RootLayout({
         <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
       </head>
       <body className={inter.className}>
-        {children}
+        <Navbar />
+        <main>
+          {children}
+        </main>
       </body>
     </html>
   )
 }
-
