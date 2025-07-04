@@ -2,29 +2,80 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase, getUserRole, type CustomUser } from '@/utils/supabase'
+import { supabase, getUserRole, getDashboardUrl, getUserDisplayName, type CustomUser } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 export default function Navbar() {
   const router = useRouter()
   const [user, setUser] = useState<CustomUser | null>(null)
+  const [userRole, setUserRole] = useState<string>('awam')
+  const [userName, setUserName] = useState<string>('Tetamu')
+  const [dashboardUrl, setDashboardUrl] = useState<string>('/dashboard-awam')
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.log('User data:', user) // Debug log
-      setUser(user as CustomUser)
-      setLoading(false)
+    const fetchUserData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.log('Auth user data:', user) // Debug log
+        
+        if (user) {
+          setUser(user as CustomUser)
+          
+          // Fetch role, name, and dashboard URL from database
+          const [role, name, dashUrl] = await Promise.all([
+            getUserRole(user as CustomUser),
+            getUserDisplayName(user as CustomUser),
+            getDashboardUrl(user as CustomUser)
+          ])
+          
+          console.log('Fetched role:', role) // Debug log
+          console.log('Fetched name:', name) // Debug log
+          console.log('Dashboard URL:', dashUrl) // Debug log
+          
+          setUserRole(role)
+          setUserName(name)
+          setDashboardUrl(dashUrl)
+        } else {
+          setUser(null)
+          setUserRole('awam')
+          setUserName('Tetamu')
+          setDashboardUrl('/dashboard-awam')
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    fetchUser()
+    fetchUserData()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('Auth state changed:', session?.user) // Debug log
-      setUser((session?.user as CustomUser) || null)
+      
+      if (session?.user) {
+        const userData = session.user as CustomUser
+        setUser(userData)
+        
+        // Fetch updated role and dashboard info
+        const [role, name, dashUrl] = await Promise.all([
+          getUserRole(userData),
+          getUserDisplayName(userData),
+          getDashboardUrl(userData)
+        ])
+        
+        setUserRole(role)
+        setUserName(name)
+        setDashboardUrl(dashUrl)
+      } else {
+        setUser(null)
+        setUserRole('awam')
+        setUserName('Tetamu')
+        setDashboardUrl('/dashboard-awam')
+      }
     })
 
     return () => {
@@ -43,8 +94,6 @@ export default function Navbar() {
 
   // Get role-specific navigation items
   const getNavigationItems = () => {
-    const role = getUserRole(user)
-
     // Common items for all users
     const commonItems = [
       { href: '/', label: 'Laman Utama' },
@@ -53,113 +102,119 @@ export default function Navbar() {
       { href: '/leaderboard', label: 'Leaderboard' }
     ]
 
-    // Add role-specific items
-    if (user) {
-      return [
-        ...commonItems,
-        { href: '/profile', label: 'Profil' }
-      ]
+    // Role-specific additional items
+    const roleSpecificItems = []
+    
+    if (userRole === 'admin') {
+      roleSpecificItems.push(
+        { href: '/dashboard-admin/nota', label: 'Urus Nota' },
+        { href: '/dashboard-admin/cabaran', label: 'Urus Cabaran' }
+      )
     }
 
-    return commonItems
+    return [...commonItems, ...roleSpecificItems]
   }
 
   // Get role-specific dashboard link
   const getDashboardLink = () => {
-    const role = getUserRole(user)
-    
-    if (!user || !role) return null
-
-    const dashboardLinks = {
-      admin: { href: '/dashboard-admin', label: 'Dashboard Admin', color: 'neon-green' },
-      murid: { href: '/dashboard-murid', label: 'Dashboard Murid', color: 'electric-blue' },
-      awam: { href: '/dashboard-awam', label: 'Dashboard Awam', color: 'electric-blue' }
+    switch (userRole) {
+      case 'admin':
+        return { href: '/dashboard-admin', label: 'Dashboard Admin', color: 'neon-green' }
+      case 'murid':
+        return { href: '/dashboard-murid', label: 'Dashboard Murid', color: 'electric-blue' }
+      case 'awam':
+      default:
+        return { href: '/dashboard-awam', label: 'Dashboard Awam', color: 'electric-blue' }
     }
-
-    return dashboardLinks[role as keyof typeof dashboardLinks] || dashboardLinks.awam
   }
 
-  // Get role-specific home page link
-  const getHomeLink = (): string => {
-    const role = getUserRole(user)
-    
-    if (!user || !role) return '/'
-    
-    const homeLinks = {
-      admin: '/home-admin',
-      murid: '/home-murid', 
-      awam: '/home-awam'
-    }
-
-    return homeLinks[role as keyof typeof homeLinks] || '/'
+  if (loading) {
+    return (
+      <nav className="bg-dark-black/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gray-700 rounded animate-pulse"></div>
+              <div className="w-24 h-6 bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            <div className="w-20 h-8 bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </nav>
+    )
   }
 
   const navigationItems = getNavigationItems()
   const dashboardLink = getDashboardLink()
 
   return (
-    <nav className="bg-gradient-to-r from-dark-black via-gray-900 to-dark-black backdrop-blur-lg border-b border-electric-blue/20 sticky top-0 z-50 shadow-lg shadow-electric-blue/10">
+    <nav className="bg-dark-black/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href={getHomeLink()} className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 transform group-hover:scale-110 transition-all duration-300">
-              <Image
-                src="/favicon.svg"
-                alt="CodeCikgu Logo"
-                width={32}
-                height={32}
-                className="w-full h-full"
-              />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-electric-blue to-neon-cyan bg-clip-text text-transparent">
-              CodeCikgu
-            </span>
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-300">
+            <Image
+              src="/favicon.svg"
+              alt="CodeCikgu"
+              width={32}
+              height={32}
+              className="hover:scale-110 transition-transform duration-300"
+            />
+            <span className="text-xl font-bold text-gradient">CodeCikgu</span>
           </Link>
-          
+
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
+          <div className="hidden md:flex items-center space-x-8">
             {navigationItems.map((item) => (
-              <Link 
-                key={item.href} 
-                href={item.href} 
-                className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative group"
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-gray-300 hover:text-electric-blue transition-colors duration-300 font-medium"
               >
-                <span>{item.label}</span>
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-electric-blue to-neon-cyan group-hover:w-full transition-all duration-300"></div>
+                {item.label}
               </Link>
             ))}
           </div>
 
           {/* User Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            {!loading && user ? (
+            {user ? (
               <>
-                {dashboardLink && (
-                  <Link 
-                    href={dashboardLink.href} 
-                    className={`px-4 py-2 bg-gradient-to-r ${
-                      dashboardLink.color === 'neon-green' 
-                        ? 'from-neon-green/20 to-electric-blue/20 border-neon-green/30 text-neon-green hover:bg-neon-green/30 hover:shadow-neon-green/25' 
-                        : 'from-electric-blue/20 to-neon-cyan/20 border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 hover:shadow-electric-blue/25'
-                    } border rounded-lg transition-all duration-300 hover:shadow-lg`}
-                  >
-                    {dashboardLink.label}
-                  </Link>
-                )}
-                <button 
-                  onClick={handleSignOut} 
-                  className="px-4 py-2 bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25"
+                <Link
+                  href={dashboardLink.href}
+                  className={`px-4 py-2 rounded-lg border transition-all duration-300 font-medium ${
+                    dashboardLink.color === 'neon-green'
+                      ? 'bg-neon-green/20 border-neon-green/30 text-neon-green hover:bg-neon-green/30'
+                      : 'bg-electric-blue/20 border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30'
+                  }`}
+                >
+                  {dashboardLink.label}
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-gray-300 hover:text-white transition-colors duration-300"
+                >
+                  👤 {userName}
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-red-400 hover:text-red-300 transition-colors duration-300"
                 >
                   Log Keluar
                 </button>
               </>
             ) : (
               <>
-                <Link href="/daftar" className="text-gray-300 hover:text-electric-blue transition-all duration-300">
+                <Link
+                  href="/daftar"
+                  className="text-gray-300 hover:text-electric-blue transition-colors duration-300"
+                >
                   Daftar
                 </Link>
-                <Link href="/login" className="px-4 py-2 bg-gradient-to-r from-electric-blue to-neon-cyan text-dark-black font-semibold rounded-lg hover:shadow-lg hover:shadow-electric-blue/50 transition-all duration-300 transform hover:scale-105">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
+                >
                   Log Masuk
                 </Link>
               </>
@@ -169,23 +224,21 @@ export default function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-gray-300 hover:text-electric-blue transition-colors duration-300"
+            className="md:hidden text-gray-300 hover:text-white transition-colors duration-300"
           >
-            <div className="w-6 h-6 flex flex-col justify-center items-center">
-              <span className={`bg-current block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${mobileMenuOpen ? 'rotate-45 translate-y-1' : '-translate-y-0.5'}`}></span>
-              <span className={`bg-current block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm my-0.5 ${mobileMenuOpen ? 'opacity-0' : 'opacity-100'}`}></span>
-              <span className={`bg-current block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${mobileMenuOpen ? '-rotate-45 -translate-y-1' : 'translate-y-0.5'}`}></span>
-            </div>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
           </button>
         </div>
 
         {/* Mobile Menu */}
-        <div className={`md:hidden transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-          <div className="py-4 space-y-4 border-t border-electric-blue/20">
+        <div className={`md:hidden transition-all duration-300 overflow-hidden ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="py-4 space-y-2 border-t border-gray-800">
             {navigationItems.map((item) => (
-              <Link 
-                key={item.href} 
-                href={item.href} 
+              <Link
+                key={item.href}
+                href={item.href}
                 className="block text-gray-300 hover:text-electric-blue transition-colors duration-300 py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -193,19 +246,24 @@ export default function Navbar() {
               </Link>
             ))}
             
-            {!loading && user ? (
+            {user ? (
               <>
-                {dashboardLink && (
-                  <Link 
-                    href={dashboardLink.href} 
-                    className={`block py-2 ${
-                      dashboardLink.color === 'neon-green' ? 'text-neon-green' : 'text-electric-blue'
-                    }`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {dashboardLink.label}
-                  </Link>
-                )}
+                <Link
+                  href={dashboardLink.href}
+                  className={`block py-2 ${
+                    dashboardLink.color === 'neon-green' ? 'text-neon-green' : 'text-electric-blue'
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {dashboardLink.label}
+                </Link>
+                <Link
+                  href="/profile"
+                  className="block text-gray-300 hover:text-white transition-colors duration-300 py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  👤 {userName}
+                </Link>
                 <button 
                   onClick={() => {
                     handleSignOut()
