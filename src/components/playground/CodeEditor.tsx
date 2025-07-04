@@ -1,154 +1,257 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Editor } from '@monaco-editor/react'
-import { supabase } from '@/utils/supabase'
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import * as monaco from 'monaco-editor'
 
 interface CodeEditorProps {
-  projectId?: string
-  initialCode?: string
-  language?: string
-  readOnly?: boolean
-  onCodeChange?: (code: string) => void
-  height?: string
-  theme?: 'vs-dark' | 'light'
+  code: string
+  language: string
+  theme: string
+  onChange: (value: string) => void
+  fileName: string
 }
 
-export default function CodeEditor({
-  projectId,
-  initialCode = '// Tulis kod anda di sini\n\nconsole.log("Hello, world!");',
-  language = 'javascript',
-  readOnly = false,
-  onCodeChange,
-  height = '70vh',
-  theme = 'vs-dark'
-}: CodeEditorProps) {
-  const [code, setCode] = useState(initialCode)
-  const [isLoading, setIsLoading] = useState(!!projectId)
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+interface CodeEditorRef {
+  getValue: () => string
+  setValue: (value: string) => void
+}
 
-  useEffect(() => {
-    if (projectId) {
-      const fetchCode = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('playground_projects')
-            .select('content')
-            .eq('id', projectId)
-            .single()
+const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(
+  ({ code, language, theme, onChange, fileName }, ref) => {
+    const editorRef = useRef<HTMLDivElement>(null)
+    const monacoRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
-          if (error) throw error
-          if (data?.content) {
-            setCode(data.content)
+    // Expose methods to parent component
+    useImperativeHandle(ref, () => ({
+      getValue: () => {
+        if (monacoRef.current) {
+          return monacoRef.current.getValue()
+        }
+        return code
+      },
+      setValue: (value: string) => {
+        if (monacoRef.current) {
+          monacoRef.current.setValue(value)
+        }
+      }
+    }))
+
+    useEffect(() => {
+      if (editorRef.current && !monacoRef.current) {
+        // Initialize Monaco Editor
+        monacoRef.current = monaco.editor.create(editorRef.current, {
+          value: code,
+          language: getMonacoLanguage(language),
+          theme: theme,
+          automaticLayout: true,
+          fontSize: 14,
+          lineNumbers: 'on',
+          roundedSelection: false,
+          scrollBeyondLastLine: false,
+          minimap: { enabled: true },
+          wordWrap: 'on',
+          folding: true,
+          lineDecorationsWidth: 10,
+          lineNumbersMinChars: 3,
+          glyphMargin: false,
+          contextmenu: true,
+          mouseWheelZoom: true,
+          smoothScrolling: true,
+          cursorBlinking: 'blink',
+          cursorSmoothCaretAnimation: true,
+          renderWhitespace: 'selection',
+          renderControlCharacters: false,
+          fontLigatures: true,
+          suggest: {
+            showKeywords: true,
+            showSnippets: true,
+            showFunctions: true,
+            showConstructors: true,
+            showFields: true,
+            showVariables: true,
+            showClasses: true,
+            showStructs: true,
+            showInterfaces: true,
+            showModules: true,
+            showProperties: true,
+            showEvents: true,
+            showOperators: true,
+            showUnits: true,
+            showValues: true,
+            showConstants: true,
+            showEnums: true,
+            showEnumMembers: true,
+            showColors: true,
+            showFiles: true,
+            showReferences: true,
+            showFolders: true,
+            showTypeParameters: true,
+            showUsers: true,
+            showIssues: true
+          },
+          quickSuggestions: {
+            other: true,
+            comments: true,
+            strings: true
+          },
+          parameterHints: {
+            enabled: true
+          },
+          acceptSuggestionOnCommitCharacter: true,
+          acceptSuggestionOnEnter: 'on',
+          accessibilitySupport: 'auto'
+        })
+
+        // Listen for content changes
+        monacoRef.current.onDidChangeModelContent(() => {
+          if (monacoRef.current) {
+            const currentValue = monacoRef.current.getValue()
+            onChange(currentValue)
           }
-        } catch (error) {
-          console.error('Error fetching code:', error)
-        } finally {
-          setIsLoading(false)
+        })
+
+        // Add keyboard shortcuts
+        monacoRef.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+          // Trigger save (handled by parent component)
+          const event = new CustomEvent('editor-save')
+          window.dispatchEvent(event)
+        })
+      }
+
+      return () => {
+        if (monacoRef.current) {
+          monacoRef.current.dispose()
+          monacoRef.current = null
         }
       }
+    }, [])
 
-      fetchCode()
-    }
-  }, [projectId])
-
-  useEffect(() => {
-    // Clean up timeout on unmount
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-    }
-  }, [])
-
-  const handleEditorChange = (value: string | undefined) => {
-    const newCode = value || ''
-    setCode(newCode)
-    
-    if (onCodeChange) {
-      onCodeChange(newCode)
-    }
-
-    if (projectId) {
-      // Debounce save operation
-      setSaveStatus('saving')
-      
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-      
-      saveTimeoutRef.current = setTimeout(() => {
-        saveCode(newCode)
-      }, 1000)
-    }
-  }
-
-  const saveCode = async (codeToSave: string) => {
-    if (!projectId || readOnly) return
-    
-    try {
-      const { error } = await supabase
-        .from('playground_projects')
-        .update({ content: codeToSave, updated_at: new Date().toISOString() })
-        .eq('id', projectId)
-
-      if (error) throw error
-      setSaveStatus('saved')
-    } catch (error) {
-      console.error('Error saving code:', error)
-      setSaveStatus('error')
-    } finally {
-      // Clear saved status after 3 seconds
-      setTimeout(() => {
-        if (saveStatus === 'saved') {
-          setSaveStatus(null)
+    useEffect(() => {
+      if (monacoRef.current && monacoRef.current.getValue() !== code) {
+        const currentPosition = monacoRef.current.getPosition()
+        monacoRef.current.setValue(code)
+        if (currentPosition) {
+          monacoRef.current.setPosition(currentPosition)
         }
-      }, 3000)
-    }
-  }
+      }
+    }, [code])
 
-  if (isLoading) {
+    useEffect(() => {
+      if (monacoRef.current) {
+        const model = monacoRef.current.getModel()
+        if (model) {
+          monaco.editor.setModelLanguage(model, getMonacoLanguage(language))
+        }
+      }
+    }, [language])
+
+    useEffect(() => {
+      if (monacoRef.current) {
+        monaco.editor.setTheme(theme)
+      }
+    }, [theme])
+
+    const getMonacoLanguage = (lang: string) => {
+      const languageMap: Record<string, string> = {
+        'javascript': 'javascript',
+        'typescript': 'typescript',
+        'html': 'html',
+        'css': 'css',
+        'python': 'python',
+        'java': 'java',
+        'cpp': 'cpp',
+        'c': 'c',
+        'php': 'php',
+        'sql': 'sql',
+        'xml': 'xml',
+        'json': 'json',
+        'markdown': 'markdown',
+        'yaml': 'yaml',
+        'shell': 'shell'
+      }
+      return languageMap[lang] || 'plaintext'
+    }
+
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="h-full flex flex-col">
+        {/* Editor Header */}
+        <div className="bg-gray-800/50 border-b border-gray-700/50 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            </div>
+            <span className="text-gray-300 text-sm font-medium">
+              {fileName}.{getFileExtension(language)}
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-4 text-xs text-gray-400">
+            <span>Bahasa: {getLanguageDisplayName(language)}</span>
+            <span>Tema: {getThemeDisplayName(theme)}</span>
+          </div>
+        </div>
+
+        {/* Monaco Editor Container */}
+        <div ref={editorRef} className="flex-1" />
       </div>
     )
   }
+)
 
-  return (
-    <div className="relative h-full">
-      <Editor
-        height={height}
-        defaultLanguage={language}
-        defaultValue={code}
-        theme={theme}
-        onChange={handleEditorChange}
-        options={{
-          readOnly,
-          minimap: { enabled: true },
-          scrollBeyondLastLine: false,
-          fontSize: 14,
-          tabSize: 2,
-          automaticLayout: true,
-          wordWrap: 'on'
-        }}
-      />
-      
-      {projectId && (
-        <div className="absolute top-2 right-2 px-2 py-1 rounded text-xs">
-          {saveStatus === 'saving' && (
-            <span className="text-yellow-400">Menyimpan...</span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="text-green-400">Disimpan</span>
-          )}
-          {saveStatus === 'error' && (
-            <span className="text-red-400">Ralat menyimpan</span>
-          )}
-        </div>
-      )}
-    </div>
-  )
+CodeEditor.displayName = 'CodeEditor'
+
+function getFileExtension(language: string) {
+  const extensions: Record<string, string> = {
+    'javascript': 'js',
+    'typescript': 'ts',
+    'html': 'html',
+    'css': 'css',
+    'python': 'py',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c': 'c',
+    'php': 'php',
+    'sql': 'sql',
+    'xml': 'xml',
+    'json': 'json',
+    'markdown': 'md',
+    'yaml': 'yml',
+    'shell': 'sh'
+  }
+  return extensions[language] || 'txt'
 }
+
+function getLanguageDisplayName(language: string) {
+  const names: Record<string, string> = {
+    'javascript': 'JavaScript',
+    'typescript': 'TypeScript',
+    'html': 'HTML',
+    'css': 'CSS',
+    'python': 'Python',
+    'java': 'Java',
+    'cpp': 'C++',
+    'c': 'C',
+    'php': 'PHP',
+    'sql': 'SQL',
+    'xml': 'XML',
+    'json': 'JSON',
+    'markdown': 'Markdown',
+    'yaml': 'YAML',
+    'shell': 'Shell'
+  }
+  return names[language] || language
+}
+
+function getThemeDisplayName(theme: string) {
+  const names: Record<string, string> = {
+    'vs-dark': 'Dark',
+    'vs-light': 'Light',
+    'hc-black': 'High Contrast'
+  }
+  return names[theme] || theme
+}
+
+export default CodeEditor
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import CodeEditor from '@/components/playground/CodeEditor'
@@ -38,6 +38,9 @@ export default function PlaygroundPage() {
   const [output, setOutput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState('')
+
+  // Ref to get current code from Monaco Editor
+  const editorRef = useRef<any>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -120,20 +123,31 @@ export default function PlaygroundPage() {
     setError('')
   }
 
+  // Function to get current code from Monaco Editor
+  const getCurrentCodeFromEditor = () => {
+    if (editorRef.current && editorRef.current.getValue) {
+      return editorRef.current.getValue()
+    }
+    return code // fallback to state
+  }
+
   const handleRunCode = async () => {
     setIsRunning(true)
     setError('')
     setOutput('')
 
+    // Get current code from editor
+    const currentCode = getCurrentCodeFromEditor()
+
     try {
       if (language === 'javascript') {
-        await runJavaScript(code)
+        await runJavaScript(currentCode)
       } else if (language === 'html') {
-        runHTML(code)
+        runHTML(currentCode)
       } else if (language === 'css') {
-        runCSS(code)
+        runCSS(currentCode)
       } else {
-        simulateCodeExecution(language, code)
+        simulateCodeExecution(language, currentCode)
       }
     } catch (err: any) {
       setError(err.message || 'Error menjalankan kod')
@@ -176,12 +190,12 @@ export default function PlaygroundPage() {
           }
 
           if (output.trim() === '') {
-            output = 'Kod berjaya dijalankan. Tiada output untuk dipaparkan.'
+            output = '✅ Kod JavaScript berjaya dijalankan!\nTiada output untuk dipaparkan.'
           }
 
           setOutput(output)
         } catch (execError: any) {
-          output += 'EXECUTION ERROR: ' + execError.message + '\n'
+          output += '❌ EXECUTION ERROR: ' + execError.message + '\n'
           setOutput(output)
           setError(execError.message)
         }
@@ -200,22 +214,22 @@ export default function PlaygroundPage() {
 
   const runHTML = (htmlCode: string) => {
     // For HTML, we can show a preview
-    setOutput('HTML Preview tersedia. Muat turun fail untuk melihat hasil penuh dalam browser.')
+    setOutput('🌐 HTML Preview tersedia. Muat turun fail untuk melihat hasil penuh dalam browser.')
   }
 
   const runCSS = (cssCode: string) => {
     // For CSS, we can show basic validation
-    setOutput('CSS kod telah disimpan. Muat turun fail untuk menggunakan dalam projek HTML.')
+    setOutput('🎨 CSS kod telah disimpan. Muat turun fail untuk menggunakan dalam projek HTML.')
   }
 
   const simulateCodeExecution = (lang: string, code: string) => {
     const simulations: Record<string, string> = {
-      'python': `Simulasi output Python:
+      'python': `🐍 Simulasi output Python:
 >>> Kod Python anda telah dianalisis
 >>> Untuk menjalankan kod Python sebenar, muat turun fail dan gunakan Python interpreter
 >>> Contoh: python ${fileName}.py`,
       
-      'java': `Simulasi output Java:
+      'java': `☕ Simulasi output Java:
 Compiling ${fileName}.java...
 Compilation successful!
 Running ${fileName}...
@@ -225,7 +239,7 @@ Untuk menjalankan kod Java sebenar:
 2. Compile: javac ${fileName}.java
 3. Run: java ${fileName.replace('.java', '')}`,
       
-      'cpp': `Simulasi output C++:
+      'cpp': `⚡ Simulasi output C++:
 Compiling ${fileName}.cpp...
 Compilation successful!
 
@@ -234,7 +248,7 @@ Untuk menjalankan kod C++ sebenar:
 2. Compile: g++ -o ${fileName.replace('.cpp', '')} ${fileName}.cpp
 3. Run: ./${fileName.replace('.cpp', '')}`,
       
-      'php': `Simulasi output PHP:
+      'php': `🐘 Simulasi output PHP:
 PHP kod telah dianalisis.
 
 Untuk menjalankan kod PHP sebenar:
@@ -242,7 +256,7 @@ Untuk menjalankan kod PHP sebenar:
 2. Gunakan XAMPP atau server PHP
 3. Run: php ${fileName}.php`,
       
-      'sql': `Simulasi output SQL:
+      'sql': `🗄️ Simulasi output SQL:
 SQL query telah dianalisis.
 
 Untuk menjalankan SQL sebenar:
@@ -250,7 +264,7 @@ Untuk menjalankan SQL sebenar:
 2. Import ke MySQL/PostgreSQL/SQLite
 3. Execute dalam database management tool`,
       
-      'default': `Kod ${lang} telah disimpan.
+      'default': `📝 Kod ${lang} telah disimpan.
 Muat turun fail untuk menjalankan dalam environment yang sesuai.`
     }
 
@@ -260,10 +274,13 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
   const handleAutoSave = async () => {
     if (!currentProject || !user) return
 
+    // Get current code from editor
+    const currentCode = getCurrentCodeFromEditor()
+
     try {
       const updatedProject = {
         ...currentProject,
-        code,
+        code: currentCode,
         language,
         theme,
         title: fileName,
@@ -302,11 +319,15 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
     if (!user) return
 
     setSaving(true)
+    
+    // Get current code from editor
+    const currentCode = getCurrentCodeFromEditor()
+    
     try {
       const projectData = {
         title: fileName,
         language,
-        code,
+        code: currentCode,
         theme,
         is_public: false,
         user_id: user.id
@@ -335,6 +356,9 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
         setCurrentProject(data)
       }
 
+      // Update local state
+      setCode(currentCode)
+
       // Refresh projects list
       await fetchProjects(user.id)
 
@@ -346,10 +370,14 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
   }
 
   const handleDownload = () => {
+    // Get current code from Monaco Editor
+    const currentCode = getCurrentCodeFromEditor()
+    
     const fileExtension = getFileExtension(language)
     const downloadFileName = `${fileName}.${fileExtension}`
     
-    const blob = new Blob([code], { type: 'text/plain' })
+    // Create blob with current code from editor
+    const blob = new Blob([currentCode], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -358,6 +386,9 @@ Muat turun fail untuk menjalankan dalam environment yang sesuai.`
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    
+    // Show confirmation
+    setOutput(`📥 Fail ${downloadFileName} telah dimuat turun dengan kod terkini dari editor.`)
   }
 
   const getFileExtension = (lang: string) => {
@@ -783,7 +814,7 @@ echo "Grade: " . $student["grade"] . "\\n";
                 <p>• JavaScript berjalan dalam browser</p>
                 <p>• Bahasa lain menunjukkan simulasi</p>
                 <p>• Ctrl+S untuk simpan pantas</p>
-                <p>• Muat turun untuk jalankan di komputer</p>
+                <p>• Download mengambil kod dari editor</p>
               </div>
             </div>
           </div>
@@ -799,6 +830,7 @@ echo "Grade: " . $student["grade"] . "\\n";
               theme={theme}
               onChange={setCode}
               fileName={fileName}
+              ref={editorRef}
             />
           </div>
 
