@@ -1,27 +1,29 @@
 "use client"
 
 import Link from 'next/link'
-import { supabase } from '@/utils/supabase'
+import { supabase, getUserRole, type CustomUser } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 export default function Navbar() {
   const router = useRouter()
-  const [user, setUser] = useState<{ email?: string; user_metadata?: { role?: string } } | null>(null)
+  const [user, setUser] = useState<CustomUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      console.log('User data:', user) // Debug log
+      setUser(user as CustomUser)
       setLoading(false)
     }
 
     fetchUser()
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null)
+      console.log('Auth state changed:', session?.user) // Debug log
+      setUser((session?.user as CustomUser) || null)
     })
 
     return () => {
@@ -38,9 +40,9 @@ export default function Navbar() {
     }
   }
 
-  // Role-specific navigation items
+  // Get role-specific navigation items
   const getNavigationItems = () => {
-    const role = user?.user_metadata?.role
+    const role = getUserRole(user)
 
     // Common items for all users
     const commonItems = [
@@ -49,51 +51,56 @@ export default function Navbar() {
       { href: '/leaderboard', label: 'Leaderboard' }
     ]
 
-    // Role-specific items
-    const roleSpecificItems = {
-      admin: [
-        ...commonItems,
-        { href: '/playground', label: 'Playground' },
-        { href: '/nota', label: 'Nota' },
-        { href: '/dashboard-admin/nota', label: 'Urus Nota' },
-        { href: '/dashboard-admin/cabaran', label: 'Urus Cabaran' }
-      ],
-      murid: [
-        ...commonItems,
-        { href: '/playground', label: 'Playground' },
-        { href: '/nota', label: 'Nota' },
-        { href: '/cabaran', label: 'Cabaran' },
-        { href: '/profile', label: 'Profil' }
-      ],
-      awam: [
-        ...commonItems,
-        { href: '/playground', label: 'Playground' },
-        { href: '/nota', label: 'Nota' },
-        { href: '/profile', label: 'Profil' }
-      ]
+    // Add role-specific items
+    if (user) {
+      if (role === 'admin') {
+        return [
+          ...commonItems,
+          { href: '/playground', label: 'Playground' },
+          { href: '/nota', label: 'Nota' },
+          { href: '/profile', label: 'Profil' }
+        ]
+      } else if (role === 'murid') {
+        return [
+          ...commonItems,
+          { href: '/playground', label: 'Playground' },
+          { href: '/nota', label: 'Nota' },
+          { href: '/profile', label: 'Profil' }
+        ]
+      } else {
+        // awam or default
+        return [
+          ...commonItems,
+          { href: '/playground', label: 'Playground' },
+          { href: '/nota', label: 'Nota' },
+          { href: '/profile', label: 'Profil' }
+        ]
+      }
     }
 
-    return role ? roleSpecificItems[role as keyof typeof roleSpecificItems] || commonItems : commonItems
+    return commonItems
   }
 
-  // Role-specific dashboard link
+  // Get role-specific dashboard link
   const getDashboardLink = () => {
-    const role = user?.user_metadata?.role
+    const role = getUserRole(user)
     
+    if (!user || !role) return null
+
     const dashboardLinks = {
       admin: { href: '/dashboard-admin', label: 'Dashboard Admin', color: 'neon-green' },
       murid: { href: '/dashboard-murid', label: 'Dashboard Murid', color: 'electric-blue' },
       awam: { href: '/dashboard-awam', label: 'Dashboard Awam', color: 'electric-blue' }
     }
 
-    return role ? dashboardLinks[role as keyof typeof dashboardLinks] : null
+    return dashboardLinks[role as keyof typeof dashboardLinks] || dashboardLinks.awam
   }
 
-  // Role-specific home page link
+  // Get role-specific home page link
   const getHomeLink = () => {
-    const role = user?.user_metadata?.role
+    const role = getUserRole(user)
     
-    if (!role) return '/'
+    if (!user || !role) return '/'
     
     const homeLinks = {
       admin: '/home-admin',
