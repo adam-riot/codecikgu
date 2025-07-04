@@ -116,54 +116,58 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Platform Features Section */}
+      {/* Quick Access Features */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gradient mb-4">Ciri-Ciri Platform CodeCikgu</h2>
-            <p className="text-gray-400">Semua yang anda perlukan untuk pembelajaran Sains Komputer</p>
+            <h2 className="text-3xl font-bold text-gradient mb-4">Akses Pantas ke Ciri-Ciri Platform</h2>
+            <p className="text-gray-400">Mulakan pembelajaran anda dengan ciri-ciri utama CodeCikgu</p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="glass-dark rounded-xl p-6 text-center neon-glow">
-              <div className="w-12 h-12 bg-electric-blue/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-electric-blue" viewBox="0 0 20 20" fill="currentColor">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Link href="/playground" className="glass-dark rounded-xl p-6 text-center neon-glow hover:scale-105 transition-all duration-300 group">
+              <div className="w-16 h-16 bg-electric-blue/20 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-electric-blue/30 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-electric-blue" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-electric-blue mb-2">Playground</h3>
               <p className="text-gray-400 text-sm">Kod Editor Interaktif</p>
-            </div>
+              <p className="text-xs text-gray-500 mt-2">Tulis & jalankan kod terus dalam pelayar</p>
+            </Link>
             
-            <div className="glass-dark rounded-xl p-6 text-center neon-glow">
-              <div className="w-12 h-12 bg-neon-green/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-neon-green" viewBox="0 0 20 20" fill="currentColor">
+            <Link href="/nota" className="glass-dark rounded-xl p-6 text-center neon-glow hover:scale-105 transition-all duration-300 group">
+              <div className="w-16 h-16 bg-neon-green/20 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-neon-green/30 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-neon-green" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neon-green mb-2">Nota</h3>
               <p className="text-gray-400 text-sm">Sumber Pembelajaran</p>
-            </div>
+              <p className="text-xs text-gray-500 mt-2">Nota lengkap Tingkatan 4 & 5</p>
+            </Link>
             
-            <div className="glass-dark rounded-xl p-6 text-center neon-glow">
-              <div className="w-12 h-12 bg-neon-cyan/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-neon-cyan" viewBox="0 0 20 20" fill="currentColor">
+            <Link href="/leaderboard" className="glass-dark rounded-xl p-6 text-center neon-glow hover:scale-105 transition-all duration-300 group">
+              <div className="w-16 h-16 bg-neon-cyan/20 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-neon-cyan/30 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-neon-cyan" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neon-cyan mb-2">Leaderboard</h3>
               <p className="text-gray-400 text-sm">Ranking & Pencapaian</p>
-            </div>
+              <p className="text-xs text-gray-500 mt-2">Bersaing dengan rakan-rakan</p>
+            </Link>
             
-            <div className="glass-dark rounded-xl p-6 text-center neon-glow">
-              <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+            <Link href="/daftar" className="glass-dark rounded-xl p-6 text-center neon-glow hover:scale-105 transition-all duration-300 group">
+              <div className="w-16 h-16 bg-yellow-500/20 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-yellow-500/30 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-yellow-400 mb-2">Profil</h3>
-              <p className="text-gray-400 text-sm">Pengurusan Akaun</p>
-            </div>
+              <h3 className="text-xl font-bold text-yellow-400 mb-2">Daftar</h3>
+              <p className="text-gray-400 text-sm">Cipta Akaun Baru</p>
+              <p className="text-xs text-gray-500 mt-2">Mula perjalanan pembelajaran</p>
+            </Link>
           </div>
         </div>
       </section>
@@ -176,35 +180,41 @@ export default function HomePage() {
             <p className="text-gray-400">Belajar dengan pelbagai bahasa pengaturcaraan popular</p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
             <div className="glass-dark rounded-xl p-4 text-center neon-glow hover:scale-105 transition-transform duration-300">
               <div className="text-3xl mb-2">☕</div>
               <h4 className="font-semibold text-orange-400">Java</h4>
+              <p className="text-xs text-gray-500 mt-1">Object-Oriented</p>
             </div>
             
             <div className="glass-dark rounded-xl p-4 text-center neon-glow hover:scale-105 transition-transform duration-300">
               <div className="text-3xl mb-2">🐍</div>
               <h4 className="font-semibold text-green-400">Python</h4>
+              <p className="text-xs text-gray-500 mt-1">Beginner Friendly</p>
             </div>
             
             <div className="glass-dark rounded-xl p-4 text-center neon-glow hover:scale-105 transition-transform duration-300">
               <div className="text-3xl mb-2">⚡</div>
               <h4 className="font-semibold text-blue-400">C++</h4>
+              <p className="text-xs text-gray-500 mt-1">High Performance</p>
             </div>
             
             <div className="glass-dark rounded-xl p-4 text-center neon-glow hover:scale-105 transition-transform duration-300">
               <div className="text-3xl mb-2">🌐</div>
               <h4 className="font-semibold text-yellow-400">JavaScript</h4>
+              <p className="text-xs text-gray-500 mt-1">Web Development</p>
             </div>
             
             <div className="glass-dark rounded-xl p-4 text-center neon-glow hover:scale-105 transition-transform duration-300">
               <div className="text-3xl mb-2">🔷</div>
               <h4 className="font-semibold text-blue-500">C#</h4>
+              <p className="text-xs text-gray-500 mt-1">Microsoft Stack</p>
             </div>
             
             <div className="glass-dark rounded-xl p-4 text-center neon-glow hover:scale-105 transition-transform duration-300">
               <div className="text-3xl mb-2">🦀</div>
               <h4 className="font-semibold text-orange-500">Rust</h4>
+              <p className="text-xs text-gray-500 mt-1">Memory Safe</p>
             </div>
           </div>
         </div>
@@ -298,6 +308,38 @@ export default function HomePage() {
               <Link href="/about" className="btn-secondary text-lg px-8 py-4">
                 Ketahui Lebih Lanjut
               </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Platform Info Section - Moved to bottom */}
+      <section className="py-16 border-t border-gray-800">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gradient mb-4">Maklumat Platform</h2>
+            <p className="text-gray-400 text-sm">Status semasa platform CodeCikgu</p>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="glass-dark rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-electric-blue mb-1">Beta</div>
+              <p className="text-gray-400 text-sm">Status Platform</p>
+            </div>
+            
+            <div className="glass-dark rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-neon-green mb-1">6</div>
+              <p className="text-gray-400 text-sm">Bahasa Disokong</p>
+            </div>
+            
+            <div className="glass-dark rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-neon-cyan mb-1">2024</div>
+              <p className="text-gray-400 text-sm">Tahun Pelancaran</p>
+            </div>
+            
+            <div className="glass-dark rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-yellow-400 mb-1">Free</div>
+              <p className="text-gray-400 text-sm">Harga Penggunaan</p>
             </div>
           </div>
         </div>
