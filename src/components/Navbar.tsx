@@ -32,7 +32,7 @@ export default function Navbar() {
     }
   }, [])
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (): Promise<void> => {
     const { error } = await supabase.auth.signOut()
     if (!error) {
       router.push('/login')
@@ -48,35 +48,17 @@ export default function Navbar() {
     // Common items for all users
     const commonItems = [
       { href: '/', label: 'Laman Utama' },
-      { href: '/about', label: 'Tentang Kami' },
+      { href: '/playground', label: 'Playground' },
+      { href: '/nota', label: 'Nota' },
       { href: '/leaderboard', label: 'Leaderboard' }
     ]
 
     // Add role-specific items
     if (user) {
-      if (role === 'admin') {
-        return [
-          ...commonItems,
-          { href: '/playground', label: 'Playground' },
-          { href: '/nota', label: 'Nota' },
-          { href: '/profile', label: 'Profil' }
-        ]
-      } else if (role === 'murid') {
-        return [
-          ...commonItems,
-          { href: '/playground', label: 'Playground' },
-          { href: '/nota', label: 'Nota' },
-          { href: '/profile', label: 'Profil' }
-        ]
-      } else {
-        // awam or default
-        return [
-          ...commonItems,
-          { href: '/playground', label: 'Playground' },
-          { href: '/nota', label: 'Nota' },
-          { href: '/profile', label: 'Profil' }
-        ]
-      }
+      return [
+        ...commonItems,
+        { href: '/profile', label: 'Profil' }
+      ]
     }
 
     return commonItems
@@ -98,7 +80,7 @@ export default function Navbar() {
   }
 
   // Get role-specific home page link
-  const getHomeLink = () => {
+  const getHomeLink = (): string => {
     const role = getUserRole(user)
     
     if (!user || !role) return '/'
@@ -258,4 +240,3 @@ export default function Navbar() {
     </nav>
   )
 }
-
