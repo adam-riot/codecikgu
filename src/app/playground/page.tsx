@@ -1,235 +1,849 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
-// --- PADAMKAN IMPORT LAMA INI ---
-// import CodeEditor from '../../components/playground/CodeEditor'
-// import ProjectManager from '../../components/playground/ProjectManager'
-// --- TAMBAH DYNAMIC IMPORT INI ---
-import dynamic from 'next/dynamic';
-import { Play, Save, Download, Settings, FolderOpen, Plus, Code, Palette } from 'lucide-react'
+import CodeEditor from '@/components/playground/CodeEditor'
+import ProjectManager from '@/components/playground/ProjectManager'
+import { Code, Save, Download, FolderOpen, Settings, Play, Square } from 'lucide-react'
 
-// --- Interfaces ---
 interface Project {
-  id: string; name: string; language: string; code: string; created_at: string; updated_at: string;
+  id: string
+  title: string
+  language: string
+  code: string
+  theme: string
+  is_public: boolean
+  created_at: string
+  updated_at: string
 }
-interface Profile {
-  id: string; name: string; email: string;
-}
 
-// --- Static Data (Moved outside component to prevent re-creation) ---
-const languages = [
-  { id: 'javascript', name: 'JavaScript', icon: '🟨', extension: 'js' }, { id: 'typescript', name: 'TypeScript', icon: '🔷', extension: 'ts' }, { id: 'python', name: 'Python', icon: '🐍', extension: 'py' }, { id: 'html', name: 'HTML', icon: '🌐', extension: 'html' }, { id: 'css', name: 'CSS', icon: '🎨', extension: 'css' }, { id: 'java', name: 'Java', icon: '☕', extension: 'java' }, { id: 'cpp', name: 'C++', icon: '⚡', extension: 'cpp' }, { id: 'csharp', name: 'C#', icon: '🔵', extension: 'cs' }, { id: 'php', name: 'PHP', icon: '🐘', extension: 'php' }, { id: 'sql', name: 'SQL', icon: '🗄️', extension: 'sql' }, { id: 'json', name: 'JSON', icon: '📋', extension: 'json' }, { id: 'xml', name: 'XML', icon: '📄', extension: 'xml' }, { id: 'markdown', name: 'Markdown', icon: '📝', extension: 'md' }, { id: 'yaml', name: 'YAML', icon: '⚙️', extension: 'yml' }, { id: 'go', name: 'Go', icon: '🐹', extension: 'go' }
-];
-const themes = [
-  { id: 'vs-dark', name: 'Dark (VS Code)', icon: '🌙' }, { id: 'vs', name: 'Light', icon: '☀️' }, { id: 'hc-black', name: 'High Contrast Dark', icon: '⚫' }, { id: 'hc-light', name: 'High Contrast Light', icon: '⚪' }
-];
-const codeTemplates: { [key: string]: string } = {
-  javascript: `// JavaScript Playground\nconsole.log("Hello, CodeCikgu!");`,
-  python: `# Python Playground\nprint("Hello, CodeCikgu!")`,
-  html: `<!DOCTYPE html>\n<html>\n<head><title>Hello</title></head>\n<body><h1>Hello, CodeCikgu!</h1></body>\n</html>`,
-  css: `/* CSS Playground */\nbody { font-family: sans-serif; }`,
-  java: `// Java Playground\npublic class Main {\n  public static void main(String[] args) {\n    System.out.println("Hello, CodeCikgu!");\n  }\n}`,
-  php: `<?php\n// PHP Playground\necho "Hello, CodeCikgu!";`,
-  sql: `-- SQL Playground\nSELECT * FROM users;`
-};
+export default function PlaygroundPage() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [currentProject, setCurrentProject] = useState<Project | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [showProjectManager, setShowProjectManager] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
-// --- DYNAMIC IMPORTS UNTUK KOMPONEN CLIENT-SIDE ---
-const DynamicCodeEditor = dynamic(() => import('../../components/playground/CodeEditor'), {
-  ssr: false, // Penting: Jangan render di server
-  loading: () => <p className="text-white text-center p-4">Memuat Editor...</p>,
-});
+  // Editor state
+  const [code, setCode] = useState('')
+  const [language, setLanguage] = useState('javascript')
+  const [theme, setTheme] = useState('vs-dark')
+  const [fileName, setFileName] = useState('untitled')
 
-const DynamicProjectManager = dynamic(() => import('../../components/playground/ProjectManager'), {
-  ssr: false, // Penting: Jangan render di server
-  loading: () => <p className="text-white text-center p-4">Memuat Pengurus Projek...</p>,
-});
-// --- TAMAT DYNAMIC IMPORTS ---
-
-
-// --- Komponen Utama ---
-export default function Playground() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [code, setCode] = useState('');
-  const [language, setLanguage] = useState('javascript');
-  const [theme, setTheme] = useState('vs-dark');
-  const [output, setOutput] = useState('');
-  const [isRunning, setIsRunning] = useState(false);
-  const [showProjectManager, setShowProjectManager] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [autoSave, setAutoSave] = useState(true);
-  const [loading, setLoading] = useState(true);
-
-  const fetchProjects = useCallback(async (userId: string) => {
-    const { data, error } = await supabase.from('playground_projects').select('*').eq('user_id', userId).order('updated_at', { ascending: false });
-    if (data && !error) setProjects(data);
-  }, []);
-
-  const saveProject = useCallback(async () => {
-    if (!currentProject || !profile) return;
-    const { error } = await supabase.from('playground_projects').update({ code, language, updated_at: new Date().toISOString() }).eq('id', currentProject.id);
-    if (!error) {
-      setCurrentProject(prev => prev ? { ...prev, code, language } : null);
-      await fetchProjects(profile.id);
-    }
-  }, [currentProject, profile, code, language, fetchProjects]);
+  // Output state
+  const [output, setOutput] = useState('')
+  const [isRunning, setIsRunning] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const initializePlayground = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
       if (!user) {
-        router.push('/login');
-        return;
+        router.push('/login')
+        return
       }
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (profileData) setProfile(profileData);
-      await fetchProjects(user.id);
-      setCode(codeTemplates.javascript);
-      setLoading(false);
-    };
-    initializePlayground();
-  }, [router, fetchProjects]);
+
+      setUser(user)
+      await fetchProjects(user.id)
+    }
+
+    checkAuth()
+  }, [router])
 
   useEffect(() => {
-    if (!autoSave || !currentProject || !profile) return;
-    const saveTimer = setTimeout(() => { saveProject(); }, 30000);
-    return () => clearTimeout(saveTimer);
-  }, [code, autoSave, currentProject, profile, saveProject]);
+    // Auto-save every 30 seconds
+    const interval = setInterval(() => {
+      if (currentProject && code !== currentProject.code) {
+        handleAutoSave()
+      }
+    }, 30000)
 
-  const createNewProject = useCallback(async () => {
-    if (!profile) return;
-    const projectName = prompt('Nama projek baru:');
-    if (!projectName) return;
-    const newProjectData = { name: projectName, language, code: codeTemplates[language] || '', user_id: profile.id };
-    const { data, error } = await supabase.from('playground_projects').insert(newProjectData).select().single();
-    if (data && !error) {
-      setCurrentProject(data);
-      setCode(data.code);
-      setLanguage(data.language);
-      await fetchProjects(profile.id);
+    return () => clearInterval(interval)
+  }, [currentProject, code])
+
+  const fetchProjects = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('code_projects')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+
+      if (error) throw error
+      setProjects(data || [])
+
+      // Load the most recent project or create a new one
+      if (data && data.length > 0) {
+        loadProject(data[0])
+      } else {
+        createNewProject()
+      }
+
+    } catch (error) {
+      console.error('Error fetching projects:', error)
     }
-  }, [profile, language, fetchProjects]);
+    setLoading(false)
+  }
+
+  const createNewProject = () => {
+    const newProject: Project = {
+      id: '',
+      title: 'Untitled Project',
+      language: 'javascript',
+      code: getDefaultCode('javascript'),
+      theme: 'vs-dark',
+      is_public: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+    setCurrentProject(newProject)
+    setCode(newProject.code)
+    setLanguage(newProject.language)
+    setTheme(newProject.theme)
+    setFileName(newProject.title)
+    setOutput('')
+    setError('')
+  }
 
   const loadProject = (project: Project) => {
-    setCurrentProject(project);
-    setCode(project.code);
-    setLanguage(project.language);
-    setShowProjectManager(false);
-  };
+    setCurrentProject(project)
+    setCode(project.code)
+    setLanguage(project.language)
+    setTheme(project.theme)
+    setFileName(project.title)
+    setOutput('')
+    setError('')
+  }
 
-  const downloadCode = () => {
-    const selectedLang = languages.find(l => l.id === language);
-    const extension = selectedLang?.extension || 'txt';
-    const filename = currentProject ? `${currentProject.name}.${extension}` : `codecikgu-playground.${extension}`;
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  const handleRunCode = async () => {
+    setIsRunning(true)
+    setError('')
+    setOutput('')
 
-  const runCode = () => {
-    setIsRunning(true);
-    setOutput('🚀 Menjalankan kod...');
-    setTimeout(() => {
+    try {
       if (language === 'javascript') {
-        try {
-          const logs: string[] = [];
-          const originalLog = console.log;
-          console.log = (...args) => { logs.push(args.map(a => String(a)).join(' ')); };
-          eval(code);
-          console.log = originalLog;
-          setOutput(logs.length > 0 ? logs.join('\n') : 'Kod berjaya dijalankan! (Tiada output)');
-        } catch (e) {
-          setOutput(`❌ Ralat: ${(e as Error).message}`);
-        }
+        await runJavaScript(code)
+      } else if (language === 'html') {
+        runHTML(code)
+      } else if (language === 'css') {
+        runCSS(code)
       } else {
-        setOutput(`✅ Preview untuk ${language.toUpperCase()} tidak tersedia dalam playground ini.`);
+        simulateCodeExecution(language, code)
       }
-      setIsRunning(false);
-    }, 500);
-  };
-
-  const changeLanguage = (newLanguage: string) => {
-    setLanguage(newLanguage);
-    if (!currentProject) {
-      setCode(codeTemplates[newLanguage] || '');
+    } catch (err: any) {
+      setError(err.message || 'Error menjalankan kod')
     }
-  };
 
-  const currentLanguageIcon = useMemo(() => languages.find(l => l.id === language)?.icon, [language]);
-  const currentLanguageName = useMemo(() => languages.find(l => l.id === language)?.name, [language]);
+    setIsRunning(false)
+  }
+
+  const runJavaScript = async (jsCode: string) => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Capture console.log output
+        const originalLog = console.log
+        const originalError = console.error
+        const originalWarn = console.warn
+        let output = ''
+
+        console.log = (...args) => {
+          output += args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+          ).join(' ') + '\n'
+        }
+
+        console.error = (...args) => {
+          output += 'ERROR: ' + args.map(arg => String(arg)).join(' ') + '\n'
+        }
+
+        console.warn = (...args) => {
+          output += 'WARNING: ' + args.map(arg => String(arg)).join(' ') + '\n'
+        }
+
+        // Execute the code in a try-catch block
+        try {
+          // Use Function constructor to execute code in a controlled environment
+          const func = new Function(jsCode)
+          const result = func()
+          
+          if (result !== undefined) {
+            output += 'Return value: ' + (typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)) + '\n'
+          }
+
+          if (output.trim() === '') {
+            output = 'Kod berjaya dijalankan. Tiada output untuk dipaparkan.'
+          }
+
+          setOutput(output)
+        } catch (execError: any) {
+          output += 'EXECUTION ERROR: ' + execError.message + '\n'
+          setOutput(output)
+          setError(execError.message)
+        }
+
+        // Restore original console methods
+        console.log = originalLog
+        console.error = originalError
+        console.warn = originalWarn
+
+        resolve(output)
+      } catch (err: any) {
+        reject(err)
+      }
+    })
+  }
+
+  const runHTML = (htmlCode: string) => {
+    // For HTML, we can show a preview
+    setOutput('HTML Preview tersedia. Muat turun fail untuk melihat hasil penuh dalam browser.')
+  }
+
+  const runCSS = (cssCode: string) => {
+    // For CSS, we can show basic validation
+    setOutput('CSS kod telah disimpan. Muat turun fail untuk menggunakan dalam projek HTML.')
+  }
+
+  const simulateCodeExecution = (lang: string, code: string) => {
+    const simulations: Record<string, string> = {
+      'python': `Simulasi output Python:
+>>> Kod Python anda telah dianalisis
+>>> Untuk menjalankan kod Python sebenar, muat turun fail dan gunakan Python interpreter
+>>> Contoh: python ${fileName}.py`,
+      
+      'java': `Simulasi output Java:
+Compiling ${fileName}.java...
+Compilation successful!
+Running ${fileName}...
+
+Untuk menjalankan kod Java sebenar:
+1. Muat turun fail ${fileName}.java
+2. Compile: javac ${fileName}.java
+3. Run: java ${fileName.replace('.java', '')}`,
+      
+      'cpp': `Simulasi output C++:
+Compiling ${fileName}.cpp...
+Compilation successful!
+
+Untuk menjalankan kod C++ sebenar:
+1. Muat turun fail ${fileName}.cpp
+2. Compile: g++ -o ${fileName.replace('.cpp', '')} ${fileName}.cpp
+3. Run: ./${fileName.replace('.cpp', '')}`,
+      
+      'php': `Simulasi output PHP:
+PHP kod telah dianalisis.
+
+Untuk menjalankan kod PHP sebenar:
+1. Muat turun fail ${fileName}.php
+2. Gunakan XAMPP atau server PHP
+3. Run: php ${fileName}.php`,
+      
+      'sql': `Simulasi output SQL:
+SQL query telah dianalisis.
+
+Untuk menjalankan SQL sebenar:
+1. Muat turun fail ${fileName}.sql
+2. Import ke MySQL/PostgreSQL/SQLite
+3. Execute dalam database management tool`,
+      
+      'default': `Kod ${lang} telah disimpan.
+Muat turun fail untuk menjalankan dalam environment yang sesuai.`
+    }
+
+    setOutput(simulations[lang] || simulations['default'])
+  }
+
+  const handleAutoSave = async () => {
+    if (!currentProject || !user) return
+
+    try {
+      const updatedProject = {
+        ...currentProject,
+        code,
+        language,
+        theme,
+        title: fileName,
+        updated_at: new Date().toISOString()
+      }
+
+      if (currentProject.id) {
+        // Update existing project
+        const { error } = await supabase
+          .from('code_projects')
+          .update(updatedProject)
+          .eq('id', currentProject.id)
+
+        if (error) throw error
+      } else {
+        // Create new project
+        const { data, error } = await supabase
+          .from('code_projects')
+          .insert({
+            ...updatedProject,
+            user_id: user.id
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        setCurrentProject(data)
+      }
+
+    } catch (error) {
+      console.error('Error auto-saving:', error)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!user) return
+
+    setSaving(true)
+    try {
+      const projectData = {
+        title: fileName,
+        language,
+        code,
+        theme,
+        is_public: false,
+        user_id: user.id
+      }
+
+      if (currentProject?.id) {
+        // Update existing project
+        const { data, error } = await supabase
+          .from('code_projects')
+          .update(projectData)
+          .eq('id', currentProject.id)
+          .select()
+          .single()
+
+        if (error) throw error
+        setCurrentProject(data)
+      } else {
+        // Create new project
+        const { data, error } = await supabase
+          .from('code_projects')
+          .insert(projectData)
+          .select()
+          .single()
+
+        if (error) throw error
+        setCurrentProject(data)
+      }
+
+      // Refresh projects list
+      await fetchProjects(user.id)
+
+    } catch (error) {
+      console.error('Error saving project:', error)
+      alert('Ralat menyimpan projek. Sila cuba lagi.')
+    }
+    setSaving(false)
+  }
+
+  const handleDownload = () => {
+    const fileExtension = getFileExtension(language)
+    const downloadFileName = `${fileName}.${fileExtension}`
+    
+    const blob = new Blob([code], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = downloadFileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const getFileExtension = (lang: string) => {
+    const extensions: Record<string, string> = {
+      'javascript': 'js',
+      'typescript': 'ts',
+      'html': 'html',
+      'css': 'css',
+      'python': 'py',
+      'java': 'java',
+      'cpp': 'cpp',
+      'c': 'c',
+      'php': 'php',
+      'sql': 'sql',
+      'xml': 'xml',
+      'json': 'json',
+      'markdown': 'md',
+      'yaml': 'yml',
+      'shell': 'sh'
+    }
+    return extensions[lang] || 'txt'
+  }
+
+  const getDefaultCode = (lang: string) => {
+    const defaultCodes: Record<string, string> = {
+      'javascript': `// Welcome to CodeCikgu Playground!
+// Write your JavaScript code here and click "Jalankan" to see the output
+
+console.log("Hello, CodeCikgu!");
+
+function greet(name) {
+    return \`Hello, \${name}!\`;
+}
+
+console.log(greet("World"));
+
+// Try some calculations
+const a = 5;
+const b = 3;
+console.log(\`\${a} + \${b} = \${a + b}\`);
+
+// Work with arrays
+const fruits = ["apple", "banana", "orange"];
+console.log("My favorite fruits:");
+fruits.forEach(fruit => console.log("- " + fruit));`,
+      'html': `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeCikgu Project</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Welcome to CodeCikgu!</h1>
+        <p>Start building your amazing web project here.</p>
+        <button onclick="alert('Hello from CodeCikgu!')">Click Me!</button>
+    </div>
+</body>
+</html>`,
+      'css': `/* Welcome to CodeCikgu Playground! */
+/* Write your CSS code here */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    backdrop-filter: blur(10px);
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    border-left: 4px solid #667eea;
+}`,
+      'python': `# Welcome to CodeCikgu Playground!
+# Write your Python code here
+
+print("Hello, CodeCikgu!")
+
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("World"))
+
+# Example: Simple calculator
+def add(a, b):
+    return a + b
+
+def multiply(a, b):
+    return a * b
+
+# Test the functions
+result1 = add(5, 3)
+result2 = multiply(4, 6)
+
+print(f"5 + 3 = {result1}")
+print(f"4 × 6 = {result2}")
+
+# Work with lists
+fruits = ["apple", "banana", "orange", "grape"]
+print("\\nMy favorite fruits:")
+for i, fruit in enumerate(fruits, 1):
+    print(f"{i}. {fruit}")`,
+      'java': `// Welcome to CodeCikgu Playground!
+// Write your Java code here
+
+public class HelloMalaysia {
+    public static void main(String[] args) {
+        System.out.println("Hello, CodeCikgu!");
+        System.out.println("Selamat datang ke Malaysia!");
+        
+        String message = greet("World");
+        System.out.println(message);
+        
+        // Simple calculations
+        int a = 10;
+        int b = 5;
+        System.out.println(a + " + " + b + " = " + (a + b));
+        System.out.println(a + " × " + b + " = " + (a * b));
+        
+        // Array example
+        String[] cities = {"Kuala Lumpur", "Penang", "Johor Bahru", "Kota Kinabalu"};
+        System.out.println("\\nMajor cities in Malaysia:");
+        for (int i = 0; i < cities.length; i++) {
+            System.out.println((i + 1) + ". " + cities[i]);
+        }
+    }
+    
+    public static String greet(String name) {
+        return "Hello, " + name + "!";
+    }
+}`,
+      'cpp': `// Welcome to CodeCikgu Playground!
+// Write your C++ code here
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+using namespace std;
+
+string greet(string name) {
+    return "Hello, " + name + "!";
+}
+
+int main() {
+    cout << "Hello, CodeCikgu!" << endl;
+    cout << "Selamat datang ke C++!" << endl;
+    cout << greet("World") << endl;
+    
+    // Simple calculations
+    int a = 15;
+    int b = 7;
+    cout << a << " + " << b << " = " << (a + b) << endl;
+    cout << a << " - " << b << " = " << (a - b) << endl;
+    
+    // Vector example
+    vector<string> languages = {"C++", "Java", "Python", "JavaScript"};
+    cout << "\\nProgramming languages:" << endl;
+    for (int i = 0; i < languages.size(); i++) {
+        cout << (i + 1) << ". " << languages[i] << endl;
+    }
+    
+    return 0;
+}`,
+      'php': `<?php
+// Welcome to CodeCikgu Playground!
+// Write your PHP code here
+
+echo "Hello, CodeCikgu!\\n";
+echo "Selamat datang ke PHP!\\n";
+
+function greet($name) {
+    return "Hello, " . $name . "!";
+}
+
+echo greet("World") . "\\n";
+
+// Simple calculations
+$a = 20;
+$b = 8;
+echo "$a + $b = " . ($a + $b) . "\\n";
+echo "$a ÷ $b = " . ($a / $b) . "\\n";
+
+// Array example
+$foods = ["Nasi Lemak", "Rendang", "Satay", "Laksa"];
+echo "\\nMalaysian foods:\\n";
+foreach ($foods as $index => $food) {
+    echo ($index + 1) . ". $food\\n";
+}
+
+// Associative array
+$student = [
+    "name" => "Ahmad",
+    "age" => 17,
+    "grade" => "Form 5"
+];
+
+echo "\\nStudent Info:\\n";
+echo "Name: " . $student["name"] . "\\n";
+echo "Age: " . $student["age"] . "\\n";
+echo "Grade: " . $student["grade"] . "\\n";
+?>`
+    }
+    return defaultCodes[lang] || '// Start coding here...'
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="glass-dark rounded-2xl p-8 text-center"><div className="text-2xl text-gradient loading-dots">Memuat playground</div></div>
+        <div className="glass-dark rounded-2xl p-8 text-center">
+          <div className="text-2xl text-gradient loading-dots">Memuat playground</div>
+        </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
       {/* Header */}
       <div className="border-b border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-electric-blue to-neon-cyan rounded-lg flex items-center justify-center"><Code className="w-5 h-5 text-white" /></div>
-              <div><h1 className="text-xl font-bold text-gradient">CodeCikgu Playground</h1><p className="text-sm text-gray-400">{currentProject ? currentProject.name : 'Projek Baru'}</p></div>
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <Code className="w-8 h-8 text-electric-blue" />
+              <h1 className="text-2xl font-bold text-gradient">CodeCikgu Playground</h1>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select value={language} onChange={(e) => changeLanguage(e.target.value)} className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:border-electric-blue focus:outline-none">
-                {languages.map((lang) => (<option key={lang.id} value={lang.id}>{lang.icon} {lang.name}</option>))}
-              </select>
-              <button onClick={() => setShowProjectManager(true)} className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg" title="Projek"><FolderOpen className="w-4 h-4" /></button>
-              <button onClick={createNewProject} className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg" title="Projek Baru"><Plus className="w-4 h-4" /></button>
-              <button onClick={saveProject} disabled={!currentProject} className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg disabled:opacity-50" title="Simpan"><Save className="w-4 h-4" /></button>
-              <button onClick={downloadCode} className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg" title="Muat Turun"><Download className="w-4 h-4" /></button>
-              <button onClick={() => setShowSettings(true)} className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg" title="Tetapan"><Settings className="w-4 h-4" /></button>
-              <button onClick={runCode} disabled={isRunning} className="px-4 py-2 bg-gradient-to-r from-electric-blue to-neon-cyan text-white rounded-lg font-medium hover:shadow-lg disabled:opacity-50 flex items-center gap-2"><Play className="w-4 h-4" />{isRunning ? 'Menjalankan...' : 'Jalankan'}</button>
+            
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleRunCode}
+                disabled={isRunning}
+                className="btn-primary flex items-center space-x-2"
+              >
+                {isRunning ? (
+                  <>
+                    <Square className="w-4 h-4" />
+                    <span>Menjalankan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    <span>Jalankan</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setShowProjectManager(true)}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <FolderOpen className="w-4 h-4" />
+                <span>Projek</span>
+              </button>
+              
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>{saving ? 'Menyimpan...' : 'Simpan'}</span>
+              </button>
+              
+              <button
+                onClick={handleDownload}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Muat Turun</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
-          <div className="lg:col-span-2"><div className="glass-dark rounded-xl overflow-hidden h-full"><div className="p-4 border-b border-gray-700/50 flex items-center justify-between"><div className="flex items-center gap-2"><span className="text-lg">{currentLanguageIcon}</span><span className="font-semibold text-white">{currentLanguageName} Editor</span></div>{autoSave && currentProject && (<span className="flex items-center gap-1 text-sm text-gray-400"><div className="w-2 h-2 bg-neon-green rounded-full animate-pulse"></div>Auto-save</span>)}</div><div className="h-[calc(100%-60px)]">
-            {/* GUNA DynamicCodeEditor DI SINI */}
-            <DynamicCodeEditor value={code} onChange={setCode} language={language} theme={theme} />
-          </div></div></div>
-          <div className="space-y-6"><div className="glass-dark rounded-xl overflow-hidden"><div className="p-4 border-b border-gray-700/50"><h3 className="font-semibold text-white flex items-center gap-2"><span>📤</span>Output</h3></div><div className="p-4 h-64 overflow-y-auto"><pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono">{output || 'Klik "Jalankan" untuk melihat output kod anda...'}</pre></div></div></div>
-        </div>
-      </div>
-
-      {showProjectManager && (
-        // GUNA DynamicProjectManager DI SINI
-        <DynamicProjectManager projects={projects} onClose={() => setShowProjectManager(false)} onLoadProject={loadProject} onRefresh={() => profile && fetchProjects(profile.id)} />
-      )}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="glass-dark rounded-xl w-full max-w-md">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-gradient">Tetapan Playground</h2><button onClick={() => setShowSettings(false)} className="p-2 text-gray-400 hover:text-white">✕</button></div>
-              <div className="space-y-6">
-                <div><label className="block text-sm font-medium text-gray-300 mb-3"><Palette className="w-4 h-4 inline mr-2" />Tema Editor</label><div className="grid grid-cols-2 gap-2">{themes.map((t) => (<button key={t.id} onClick={() => setTheme(t.id)} className={`p-3 rounded-lg border-2 transition-all text-left ${theme === t.id ? 'border-electric-blue bg-electric-blue/10' : 'border-gray-600 hover:border-gray-500'}`}><div className="flex items-center gap-2"><span>{t.icon}</span><span className="text-sm font-medium text-white">{t.name}</span></div></button>))}</div></div>
-                <div className="flex items-center justify-between"><label className="text-sm font-medium text-gray-300">Auto-save (30 saat)</label><button onClick={() => setAutoSave(!autoSave)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoSave ? 'bg-electric-blue' : 'bg-gray-600'}`}><span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoSave ? 'translate-x-6' : 'translate-x-1'}`} /></button></div>
+      <div className="flex h-[calc(100vh-4rem)]">
+        {/* Sidebar */}
+        <div className="w-80 bg-gray-900/50 border-r border-gray-700/50 p-4">
+          <div className="space-y-6">
+            {/* Project Info */}
+            <div className="glass-dark rounded-xl p-4">
+              <h3 className="text-lg font-bold text-white mb-4">Maklumat Projek</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Nama Fail</label>
+                  <input
+                    type="text"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:border-electric-blue focus:outline-none"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Bahasa</label>
+                  <select
+                    value={language}
+                    onChange={(e) => {
+                      setLanguage(e.target.value)
+                      if (!currentProject?.id) {
+                        setCode(getDefaultCode(e.target.value))
+                      }
+                      setOutput('')
+                      setError('')
+                    }}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:border-electric-blue focus:outline-none"
+                  >
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="c">C</option>
+                    <option value="php">PHP</option>
+                    <option value="sql">SQL</option>
+                    <option value="xml">XML</option>
+                    <option value="json">JSON</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="yaml">YAML</option>
+                    <option value="shell">Shell</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Tema</label>
+                  <select
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:border-electric-blue focus:outline-none"
+                  >
+                    <option value="vs-dark">Dark</option>
+                    <option value="vs-light">Light</option>
+                    <option value="hc-black">High Contrast</option>
+                  </select>
+                </div>
               </div>
-              <div className="mt-6 pt-6 border-t border-gray-700/50"><button onClick={() => setShowSettings(false)} className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg">Simpan Tetapan</button></div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="glass-dark rounded-xl p-4">
+              <h3 className="text-lg font-bold text-white mb-4">Tindakan Pantas</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={handleRunCode}
+                  disabled={isRunning}
+                  className="w-full btn-primary text-left flex items-center space-x-2"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>{isRunning ? 'Menjalankan...' : 'Jalankan Kod'}</span>
+                </button>
+                <button
+                  onClick={createNewProject}
+                  className="w-full btn-secondary text-left"
+                >
+                  📄 Projek Baru
+                </button>
+                <button
+                  onClick={() => setShowProjectManager(true)}
+                  className="w-full btn-secondary text-left"
+                >
+                  📁 Buka Projek
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="w-full btn-secondary text-left"
+                >
+                  💾 Simpan Projek
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="w-full btn-secondary text-left"
+                >
+                  📥 Muat Turun Fail
+                </button>
+              </div>
+            </div>
+
+            {/* Tips */}
+            <div className="glass-dark rounded-xl p-4">
+              <h3 className="text-lg font-bold text-white mb-4">Tips</h3>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>• Klik "Jalankan" untuk execute kod</p>
+                <p>• JavaScript berjalan dalam browser</p>
+                <p>• Bahasa lain menunjukkan simulasi</p>
+                <p>• Ctrl+S untuk simpan pantas</p>
+                <p>• Muat turun untuk jalankan di komputer</p>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Editor and Output */}
+        <div className="flex-1 flex flex-col">
+          {/* Editor */}
+          <div className="flex-1">
+            <CodeEditor
+              code={code}
+              language={language}
+              theme={theme}
+              onChange={setCode}
+              fileName={fileName}
+            />
+          </div>
+
+          {/* Output Panel */}
+          <div className="h-64 border-t border-gray-700/50 bg-gray-900/50">
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/50">
+                <h3 className="text-lg font-bold text-white">Output</h3>
+                <button
+                  onClick={() => {
+                    setOutput('')
+                    setError('')
+                  }}
+                  className="text-sm text-gray-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="flex-1 p-4 overflow-y-auto">
+                {error && (
+                  <div className="mb-4 p-3 bg-red-900/30 border border-red-500/30 rounded text-red-400 text-sm">
+                    <strong>Error:</strong> {error}
+                  </div>
+                )}
+                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono">
+                  {output || 'Klik "Jalankan" untuk melihat output kod anda...'}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Project Manager Modal */}
+      {showProjectManager && (
+        <ProjectManager
+          projects={projects}
+          onClose={() => setShowProjectManager(false)}
+          onSelectProject={loadProject}
+          onDeleteProject={(projectId) => {
+            setProjects(projects.filter(p => p.id !== projectId))
+          }}
+        />
       )}
     </div>
-  );
+  )
 }
+
