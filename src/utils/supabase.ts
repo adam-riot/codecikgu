@@ -10,16 +10,9 @@ export interface CustomUser {
     role?: string
     full_name?: string
     phone?: string
-    school?: string
-    grade?: string
-    birth_date?: string
-    gender?: string
     address?: string
-    city?: string
-    state?: string
-    postcode?: string
-    emergency_contact_name?: string
-    emergency_contact_phone?: string
+    school?: string
+    tingkatan?: string
     [key: string]: any
   }
   app_metadata?: {
@@ -27,7 +20,6 @@ export interface CustomUser {
     [key: string]: any
   }
   created_at?: string
-  updated_at?: string
   [key: string]: any
 }
 
@@ -40,35 +32,94 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase URL or Anon Key is missing from environment variables.')
 }
 
-// Cipta dan eksport client Supabase dengan custom types
+// Cipta dan eksport client Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Helper function untuk type-safe user role detection
-export const getUserRole = (user: CustomUser | null): string => {
-  if (!user) return 'awam'
+// Helper function to get user role with fallback logic
+export const getUserRole = (userData: CustomUser | null): string => {
+  if (!userData) return 'awam'
   
-  // Check user_metadata for role
-  const metadataRole = user.user_metadata?.role
-  if (metadataRole) {
-    console.log('Found role in user_metadata:', metadataRole, 'for user:', user.email)
-    return metadataRole
-  }
+  console.log('Getting role for user:', userData.email) // Debug log
   
-  // Check app_metadata for role (fallback)
-  const appMetadataRole = user.app_metadata?.role
-  if (appMetadataRole) {
-    console.log('Found role in app_metadata:', appMetadataRole, 'for user:', user.email)
-    return appMetadataRole
-  }
+  // Check multiple possible locations for role
+  const role = userData.user_metadata?.role || 
+               userData.app_metadata?.role ||
+               (userData.email?.includes('admin') ? 'admin' : 'awam')
   
-  // Fallback based on email pattern
-  if (user.email?.includes('admin')) {
-    console.log('Detected admin role from email:', user.email)
-    return 'admin'
-  }
+  console.log('Found role in user_metadata:', userData.user_metadata?.role) // Debug log
+  console.log('Found role in app_metadata:', userData.app_metadata?.role) // Debug log
+  console.log('Final role:', role) // Debug log
   
-  // Default fallback
-  console.log('Using default role awam for user:', user.email)
-  return 'awam'
+  return role
 }
 
+// Helper function to check if user is admin
+export const isAdmin = (userData: CustomUser | null): boolean => {
+  return getUserRole(userData) === 'admin'
+}
+
+// Helper function to check if user is student
+export const isStudent = (userData: CustomUser | null): boolean => {
+  return getUserRole(userData) === 'murid'
+}
+
+// Helper function to check if user is public
+export const isPublic = (userData: CustomUser | null): boolean => {
+  return getUserRole(userData) === 'awam'
+}
+
+// Helper function to get user display name
+export const getUserDisplayName = (userData: CustomUser | null): string => {
+  if (!userData) return 'Tetamu'
+  
+  return userData.user_metadata?.full_name || 
+         userData.email?.split('@')[0] || 
+         'Pengguna'
+}
+
+// Helper function to get role-specific dashboard URL
+export const getDashboardUrl = (userData: CustomUser | null): string => {
+  const role = getUserRole(userData)
+  
+  switch (role) {
+    case 'admin': return '/dashboard-admin'
+    case 'murid': return '/dashboard-murid'
+    case 'awam': return '/dashboard-awam'
+    default: return '/dashboard-awam'
+  }
+}
+
+// Helper function to get role-specific home URL
+export const getHomeUrl = (userData: CustomUser | null): string => {
+  const role = getUserRole(userData)
+  
+  switch (role) {
+    case 'admin': return '/home-admin'
+    case 'murid': return '/home-murid'
+    case 'awam': return '/home-awam'
+    default: return '/'
+  }
+}
+
+// Helper function to check if user has access to admin features
+export const hasAdminAccess = (userData: CustomUser | null): boolean => {
+  return isAdmin(userData)
+}
+
+// Helper function to check if user has access to student features
+export const hasStudentAccess = (userData: CustomUser | null): boolean => {
+  return isStudent(userData) || isAdmin(userData)
+}
+
+// Helper function to get role display info
+export const getRoleDisplayInfo = (userData: CustomUser | null) => {
+  const role = getUserRole(userData)
+  
+  const roleInfo = {
+    admin: { icon: '👨‍💼', label: 'Admin', color: 'text-green-400', bgColor: 'bg-green-500/20' },
+    murid: { icon: '👨‍🎓', label: 'Murid', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+    awam: { icon: '👤', label: 'Awam', color: 'text-purple-400', bgColor: 'bg-purple-500/20' }
+  }
+  
+  return roleInfo[role as keyof typeof roleInfo] || roleInfo.awam
+}
