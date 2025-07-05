@@ -27,7 +27,9 @@ import {
   Check, 
   ChevronDown, 
   ChevronRight, 
-  RefreshCw 
+  RefreshCw,
+  Cloud,
+  FolderOpen
 } from 'lucide-react'
 
 // Types
@@ -39,6 +41,7 @@ interface Tab {
   saved: boolean
   fileHandle?: FileSystemFileHandle
   isFromFileSystem?: boolean
+  lastSaved?: number
 }
 
 interface CodeError {
@@ -53,12 +56,11 @@ interface Notification {
   message: string
 }
 
-interface FileTreeItem {
-  name: string
-  type: 'file' | 'directory'
-  handle?: FileSystemFileHandle | FileSystemDirectoryHandle
-  children?: FileTreeItem[]
-  expanded?: boolean
+interface PlaygroundSession {
+  tabs: Tab[]
+  activeTabId: string
+  nextTabId: number
+  lastSaved: number
 }
 
 // Language patterns for auto-detection
@@ -218,6 +220,12 @@ const languagePatterns = {
   }
 }
 
+// Storage keys
+const STORAGE_KEYS = {
+  PLAYGROUND_SESSION: 'codecikgu_playground_session',
+  USER_PREFERENCES: 'codecikgu_playground_preferences'
+}
+
 // Utility functions
 const detectLanguage = (content: string): string => {
   if (!content.trim()) return 'javascript'
@@ -264,42 +272,42 @@ const ensureCorrectExtension = (filename: string, language: string): string => {
   return nameWithoutExt + config.extensions[0]
 }
 
-// Helper function for typo detection
-const levenshteinDistance = (str1: string, str2: string): number => {
-  const matrix = []
-  
-  for (let i = 0; i <= str2.length; i++) {
-    matrix[i] = [i]
+// Storage utilities
+const saveSessionToStorage = (session: PlaygroundSession) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PLAYGROUND_SESSION, JSON.stringify(session))
+  } catch (error) {
+    console.error('Failed to save session to storage:', error)
   }
-  
-  for (let j = 0; j <= str1.length; j++) {
-    matrix[0][j] = j
-  }
-  
-  for (let i = 1; i <= str2.length; i++) {
-    for (let j = 1; j <= str1.length; j++) {
-      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1]
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        )
-      }
-    }
-  }
-  
-  return matrix[str2.length][str1.length]
 }
 
+const loadSessionFromStorage = (): PlaygroundSession | null => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.PLAYGROUND_SESSION)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (error) {
+    console.error('Failed to load session from storage:', error)
+  }
+  return null
+}
+
+const clearSessionFromStorage = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.PLAYGROUND_SESSION)
+  } catch (error) {
+    console.error('Failed to clear session from storage:', error)
+  }
+}
+
+// Error detection and execution functions (same as before)
 const detectErrors = (content: string, language: string): CodeError[] => {
   const errors: CodeError[] = []
   const lines = content.split('\n')
   
   if (language === 'javascript' || language === 'typescript') {
     lines.forEach((line, index) => {
-      // Check for common syntax errors
       if (line.includes('console.log') && !line.includes('(') && !line.includes(')')) {
         errors.push({
           line: index + 1,
@@ -308,7 +316,6 @@ const detectErrors = (content: string, language: string): CodeError[] => {
         })
       }
       
-      // Check for missing semicolons (warning)
       if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}')) {
         if (line.includes('=') || line.includes('console.log') || line.includes('return')) {
           errors.push({
@@ -325,12 +332,10 @@ const detectErrors = (content: string, language: string): CodeError[] => {
     lines.forEach((line, index) => {
       const trimmedLine = line.trim()
       
-      // Skip empty lines and comments
       if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('/*') || trimmedLine.startsWith('*')) {
         return
       }
       
-      // Check for missing PHP opening tag
       if (index === 0 && !line.includes('<?php') && trimmedLine && !trimmedLine.startsWith('//')) {
         errors.push({
           line: index + 1,
@@ -339,7 +344,6 @@ const detectErrors = (content: string, language: string): CodeError[] => {
         })
       }
       
-      // Check for missing semicolons (more accurate)
       if (trimmedLine && 
           !trimmedLine.endsWith(';') && 
           !trimmedLine.endsWith('{') && 
@@ -349,7 +353,6 @@ const detectErrors = (content: string, language: string): CodeError[] => {
           !trimmedLine.includes('//') &&
           !trimmedLine.includes('/*')) {
         
-        // Check if it's a statement that needs semicolon
         if (trimmedLine.includes('echo') || 
             trimmedLine.includes('$') || 
             trimmedLine.includes('=') ||
@@ -364,87 +367,6 @@ const detectErrors = (content: string, language: string): CodeError[] => {
           })
         }
       }
-      
-      // Check for undefined variables (improved)
-      const varMatches = line.match(/\$(\w+)/g)
-      if (varMatches) {
-        varMatches.forEach(varMatch => {
-          const varName = varMatch.substring(1) // Remove $
-          
-          // Skip superglobals
-          if (['_GET', '_POST', '_SESSION', '_COOKIE', '_SERVER', '_FILES', '_ENV', 'GLOBALS'].includes(varName)) {
-            return
-          }
-          
-          // Check if variable is defined before this line
-          const beforeLines = lines.slice(0, index).join('\n')
-          const isDefinedBefore = beforeLines.includes(`${varMatch} =`) || 
-                                 beforeLines.includes(`${varMatch}=`) ||
-                                 beforeLines.includes(`function`) // Could be function parameter
-          
-          // Check if it's being defined on this line
-          const isBeingDefined = line.includes(`${varMatch} =`) || line.includes(`${varMatch}=`)
-          
-          if (!isDefinedBefore && !isBeingDefined) {
-            errors.push({
-              line: index + 1,
-              message: `Variable ${varMatch} may be undefined`,
-              type: 'warning'
-            })
-          }
-        })
-      }
-      
-      // Unmatched quotes
-      const singleQuotes = (line.match(/'/g) || []).length
-      const doubleQuotes = (line.match(/"/g) || []).length
-      
-      if (singleQuotes % 2 !== 0) {
-        errors.push({
-          line: index + 1,
-          message: 'Unmatched single quote',
-          type: 'error'
-        })
-      }
-      
-      if (doubleQuotes % 2 !== 0) {
-        errors.push({
-          line: index + 1,
-          message: 'Unmatched double quote',
-          type: 'error'
-        })
-      }
-      
-      // Unmatched parentheses
-      const openParens = (line.match(/\(/g) || []).length
-      const closeParens = (line.match(/\)/g) || []).length
-      
-      if (openParens !== closeParens) {
-        errors.push({
-          line: index + 1,
-          message: 'Unmatched parentheses',
-          type: 'error'
-        })
-      }
-    })
-  }
-  
-  if (language === 'html') {
-    lines.forEach((line, index) => {
-      // Check for unclosed tags (basic check)
-      const openTags = line.match(/<(\w+)[^>]*>/g) || []
-      const closeTags = line.match(/<\/(\w+)>/g) || []
-      
-      if (openTags.length > closeTags.length) {
-        const tagName = openTags[0]?.match(/<(\w+)/)?.[1]
-        if (tagName && !['img', 'br', 'hr', 'input', 'meta', 'link'].includes(tagName)) {
-          errors.push({
-            line: index + 1,
-            message: `Possible unclosed tag: ${tagName}`,
-            type: 'warning'
-          })
-        }
-      }
     })
   }
   
@@ -455,7 +377,6 @@ const executeJavaScript = (code: string) => {
   const output: string[] = []
   const errors: string[] = []
   
-  // Create a safe console object
   const safeConsole = {
     log: (...args: any[]) => {
       output.push(args.map(arg => 
@@ -471,7 +392,6 @@ const executeJavaScript = (code: string) => {
   }
   
   try {
-    // Create a function with the code and safe console
     const func = new Function('console', code)
     func(safeConsole)
   } catch (error) {
@@ -484,26 +404,21 @@ const executeJavaScript = (code: string) => {
   }
 }
 
-// Improved PHP execution function with better parsing
 const executePHP = (code: string) => {
   const output: string[] = []
   const errors: string[] = []
   
   try {
-    // Mock PHP execution - parse basic PHP syntax with improved accuracy
     const lines = code.split('\n')
     let variables: { [key: string]: any } = {}
     
-    // Helper function to evaluate PHP expressions
     const evaluateExpression = (expr: string): string => {
-      // Handle date() function
       if (expr.includes('date(')) {
         const dateMatch = expr.match(/date\s*\(\s*["']([^"']+)["']\s*\)/)
         if (dateMatch) {
           const format = dateMatch[1]
           const now = new Date()
           
-          // Convert PHP date format to JavaScript equivalent
           let jsFormat = format
             .replace(/d/g, now.getDate().toString().padStart(2, '0'))
             .replace(/m/g, (now.getMonth() + 1).toString().padStart(2, '0'))
@@ -520,17 +435,14 @@ const executePHP = (code: string) => {
         }
       }
       
-      // Handle time() function
       if (expr.includes('time()')) {
         return Math.floor(Date.now() / 1000).toString()
       }
       
-      // Handle variables
       expr = expr.replace(/\$(\w+)/g, (match, varName) => {
         return variables[varName] !== undefined ? variables[varName] : `[undefined: ${match}]`
       })
       
-      // Handle $_GET, $_POST
       if (expr.includes('$_GET')) {
         const getMatch = expr.match(/\$_GET\[['"](\w+)['"]\]/)
         if (getMatch) {
@@ -545,22 +457,16 @@ const executePHP = (code: string) => {
         }
       }
       
-      // Handle quoted strings
       expr = expr.replace(/["']/g, '')
-      
       return expr
     }
     
-    // Helper function to handle string concatenation
     const handleConcatenation = (expr: string): string => {
-      // Split by concatenation operator (.)
       const parts = expr.split(/\s*\.\s*/)
       let result = ''
       
       for (let part of parts) {
         part = part.trim()
-        
-        // Evaluate each part
         const evaluated = evaluateExpression(part)
         result += evaluated
       }
@@ -571,7 +477,6 @@ const executePHP = (code: string) => {
     lines.forEach((line, index) => {
       const trimmedLine = line.trim()
       
-      // Skip empty lines, comments, and PHP tags
       if (!trimmedLine || 
           trimmedLine.startsWith('//') || 
           trimmedLine.startsWith('/*') ||
@@ -581,12 +486,10 @@ const executePHP = (code: string) => {
         return
       }
       
-      // Handle echo statements with improved parsing
       const echoMatch = trimmedLine.match(/echo\s+(.+);?/)
       if (echoMatch) {
         let echoContent = echoMatch[1].replace(/;$/, '').trim()
         
-        // Handle concatenation
         if (echoContent.includes('.')) {
           echoContent = handleConcatenation(echoContent)
         } else {
@@ -597,13 +500,11 @@ const executePHP = (code: string) => {
         return
       }
       
-      // Handle variable assignments with improved parsing
       const varMatch = trimmedLine.match(/\$(\w+)\s*=\s*(.+);?/)
       if (varMatch) {
         const varName = varMatch[1]
         let varValue = varMatch[2].replace(/;$/, '').trim()
         
-        // Evaluate the value
         if (varValue.includes('.')) {
           varValue = handleConcatenation(varValue)
         } else {
@@ -611,34 +512,6 @@ const executePHP = (code: string) => {
         }
         
         variables[varName] = varValue
-        return
-      }
-      
-      // Handle function calls (basic)
-      const funcMatch = trimmedLine.match(/(\w+)\s*\(([^)]*)\)\s*;?/)
-      if (funcMatch) {
-        const funcName = funcMatch[1]
-        const funcArgs = funcMatch[2]
-        
-        switch (funcName) {
-          case 'date_default_timezone_set':
-            output.push(`Timezone set to: ${funcArgs.replace(/["']/g, '')}`)
-            break
-          case 'phpinfo':
-            output.push('PHP Info: Mock PHP environment for CodeCikgu Playground')
-            break
-          case 'var_dump':
-            output.push(`var_dump: ${funcArgs}`)
-            break
-          default:
-            output.push(`Function called: ${funcName}(${funcArgs})`)
-        }
-        return
-      }
-      
-      // Handle other PHP constructs
-      if (trimmedLine.includes('if') || trimmedLine.includes('for') || trimmedLine.includes('while')) {
-        output.push(`Control structure detected: ${trimmedLine}`)
         return
       }
     })
@@ -663,59 +536,6 @@ const executePHP = (code: string) => {
     output: output.join('\n'),
     errors
   }
-}
-
-// Build file tree from directory handle
-const buildFileTree = async (dirHandle: FileSystemDirectoryHandle): Promise<FileTreeItem[]> => {
-  const items: FileTreeItem[] = []
-  
-  try {
-    for await (const [name, handle] of dirHandle.entries()) {
-      if (handle.kind === 'file') {
-        // Only include text files
-        const file = await handle.getFile()
-        if (isTextFile(file.name)) {
-          items.push({
-            name,
-            type: 'file',
-            handle
-          })
-        }
-      } else if (handle.kind === 'directory') {
-        const children = await buildFileTree(handle)
-        if (children.length > 0) {
-          items.push({
-            name,
-            type: 'directory',
-            handle,
-            children,
-            expanded: false
-          })
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error building file tree:', error)
-  }
-  
-  return items.sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1
-    }
-    return a.name.localeCompare(b.name)
-  })
-}
-
-const isTextFile = (filename: string): boolean => {
-  const textExtensions = [
-    '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less',
-    '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
-    '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf',
-    '.vue', '.svelte', '.mjs', '.cjs'
-  ]
-  
-  const ext = '.' + filename.split('.').pop()?.toLowerCase()
-  return textExtensions.includes(ext)
 }
 
 export default function PlaygroundPage() {
@@ -765,11 +585,6 @@ export default function PlaygroundPage() {
 
   // File system
   const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false)
-  const [currentDirectory, setCurrentDirectory] = useState<FileSystemDirectoryHandle | null>(null)
-  const [fileTree, setFileTree] = useState<FileTreeItem[]>([])
-  const [directoryName, setDirectoryName] = useState('')
-  const [fileCount, setFileCount] = useState(0)
-  const [loadingFiles, setLoadingFiles] = useState(false)
 
   // Output panel
   const [showOutput, setShowOutput] = useState(true)
@@ -781,16 +596,43 @@ export default function PlaygroundPage() {
   // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
 
+  // Session state
+  const [sessionSaved, setSessionSaved] = useState(false)
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null)
+
   // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout>()
-  const errorCheckTimeoutRef = useRef<NodeJS.Timeout>()
 
   // Check File System API support
   useEffect(() => {
     setSupportsFileSystemAPI('showDirectoryPicker' in window && 'showOpenFilePicker' in window)
   }, [])
+
+  // Load session from storage on mount
+  useEffect(() => {
+    const savedSession = loadSessionFromStorage()
+    if (savedSession) {
+      setTabs(savedSession.tabs)
+      setActiveTabId(savedSession.activeTabId)
+      setNextTabId(savedSession.nextTabId)
+      setSessionSaved(true)
+      setLastSaveTime(new Date(savedSession.lastSaved))
+      addNotification('success', 'Session telah dipulihkan dari simpanan')
+    }
+  }, [])
+
+  // Auto-save session every 30 seconds
+  useEffect(() => {
+    if (autoSave) {
+      const interval = setInterval(() => {
+        saveSession(true) // Silent save
+      }, 30000)
+
+      return () => clearInterval(interval)
+    }
+  }, [tabs, activeTabId, nextTabId, autoSave])
 
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -865,27 +707,113 @@ export default function PlaygroundPage() {
     setCodeErrors(errors)
   }, [tabs, activeTabId])
 
-  // Auto-save functionality for file system files
-  useEffect(() => {
-    if (autoSave) {
-      const interval = setInterval(async () => {
-        const currentActiveTab = getActiveTab()
-        if (currentActiveTab.isFromFileSystem && currentActiveTab.fileHandle && !currentActiveTab.saved) {
-          await saveFileToSystem(currentActiveTab, true)
-        }
-      }, 3000)
-
-      return () => clearInterval(interval)
-    }
-  }, [tabs, activeTabId, autoSave])
-
   const updateTab = (tabId: string, updates: Partial<Tab>) => {
     setTabs(prev => prev.map(tab => 
       tab.id === tabId ? { ...tab, ...updates, saved: false } : tab
     ))
+    setSessionSaved(false)
   }
 
-  // Open file picker (individual files)
+  // Save session to localStorage
+  const saveSession = (silent: boolean = false) => {
+    const session: PlaygroundSession = {
+      tabs: tabs.map(tab => ({
+        ...tab,
+        fileHandle: undefined, // Don't save file handles
+        lastSaved: Date.now()
+      })),
+      activeTabId,
+      nextTabId,
+      lastSaved: Date.now()
+    }
+    
+    saveSessionToStorage(session)
+    setSessionSaved(true)
+    setLastSaveTime(new Date())
+    
+    if (!silent) {
+      addNotification('success', 'Session telah disimpan ke browser storage')
+    }
+  }
+
+  // Clear saved session
+  const clearSession = () => {
+    clearSessionFromStorage()
+    setSessionSaved(false)
+    setLastSaveTime(null)
+    addNotification('info', 'Session telah dibersihkan dari storage')
+  }
+
+  // Download file with directory picker
+  const downloadFileWithPicker = async () => {
+    const currentActiveTab = getActiveTab()
+    
+    if (!currentActiveTab.content.trim()) {
+      addNotification('error', 'Tiada kandungan untuk dimuat turun')
+      return
+    }
+
+    // Auto-detect correct file extension based on language
+    const correctFilename = ensureCorrectExtension(currentActiveTab.name, currentActiveTab.language)
+    
+    if (supportsFileSystemAPI) {
+      try {
+        // Use File System Access API for directory picker
+        const fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: correctFilename,
+          types: [{
+            description: 'Text files',
+            accept: {
+              'text/plain': ['.txt'],
+              'text/javascript': ['.js', '.jsx', '.mjs'],
+              'text/typescript': ['.ts', '.tsx'],
+              'text/html': ['.html', '.htm'],
+              'text/css': ['.css', '.scss', '.sass'],
+              'application/x-httpd-php': ['.php'],
+              'text/x-python': ['.py'],
+              'text/x-java-source': ['.java'],
+              'text/x-c++src': ['.cpp', '.cc', '.cxx'],
+              'text/x-csrc': ['.c', '.h'],
+              'application/sql': ['.sql'],
+              'application/xml': ['.xml'],
+              'application/json': ['.json']
+            }
+          }]
+        })
+
+        const writable = await fileHandle.createWritable()
+        await writable.write(currentActiveTab.content)
+        await writable.close()
+        
+        addNotification('success', `File ${correctFilename} telah disimpan`)
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          // Fallback to regular download
+          downloadFileRegular(correctFilename, currentActiveTab.content)
+        }
+      }
+    } else {
+      // Fallback for browsers without File System Access API
+      downloadFileRegular(correctFilename, currentActiveTab.content)
+    }
+  }
+
+  // Regular download (fallback)
+  const downloadFileRegular = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    
+    addNotification('success', `File ${filename} telah dimuat turun`)
+  }
+
+  // Open file picker
   const openFiles = async () => {
     if (!supportsFileSystemAPI) {
       addNotification('error', 'Browser anda tidak support File System API. Sila guna Chrome 86+ atau Edge 86+')
@@ -943,45 +871,11 @@ export default function PlaygroundPage() {
       setTabs(prev => [...prev, newTab])
       setActiveTabId(newTab.id)
       setNextTabId(prev => prev + 1)
+      setSessionSaved(false)
       
       addNotification('success', `File "${file.name}" telah dibuka`)
     } catch (error) {
       addNotification('error', `Gagal membuka file: ${(error as Error).message}`)
-    }
-  }
-
-  // Save file to file system
-  const saveFileToSystem = async (tab: Tab, silent: boolean = false) => {
-    if (!tab.fileHandle) {
-      addNotification('error', 'Tiada file handle untuk disimpan')
-      return
-    }
-
-    try {
-      const writable = await tab.fileHandle.createWritable()
-      await writable.write(tab.content)
-      await writable.close()
-      
-      setTabs(prev => prev.map(t => 
-        t.id === tab.id ? { ...t, saved: true } : t
-      ))
-      
-      if (!silent) {
-        addNotification('success', `File "${tab.name}" telah disimpan`)
-      }
-    } catch (error) {
-      addNotification('error', `Gagal menyimpan file "${tab.name}"`)
-    }
-  }
-
-  // Save current tab
-  const saveCurrentTab = async () => {
-    const currentActiveTab = getActiveTab()
-    
-    if (currentActiveTab.isFromFileSystem && currentActiveTab.fileHandle) {
-      await saveFileToSystem(currentActiveTab)
-    } else {
-      downloadFile()
     }
   }
 
@@ -998,6 +892,7 @@ export default function PlaygroundPage() {
     setTabs(prev => [...prev, newTab])
     setActiveTabId(newTab.id)
     setNextTabId(prev => prev + 1)
+    setSessionSaved(false)
     
     addNotification('success', 'New tab telah ditambah')
   }
@@ -1018,35 +913,12 @@ export default function PlaygroundPage() {
       setActiveTabId(newTabs[newActiveIndex].id)
     }
     
+    setSessionSaved(false)
     addNotification('success', 'Tab telah ditutup')
   }
 
   const handleContentChange = (content: string) => {
     updateTab(activeTabId, { content })
-  }
-
-  const downloadFile = () => {
-    const currentActiveTab = getActiveTab()
-    
-    if (!currentActiveTab.content.trim()) {
-      addNotification('error', 'Tiada kandungan untuk dimuat turun')
-      return
-    }
-    
-    // Auto-detect correct file extension based on language
-    const correctFilename = ensureCorrectExtension(currentActiveTab.name, currentActiveTab.language)
-    
-    const blob = new Blob([currentActiveTab.content], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = correctFilename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    
-    addNotification('success', `File ${correctFilename} telah dimuat turun`)
   }
 
   // Execute code
@@ -1071,7 +943,6 @@ export default function PlaygroundPage() {
       setOutputTab('console')
       addNotification('success', 'Kod PHP telah dianalisis dan dijalankan (mock execution)')
     } else if (currentActiveTab.language === 'html') {
-      // For HTML, we'll show a preview
       setOutputTab('preview')
       addNotification('success', 'HTML preview telah dikemaskini')
     } else {
@@ -1199,8 +1070,7 @@ export default function PlaygroundPage() {
               {supportsFileSystemAPI && (
                 <button
                   onClick={openFiles}
-                  disabled={loadingFiles}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 rounded-lg transition-all duration-300"
                 >
                   <File className="w-4 h-4" />
                   <span>Open File</span>
@@ -1208,22 +1078,51 @@ export default function PlaygroundPage() {
               )}
               
               <button
-                onClick={saveCurrentTab}
+                onClick={() => saveSession()}
                 className="flex items-center space-x-2 px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300"
+                title="Save session to browser storage"
               >
-                <Save className="w-4 h-4" />
+                <Cloud className="w-4 h-4" />
                 <span>Save</span>
+                {sessionSaved && <div className="w-2 h-2 bg-neon-green rounded-full"></div>}
               </button>
               
               <button
-                onClick={downloadFile}
+                onClick={downloadFileWithPicker}
                 className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
+                title="Download file with directory picker"
               >
-                <Download className="w-4 h-4" />
+                <FolderOpen className="w-4 h-4" />
                 <span>Download</span>
               </button>
             </div>
           </div>
+
+          {/* Session Status */}
+          {(sessionSaved || lastSaveTime) && (
+            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Cloud className="w-5 h-5 text-green-400" />
+                  <span className="text-green-400 font-medium">
+                    Session Saved
+                  </span>
+                  {lastSaveTime && (
+                    <span className="text-gray-400 text-sm">
+                      Last saved: {lastSaveTime.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={clearSession}
+                  className="text-gray-400 hover:text-red-400 transition-colors duration-300"
+                  title="Clear saved session"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Search & Replace Panel */}
           {showSearch && (
@@ -1331,8 +1230,7 @@ export default function PlaygroundPage() {
                   {supportsFileSystemAPI && (
                     <button
                       onClick={openFiles}
-                      disabled={loadingFiles}
-                      className="w-full flex items-center p-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
+                      className="w-full flex items-center p-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors duration-300"
                     >
                       <File className="w-4 h-4 text-blue-400 mr-2" />
                       <span className="text-blue-400 text-sm">Open File</span>
@@ -1340,13 +1238,19 @@ export default function PlaygroundPage() {
                   )}
                   
                   <button
-                    onClick={saveCurrentTab}
+                    onClick={() => saveSession()}
                     className="w-full flex items-center p-3 bg-neon-green/20 hover:bg-neon-green/30 border border-neon-green/30 rounded-lg transition-colors duration-300"
                   >
-                    <Save className="w-4 h-4 text-neon-green mr-2" />
-                    <span className="text-neon-green text-sm">
-                      {activeTab.isFromFileSystem ? 'Save File' : 'Download'}
-                    </span>
+                    <Cloud className="w-4 h-4 text-neon-green mr-2" />
+                    <span className="text-neon-green text-sm">Save Session</span>
+                  </button>
+                  
+                  <button
+                    onClick={downloadFileWithPicker}
+                    className="w-full flex items-center p-3 bg-electric-blue/20 hover:bg-electric-blue/30 border border-electric-blue/30 rounded-lg transition-colors duration-300"
+                  >
+                    <FolderOpen className="w-4 h-4 text-electric-blue mr-2" />
+                    <span className="text-electric-blue text-sm">Download File</span>
                   </button>
                 </div>
               </div>
@@ -1406,7 +1310,7 @@ export default function PlaygroundPage() {
                           fontSize: `${fontSize}px`, 
                           lineHeight: '1.5',
                           width: '60px',
-                          height: '384px' // Match textarea height
+                          height: '384px'
                         }}
                       >
                         {activeTab.content.split('\n').map((_, index) => (
@@ -1446,7 +1350,7 @@ export default function PlaygroundPage() {
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      {autoSave && activeTab.isFromFileSystem && <span className="text-green-400">Auto-save: ON</span>}
+                      {sessionSaved && <span className="text-green-400">💾 Saved</span>}
                       <span>Tema: {theme}</span>
                       {supportsFileSystemAPI && <span className="text-blue-400">FS API: ✓</span>}
                     </div>
