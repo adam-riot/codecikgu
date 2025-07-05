@@ -3,40 +3,62 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase, getUserRole, type CustomUser } from '@/utils/supabase'
+import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
 import { Play, BookOpen, Trophy, UserPlus, Code, Zap, Globe, Cpu, Database, Smartphone } from 'lucide-react'
 
 export default function HomePage() {
   const router = useRouter()
   const [user, setUser] = useState<CustomUser | null>(null)
+  const [userRole, setUserRole] = useState<string>('awam')
+  const [userName, setUserName] = useState<string>('Tetamu')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        const role = getUserRole(user as CustomUser)
-        console.log('User role detected:', role) // Debug log
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.log('Home page - Auth user:', user) // Debug log
         
-        // Redirect based on role
-        switch (role) {
-          case 'admin':
-            router.replace('/home-admin')
-            return
-          case 'murid':
-            router.replace('/home-murid')
-            return
-          case 'awam':
-            router.replace('/home-awam')
-            return
-          default:
-            // If role is not recognized, show public page
-            setUser(user as CustomUser)
-            setLoading(false)
+        if (user) {
+          const userData = user as CustomUser
+          setUser(userData)
+          
+          // Fetch role and name from database
+          const [role, name] = await Promise.all([
+            getUserRole(userData),
+            getUserDisplayName(userData)
+          ])
+          
+          console.log('Home page - Fetched role:', role) // Debug log
+          console.log('Home page - Fetched name:', name) // Debug log
+          
+          setUserRole(role)
+          setUserName(name)
+          
+          // Redirect based on role
+          switch (role) {
+            case 'admin':
+              router.replace('/home-admin')
+              return
+            case 'murid':
+              router.replace('/home-murid')
+              return
+            case 'awam':
+              router.replace('/home-awam')
+              return
+            default:
+              // If role is not recognized, show public page
+              setLoading(false)
+          }
+        } else {
+          // No user logged in, show public landing page
+          setUser(null)
+          setUserRole('awam')
+          setUserName('Tetamu')
+          setLoading(false)
         }
-      } else {
-        // No user logged in, show public landing page
+      } catch (error) {
+        console.error('Error in checkUserAndRedirect:', error)
         setLoading(false)
       }
     }
@@ -61,6 +83,15 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="container mx-auto px-4 py-20">
           <div className="max-w-4xl mx-auto text-center">
+            {/* Dynamic greeting based on user status */}
+            {user ? (
+              <div className="mb-4">
+                <span className="text-lg text-gray-400">
+                  {userRole === 'admin' ? '👨‍💼 Admin' : userRole === 'murid' ? '👨‍🎓 Murid' : '👤 Pengguna'} • {userName}
+                </span>
+              </div>
+            ) : null}
+            
             <h1 className="text-4xl md:text-7xl font-bold mb-8 text-gradient leading-tight">
               Selamat Datang<br />
               ke CodeCikgu
@@ -71,13 +102,28 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <Link href="/daftar" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
-                <UserPlus className="w-6 h-6" />
-                <span>🚀 Daftar Sekarang</span>
-              </Link>
-              <Link href="/login" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
-                <span>🔐 Log Masuk</span>
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/playground" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
+                    <Play className="w-6 h-6" />
+                    <span>🚀 Mula Kod</span>
+                  </Link>
+                  <Link href="/nota" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
+                    <BookOpen className="w-6 h-6" />
+                    <span>📚 Baca Nota</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/daftar" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
+                    <UserPlus className="w-6 h-6" />
+                    <span>🚀 Daftar Sekarang</span>
+                  </Link>
+                  <Link href="/login" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
+                    <span>🔐 Log Masuk</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -118,17 +164,27 @@ export default function HomePage() {
                 <div className="text-neon-cyan group-hover:underline">Lihat Ranking →</div>
               </Link>
 
-              <Link href="/daftar" className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
-                <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
-                <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
-                <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
-              </Link>
+              {user ? (
+                <Link href={`/dashboard-${userRole}`} className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                    {userRole === 'admin' ? '👨‍💼' : userRole === 'murid' ? '👨‍🎓' : '👤'}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-3">Dashboard</h3>
+                  <p className="text-gray-400 text-sm mb-4">Akses dashboard {userRole === 'admin' ? 'admin' : userRole === 'murid' ? 'murid' : 'awam'} anda</p>
+                  <div className="text-purple-400 group-hover:underline">Ke Dashboard →</div>
+                </Link>
+              ) : (
+                <Link href="/daftar" className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
+                  <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
+                  <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
+                  <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
+                </Link>
+              )}
             </div>
           </div>
         </div>
       </section>
-      
       {/* Programming Languages */}
       <section className="py-20 bg-gradient-to-r from-gray-900/50 to-dark-black/50">
         <div className="container mx-auto px-4">
@@ -281,21 +337,39 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-5xl font-bold mb-8 text-gradient">
-              🎓 Mula Pembelajaran Anda Hari Ini
+              🎓 {user ? 'Teruskan Pembelajaran Anda' : 'Mula Pembelajaran Anda Hari Ini'}
             </h2>
             <p className="text-xl text-gray-300 mb-12">
-              Sertai ribuan pelajar yang telah memulakan perjalanan pembelajaran Sains Komputer mereka dengan CodeCikgu
+              {user 
+                ? `Selamat kembali, ${userName}! Teruskan perjalanan pembelajaran Sains Komputer anda.`
+                : 'Sertai ribuan pelajar yang telah memulakan perjalanan pembelajaran Sains Komputer mereka dengan CodeCikgu'
+              }
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <Link href="/daftar" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
-                <UserPlus className="w-6 h-6" />
-                <span>Daftar Percuma Sekarang</span>
-              </Link>
-              <Link href="/playground" className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
-                <Play className="w-6 h-6" />
-                <span>Cuba Playground</span>
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/playground" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
+                    <Play className="w-6 h-6" />
+                    <span>Mula Kod</span>
+                  </Link>
+                  <Link href={`/dashboard-${userRole}`} className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
+                    <Trophy className="w-6 h-6" />
+                    <span>Ke Dashboard</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/daftar" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
+                    <UserPlus className="w-6 h-6" />
+                    <span>Daftar Percuma Sekarang</span>
+                  </Link>
+                  <Link href="/playground" className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
+                    <Play className="w-6 h-6" />
+                    <span>Cuba Playground</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
