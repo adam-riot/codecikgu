@@ -1,550 +1,363 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  School, 
-  Calendar, 
-  Edit3, 
-  Save, 
-  X, 
-  Trophy, 
-  Target, 
-  BookOpen, 
-  Code,
-  ArrowLeft,
-  Shield,
-  Settings,
-  Bell,
-  Lock
-} from 'lucide-react'
+import { Play, BookOpen, Trophy, UserPlus, Code, Zap, Globe, Cpu, Database, Smartphone } from 'lucide-react'
 
-interface ProfileData {
-  id: string
-  email: string
-  full_name: string
-  phone: string
-  address: string
-  school: string
-  role: string
-  created_at: string
-  xp_points?: number
-  level?: number
-  completed_challenges?: number
-  notes_read?: number
-  activities_completed?: number
-}
-
-export default function ProfilePage() {
-  const router = useRouter()
+export default function HomePage() {
   const [user, setUser] = useState<CustomUser | null>(null)
-  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+  const [userRole, setUserRole] = useState<string>('awam')
+  const [userName, setUserName] = useState<string>('Tetamu')
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    phone: '',
-    address: '',
-    school: ''
-  })
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const checkUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
+        console.log('Main page - Auth user:', user) // Debug log
         
-        if (!user) {
-          router.push('/login')
-          return
-        }
-
-        setUser(user as CustomUser)
-        
-        // Fetch profile data from database
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-
-        if (error) {
-          console.error('Error fetching profile:', error)
-          // Create default profile if doesn't exist
-          const role = await getUserRole(user as CustomUser)
-          const displayName = await getUserDisplayName(user as CustomUser)
+        if (user) {
+          const userData = user as CustomUser
+          setUser(userData)
           
-          const defaultProfile: ProfileData = {
-            id: user.id,
-            email: user.email || '',
-            full_name: displayName,
-            phone: '',
-            address: '',
-            school: '',
-            role: role,
-            created_at: user.created_at || new Date().toISOString(),
-            xp_points: 0,
-            level: 1,
-            completed_challenges: 0,
-            notes_read: 0,
-            activities_completed: 0
-          }
+          // Fetch role and name from database
+          const [role, name] = await Promise.all([
+            getUserRole(userData),
+            getUserDisplayName(userData)
+          ])
           
-          setProfileData(defaultProfile)
-          setEditForm({
-            full_name: displayName,
-            phone: '',
-            address: '',
-            school: ''
-          })
+          console.log('Main page - Fetched role:', role) // Debug log
+          console.log('Main page - Fetched name:', name) // Debug log
+          
+          setUserRole(role)
+          setUserName(name)
         } else {
-          setProfileData(profile)
-          setEditForm({
-            full_name: profile.full_name || '',
-            phone: profile.phone || '',
-            address: profile.address || '',
-            school: profile.school || ''
-          })
+          // No user logged in
+          setUser(null)
+          setUserRole('awam')
+          setUserName('Tetamu')
         }
       } catch (error) {
-        console.error('Error in fetchUserProfile:', error)
+        console.error('Error in checkUser:', error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchUserProfile()
-  }, [router])
-
-  const handleSaveProfile = async () => {
-    if (!user || !profileData) return
-
-    setSaving(true)
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          email: profileData.email,
-          full_name: editForm.full_name,
-          phone: editForm.phone,
-          address: editForm.address,
-          school: editForm.school,
-          role: profileData.role,
-          updated_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error('Error saving profile:', error)
-        alert('Gagal menyimpan profil. Sila cuba lagi.')
-      } else {
-        setProfileData({
-          ...profileData,
-          full_name: editForm.full_name,
-          phone: editForm.phone,
-          address: editForm.address,
-          school: editForm.school
-        })
-        setEditing(false)
-        alert('Profil berjaya dikemaskini!')
-      }
-    } catch (error) {
-      console.error('Error saving profile:', error)
-      alert('Ralat berlaku. Sila cuba lagi.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'admin': return '👨‍💼'
-      case 'murid': return '👨‍🎓'
-      case 'awam': return '👤'
-      default: return '👤'
-    }
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'text-neon-green bg-neon-green/20 border-neon-green/30'
-      case 'murid': return 'text-electric-blue bg-electric-blue/20 border-electric-blue/30'
-      case 'awam': return 'text-neon-cyan bg-neon-cyan/20 border-neon-cyan/30'
-      default: return 'text-gray-400 bg-gray-500/20 border-gray-500/30'
-    }
-  }
-
-  const getDashboardLink = (role: string) => {
-    switch (role) {
-      case 'admin': return '/dashboard-admin'
-      case 'murid': return '/dashboard-murid'
-      case 'awam': return '/dashboard-awam'
-      default: return '/dashboard-awam'
-    }
-  }
-
-  const getLevel = (xp: number) => {
-    return Math.floor(xp / 100) + 1
-  }
-
-  const getXPForNextLevel = (xp: number) => {
-    const currentLevel = getLevel(xp)
-    return currentLevel * 100 - xp
-  }
+    checkUser()
+  }, [])
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
         <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="text-2xl text-gradient loading-dots">Memuat profil</div>
+          <div className="text-2xl text-gradient loading-dots">Memuat halaman</div>
         </div>
       </div>
     )
   }
 
-  if (!profileData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="text-2xl text-red-400">Gagal memuat profil</div>
-          <Link href="/" className="btn-primary mt-4">Kembali ke Laman Utama</Link>
-        </div>
-      </div>
-    )
-  }
-
+  // Always show public landing page content (no auto-redirect)
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <Link 
-              href={getDashboardLink(profileData.role)}
-              className="flex items-center text-gray-400 hover:text-electric-blue transition-colors duration-300"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Kembali ke Dashboard
-            </Link>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="container mx-auto px-4 py-20">
+          <div className="max-w-4xl mx-auto text-center">
+            {/* Dynamic greeting based on user status */}
+            {user ? (
+              <div className="mb-4">
+                <span className="text-lg text-gray-400">
+                  {userRole === 'admin' ? '👨‍💼 Admin' : userRole === 'murid' ? '👨‍🎓 Murid' : '👤 Pengguna'} • {userName}
+                </span>
+              </div>
+            ) : null}
             
-            <div className="flex items-center space-x-4">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getRoleColor(profileData.role)}`}>
-                {getRoleIcon(profileData.role)} {profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1)}
-              </span>
-            </div>
-          </div>
-
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gradient">
-              👤 Profil Pengguna
+            <h1 className="text-4xl md:text-7xl font-bold mb-8 text-gradient leading-tight">
+              Selamat Datang<br />
+              ke CodeCikgu
             </h1>
-            <p className="text-xl text-gray-300">
-              Urus maklumat peribadi dan lihat pencapaian anda
+            <p className="text-xl md:text-2xl text-gray-300 mb-12 leading-relaxed">
+              Platform pembelajaran <span className="text-electric-blue font-semibold">Sains Komputer</span> yang interaktif untuk murid Tingkatan 4 & 5.<br />
+              Belajar dengan cara yang menyeronokkan dan dapatkan ganjaran!
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Profile Info */}
-            <div className="lg:col-span-2">
-              <div className="glass-dark rounded-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white flex items-center">
-                    <User className="w-6 h-6 mr-3 text-electric-blue" />
-                    Maklumat Peribadi
-                  </h2>
-                  
-                  {!editing ? (
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                      <span>Edit</span>
-                    </button>
-                  ) : (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={handleSaveProfile}
-                        disabled={saving}
-                        className="flex items-center space-x-2 px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300 disabled:opacity-50"
-                      >
-                        <Save className="w-4 h-4" />
-                        <span>{saving ? 'Menyimpan...' : 'Simpan'}</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditing(false)
-                          setEditForm({
-                            full_name: profileData.full_name || '',
-                            phone: profileData.phone || '',
-                            address: profileData.address || '',
-                            school: profileData.school || ''
-                          })
-                        }}
-                        className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300"
-                      >
-                        <X className="w-4 h-4" />
-                        <span>Batal</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-6">
-                  {/* Full Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      <User className="w-4 h-4 inline mr-2" />
-                      Nama Penuh
-                    </label>
-                    {editing ? (
-                      <input
-                        type="text"
-                        value={editForm.full_name}
-                        onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors duration-300"
-                        placeholder="Masukkan nama penuh"
-                      />
-                    ) : (
-                      <div className="px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-lg text-white">
-                        {profileData.full_name || 'Belum ditetapkan'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Email */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      <Mail className="w-4 h-4 inline mr-2" />
-                      Email
-                    </label>
-                    <div className="px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-lg text-gray-400">
-                      {profileData.email}
-                      <span className="text-xs ml-2">(tidak boleh diubah)</span>
-                    </div>
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      <Phone className="w-4 h-4 inline mr-2" />
-                      Nombor Telefon
-                    </label>
-                    {editing ? (
-                      <input
-                        type="tel"
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors duration-300"
-                        placeholder="Contoh: 012-3456789"
-                      />
-                    ) : (
-                      <div className="px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-lg text-white">
-                        {profileData.phone || 'Belum ditetapkan'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Address */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      <MapPin className="w-4 h-4 inline mr-2" />
-                      Alamat
-                    </label>
-                    {editing ? (
-                      <textarea
-                        value={editForm.address}
-                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors duration-300"
-                        placeholder="Masukkan alamat lengkap"
-                      />
-                    ) : (
-                      <div className="px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-lg text-white min-h-[80px]">
-                        {profileData.address || 'Belum ditetapkan'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* School */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      <School className="w-4 h-4 inline mr-2" />
-                      Sekolah/Institusi
-                    </label>
-                    {editing ? (
-                      <input
-                        type="text"
-                        value={editForm.school}
-                        onChange={(e) => setEditForm({ ...editForm, school: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue transition-colors duration-300"
-                        placeholder="Contoh: SMK Bandar Utama"
-                      />
-                    ) : (
-                      <div className="px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-lg text-white">
-                        {profileData.school || 'Belum ditetapkan'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Account Created */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      <Calendar className="w-4 h-4 inline mr-2" />
-                      Akaun Dicipta
-                    </label>
-                    <div className="px-4 py-3 bg-gray-800/30 border border-gray-700 rounded-lg text-gray-400">
-                      {new Date(profileData.created_at).toLocaleDateString('ms-MY', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats & Settings */}
-            <div className="space-y-8">
-              {/* Stats Card */}
-              {(profileData.role === 'murid' || profileData.role === 'awam') && (
-                <div className="glass-dark rounded-xl p-6">
-                  <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                    <Trophy className="w-5 h-5 mr-2 text-yellow-400" />
-                    Pencapaian
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {profileData.role === 'murid' && (
-                      <>
-                        {/* XP and Level */}
-                        <div className="text-center p-4 bg-gradient-to-r from-electric-blue/20 to-neon-cyan/20 rounded-lg border border-electric-blue/30">
-                          <div className="text-2xl font-bold text-electric-blue mb-1">
-                            Level {getLevel(profileData.xp_points || 0)}
-                          </div>
-                          <div className="text-sm text-gray-300 mb-2">
-                            {profileData.xp_points || 0} XP
-                          </div>
-                          <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="bg-gradient-to-r from-electric-blue to-neon-cyan h-2 rounded-full transition-all duration-300"
-                              style={{ 
-                                width: `${((profileData.xp_points || 0) % 100)}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {getXPForNextLevel(profileData.xp_points || 0)} XP ke level seterusnya
-                          </div>
-                        </div>
-
-                        {/* Challenges */}
-                        <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
-                          <div className="flex items-center">
-                            <Target className="w-5 h-5 text-neon-green mr-2" />
-                            <span className="text-gray-300">Cabaran Selesai</span>
-                          </div>
-                          <span className="text-neon-green font-bold">{profileData.completed_challenges || 0}</span>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Notes Read */}
-                    <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
-                      <div className="flex items-center">
-                        <BookOpen className="w-5 h-5 text-electric-blue mr-2" />
-                        <span className="text-gray-300">Nota Dibaca</span>
-                      </div>
-                      <span className="text-electric-blue font-bold">{profileData.notes_read || 0}</span>
-                    </div>
-
-                    {/* Activities */}
-                    <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
-                      <div className="flex items-center">
-                        <Code className="w-5 h-5 text-neon-cyan mr-2" />
-                        <span className="text-gray-300">Aktiviti Selesai</span>
-                      </div>
-                      <span className="text-neon-cyan font-bold">{profileData.activities_completed || 0}</span>
-                    </div>
-                  </div>
-                </div>
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+              {user ? (
+                <>
+                  <Link href="/playground" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
+                    <Play className="w-6 h-6" />
+                    <span>🚀 Mula Kod</span>
+                  </Link>
+                  <Link href="/nota" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
+                    <BookOpen className="w-6 h-6" />
+                    <span>📚 Baca Nota</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/daftar" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
+                    <UserPlus className="w-6 h-6" />
+                    <span>🚀 Daftar Sekarang</span>
+                  </Link>
+                  <Link href="/login" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
+                    <span>🔐 Log Masuk</span>
+                  </Link>
+                </>
               )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Animated background elements */}
+        <div className="absolute top-20 left-10 w-20 h-20 bg-electric-blue/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-32 h-32 bg-neon-cyan/10 rounded-full blur-xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-neon-green/10 rounded-full blur-xl animate-pulse delay-500"></div>
+      </section>
 
-              {/* Account Settings */}
-              <div className="glass-dark rounded-xl p-6">
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                  <Settings className="w-5 h-5 mr-2 text-gray-400" />
-                  Tetapan Akaun
-                </h3>
-                
-                <div className="space-y-3">
-                  <button className="w-full flex items-center justify-between p-3 bg-gray-800/30 hover:bg-gray-800/50 rounded-lg transition-colors duration-300 text-left">
-                    <div className="flex items-center">
-                      <Bell className="w-5 h-5 text-yellow-400 mr-3" />
-                      <span className="text-gray-300">Notifikasi</span>
-                    </div>
-                    <span className="text-gray-400">→</span>
-                  </button>
+      {/* Quick Access Features */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
+              🎯 Ciri-Ciri Platform
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <Link href="/playground" className="glass-dark rounded-xl p-8 card-hover neon-glow group text-center">
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">🖥️</div>
+                <h3 className="text-xl font-bold text-white mb-3">Playground</h3>
+                <p className="text-gray-400 text-sm mb-4">Kod Editor Interaktif dengan sokongan pelbagai bahasa</p>
+                <div className="text-electric-blue group-hover:underline">Mula Kod →</div>
+              </Link>
 
-                  <button className="w-full flex items-center justify-between p-3 bg-gray-800/30 hover:bg-gray-800/50 rounded-lg transition-colors duration-300 text-left">
-                    <div className="flex items-center">
-                      <Lock className="w-5 h-5 text-red-400 mr-3" />
-                      <span className="text-gray-300">Keselamatan</span>
-                    </div>
-                    <span className="text-gray-400">→</span>
-                  </button>
+              <Link href="/nota" className="glass-dark rounded-xl p-8 card-hover neon-glow-green group text-center">
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">📚</div>
+                <h3 className="text-xl font-bold text-white mb-3">Nota</h3>
+                <p className="text-gray-400 text-sm mb-4">Sumber pembelajaran lengkap untuk Tingkatan 4 & 5</p>
+                <div className="text-neon-green group-hover:underline">Baca Nota →</div>
+              </Link>
 
-                  <button className="w-full flex items-center justify-between p-3 bg-gray-800/30 hover:bg-gray-800/50 rounded-lg transition-colors duration-300 text-left">
-                    <div className="flex items-center">
-                      <Shield className="w-5 h-5 text-green-400 mr-3" />
-                      <span className="text-gray-300">Privasi</span>
-                    </div>
-                    <span className="text-gray-400">→</span>
-                  </button>
-                </div>
+              <Link href="/leaderboard" className="glass-dark rounded-xl p-8 card-hover neon-glow-cyan group text-center">
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">🏆</div>
+                <h3 className="text-xl font-bold text-white mb-3">Leaderboard</h3>
+                <p className="text-gray-400 text-sm mb-4">Ranking & pencapaian pelajar terbaik</p>
+                <div className="text-neon-cyan group-hover:underline">Lihat Ranking →</div>
+              </Link>
+
+              {user ? (
+                <Link href={`/dashboard-${userRole}`} className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                    {userRole === 'admin' ? '👨‍💼' : userRole === 'murid' ? '👨‍🎓' : '👤'}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-3">Dashboard</h3>
+                  <p className="text-gray-400 text-sm mb-4">Akses dashboard {userRole === 'admin' ? 'admin' : userRole === 'murid' ? 'murid' : 'awam'} anda</p>
+                  <div className="text-purple-400 group-hover:underline">Ke Dashboard →</div>
+                </Link>
+              ) : (
+                <Link href="/daftar" className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
+                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
+                  <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
+                  <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
+                  <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Programming Languages */}
+      <section className="py-20 bg-gradient-to-r from-gray-900/50 to-dark-black/50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
+              💻 Bahasa Pengaturcaraan
+            </h2>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">☕</div>
+                <h3 className="text-lg font-bold text-white mb-2">Java</h3>
+                <p className="text-gray-400 text-sm">Object-oriented programming</p>
               </div>
 
-              {/* Quick Actions */}
-              <div className="glass-dark rounded-xl p-6">
-                <h3 className="text-xl font-bold text-white mb-6">Akses Pantas</h3>
-                
-                <div className="space-y-3">
-                  <Link 
-                    href="/playground"
-                    className="w-full flex items-center p-3 bg-electric-blue/20 hover:bg-electric-blue/30 border border-electric-blue/30 rounded-lg transition-colors duration-300"
-                  >
-                    <Code className="w-5 h-5 text-electric-blue mr-3" />
-                    <span className="text-electric-blue">Playground</span>
-                  </Link>
+              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🐍</div>
+                <h3 className="text-lg font-bold text-white mb-2">Python</h3>
+                <p className="text-gray-400 text-sm">Beginner-friendly syntax</p>
+              </div>
 
-                  <Link 
-                    href="/nota"
-                    className="w-full flex items-center p-3 bg-neon-green/20 hover:bg-neon-green/30 border border-neon-green/30 rounded-lg transition-colors duration-300"
-                  >
-                    <BookOpen className="w-5 h-5 text-neon-green mr-3" />
-                    <span className="text-neon-green">Nota</span>
-                  </Link>
+              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">⚡</div>
+                <h3 className="text-lg font-bold text-white mb-2">C++</h3>
+                <p className="text-gray-400 text-sm">High-performance computing</p>
+              </div>
 
-                  <Link 
-                    href="/leaderboard"
-                    className="w-full flex items-center p-3 bg-neon-cyan/20 hover:bg-neon-cyan/30 border border-neon-cyan/30 rounded-lg transition-colors duration-300"
-                  >
-                    <Trophy className="w-5 h-5 text-neon-cyan mr-3" />
-                    <span className="text-neon-cyan">Leaderboard</span>
-                  </Link>
-                </div>
+              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🌐</div>
+                <h3 className="text-lg font-bold text-white mb-2">JavaScript</h3>
+                <p className="text-gray-400 text-sm">Web development</p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🔷</div>
+                <h3 className="text-lg font-bold text-white mb-2">C#</h3>
+                <p className="text-gray-400 text-sm">Microsoft ecosystem</p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🦀</div>
+                <h3 className="text-lg font-bold text-white mb-2">Rust</h3>
+                <p className="text-gray-400 text-sm">Memory-safe systems</p>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Platform Features */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
+              ✨ Mengapa CodeCikgu?
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="glass-dark rounded-xl p-8 card-hover">
+                <div className="text-4xl mb-4">🎮</div>
+                <h3 className="text-xl font-bold text-white mb-4">Pembelajaran Interaktif</h3>
+                <p className="text-gray-400">
+                  Belajar sambil bermain dengan playground interaktif dan sistem ganjaran XP yang menarik.
+                </p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-8 card-hover">
+                <div className="text-4xl mb-4">📖</div>
+                <h3 className="text-xl font-bold text-white mb-4">Sukatan Pelajaran SPM</h3>
+                <p className="text-gray-400">
+                  Nota dan bahan pembelajaran yang mengikut sukatan pelajaran Sains Komputer SPM terkini.
+                </p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-8 card-hover">
+                <div className="text-4xl mb-4">📱</div>
+                <h3 className="text-xl font-bold text-white mb-4">Multi-Platform</h3>
+                <p className="text-gray-400">
+                  Akses dari mana-mana peranti - desktop, tablet, atau telefon pintar dengan responsive design.
+                </p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-8 card-hover">
+                <div className="text-4xl mb-4">🏆</div>
+                <h3 className="text-xl font-bold text-white mb-4">Sistem Ranking</h3>
+                <p className="text-gray-400">
+                  Bersaing dengan rakan-rakan melalui sistem XP dan leaderboard untuk motivasi pembelajaran.
+                </p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-8 card-hover">
+                <div className="text-4xl mb-4">👥</div>
+                <h3 className="text-xl font-bold text-white mb-4">Multi-Role Support</h3>
+                <p className="text-gray-400">
+                  Sokongan untuk admin, murid, dan pengguna awam dengan ciri-ciri yang disesuaikan.
+                </p>
+              </div>
+
+              <div className="glass-dark rounded-xl p-8 card-hover">
+                <div className="text-4xl mb-4">💰</div>
+                <h3 className="text-xl font-bold text-white mb-4">Percuma Selamanya</h3>
+                <p className="text-gray-400">
+                  Platform pembelajaran yang sepenuhnya percuma untuk semua pelajar Malaysia.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Platform Info */}
+      <section className="py-20 bg-gradient-to-r from-dark-black/50 to-gray-900/50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
+              📊 Platform Info
+            </h2>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="text-center">
+                <div className="text-4xl mb-4">🚀</div>
+                <div className="text-3xl font-bold text-electric-blue mb-2">Beta</div>
+                <div className="text-gray-400">Status Platform</div>
+              </div>
+
+              <div className="text-center">
+                <div className="text-4xl mb-4">💻</div>
+                <div className="text-3xl font-bold text-neon-green mb-2">6</div>
+                <div className="text-gray-400">Bahasa Disokong</div>
+              </div>
+
+              <div className="text-center">
+                <div className="text-4xl mb-4">📅</div>
+                <div className="text-3xl font-bold text-neon-cyan mb-2">2024</div>
+                <div className="text-gray-400">Tahun Pelancaran</div>
+              </div>
+
+              <div className="text-center">
+                <div className="text-4xl mb-4">💰</div>
+                <div className="text-3xl font-bold text-purple-400 mb-2">Free</div>
+                <div className="text-gray-400">Harga Penggunaan</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl md:text-5xl font-bold mb-8 text-gradient">
+              🎓 {user ? 'Teruskan Pembelajaran Anda' : 'Mula Pembelajaran Anda Hari Ini'}
+            </h2>
+            <p className="text-xl text-gray-300 mb-12">
+              {user 
+                ? `Selamat kembali, ${userName}! Teruskan perjalanan pembelajaran Sains Komputer anda.`
+                : 'Sertai ribuan pelajar yang telah memulakan perjalanan pembelajaran Sains Komputer mereka dengan CodeCikgu'
+              }
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+              {user ? (
+                <>
+                  <Link href="/playground" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
+                    <Play className="w-6 h-6" />
+                    <span>Mula Kod</span>
+                  </Link>
+                  <Link href={`/dashboard-${userRole}`} className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
+                    <Trophy className="w-6 h-6" />
+                    <span>Ke Dashboard</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/daftar" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
+                    <UserPlus className="w-6 h-6" />
+                    <span>Daftar Percuma Sekarang</span>
+                  </Link>
+                  <Link href="/playground" className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
+                    <Play className="w-6 h-6" />
+                    <span>Cuba Playground</span>
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
+
