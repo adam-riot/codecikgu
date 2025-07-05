@@ -22,9 +22,11 @@ import {
   AlertCircle,
   School,
   Phone,
-  MapPin,
   Check,
-  X
+  X,
+  Info,
+  GraduationCap,
+  UserCheck
 } from 'lucide-react'
 
 interface Notification {
@@ -39,6 +41,13 @@ interface PasswordStrength {
   color: string
 }
 
+interface EmailValidation {
+  isValid: boolean
+  isMOE: boolean
+  role: 'murid' | 'awam'
+  message: string
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
@@ -46,7 +55,6 @@ export default function RegisterPage() {
     email: '',
     telefon: '',
     sekolah: '',
-    alamat: '',
     password: '',
     confirmPassword: ''
   })
@@ -58,6 +66,12 @@ export default function RegisterPage() {
     score: 0,
     feedback: [],
     color: 'red'
+  })
+  const [emailValidation, setEmailValidation] = useState<EmailValidation>({
+    isValid: false,
+    isMOE: false,
+    role: 'awam',
+    message: ''
   })
   const [step, setStep] = useState(1) // Multi-step form
 
@@ -71,6 +85,39 @@ export default function RegisterPage() {
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
+  }
+
+  // MOE Email validation function
+  const validateMOEEmail = (email: string): EmailValidation => {
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return {
+        isValid: false,
+        isMOE: false,
+        role: 'awam',
+        message: 'Format email tidak sah'
+      }
+    }
+
+    // MOE email pattern: m-xxxxxxx@moe-dl.edu.my (7 digits) or m-xxxxxxxx@moe-dl.edu.my (8 digits)
+    const moePattern = /^m-\d{7,8}@moe-dl\.edu\.my$/i
+    
+    if (moePattern.test(email)) {
+      return {
+        isValid: true,
+        isMOE: true,
+        role: 'murid',
+        message: 'Email MOE sah - Anda akan didaftarkan sebagai Murid'
+      }
+    } else {
+      return {
+        isValid: true,
+        isMOE: false,
+        role: 'awam',
+        message: 'Email awam - Anda akan didaftarkan sebagai Awam'
+      }
+    }
   }
 
   // Password strength checker
@@ -123,6 +170,20 @@ export default function RegisterPage() {
     }
   }, [formData.password])
 
+  // Update email validation when email changes
+  useEffect(() => {
+    if (formData.email) {
+      setEmailValidation(validateMOEEmail(formData.email))
+    } else {
+      setEmailValidation({
+        isValid: false,
+        isMOE: false,
+        role: 'awam',
+        message: ''
+      })
+    }
+  }, [formData.email])
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -132,7 +193,7 @@ export default function RegisterPage() {
       addNotification('error', 'Sila lengkapkan maklumat peribadi')
       return false
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!emailValidation.isValid) {
       addNotification('error', 'Format email tidak sah')
       return false
     }
@@ -182,8 +243,7 @@ export default function RegisterPage() {
             nama: formData.nama,
             telefon: formData.telefon,
             sekolah: formData.sekolah,
-            alamat: formData.alamat,
-            role: 'murid'
+            role: emailValidation.role
           }
         }
       })
@@ -203,8 +263,7 @@ export default function RegisterPage() {
             email: formData.email,
             telefon: formData.telefon,
             sekolah: formData.sekolah,
-            alamat: formData.alamat,
-            role: 'murid',
+            role: emailValidation.role,
             xp: 0,
             level: 1,
             created_at: new Date().toISOString()
@@ -216,7 +275,7 @@ export default function RegisterPage() {
         }
       }
 
-      addNotification('success', 'Pendaftaran berjaya! Sila semak email untuk pengesahan.')
+      addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Sila semak email untuk pengesahan.`)
       setTimeout(() => {
         router.push('/login')
       }, 2000)
@@ -291,6 +350,24 @@ export default function RegisterPage() {
               </p>
             </div>
 
+            {/* MOE Email Info */}
+            <div className="mb-8 p-4 bg-gradient-to-r from-blue-500/10 to-green-500/10 rounded-xl border border-blue-500/20">
+              <div className="flex items-center mb-3">
+                <GraduationCap className="w-6 h-6 text-blue-400 mr-2" />
+                <h4 className="text-lg font-semibold text-white">Pelajar MOE</h4>
+              </div>
+              <p className="text-gray-300 text-sm mb-2">
+                Gunakan email MOE rasmi untuk mendapat akses penuh sebagai <strong>Murid</strong>:
+              </p>
+              <div className="text-blue-400 text-sm font-mono bg-gray-800/50 p-2 rounded">
+                m-1234567@moe-dl.edu.my<br/>
+                m-12345678@moe-dl.edu.my
+              </div>
+              <p className="text-gray-400 text-xs mt-2">
+                Email lain akan didaftarkan sebagai <strong>Awam</strong> dengan akses terhad.
+              </p>
+            </div>
+
             {/* Benefits */}
             <div className="space-y-6">
               <div className="flex items-start space-x-4">
@@ -331,20 +408,6 @@ export default function RegisterPage() {
                   <h3 className="text-lg font-semibold text-white mb-1">Komuniti Aktif</h3>
                   <p className="text-gray-400">Belajar bersama, tanya soalan, dan berkongsi projek dengan rakan-rakan</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Success Stories */}
-            <div className="mt-12 p-6 bg-gradient-to-r from-electric-blue/10 to-neon-green/10 rounded-xl border border-electric-blue/20">
-              <div className="flex items-center mb-3">
-                <Trophy className="w-6 h-6 text-neon-green mr-2" />
-                <h4 className="text-lg font-semibold text-white">Success Story</h4>
-              </div>
-              <p className="text-gray-300 text-sm italic">
-                "Dalam 3 bulan belajar di CodeCikgu, saya berjaya buat website pertama dan dapat internship sebagai web developer!"
-              </p>
-              <div className="mt-3 text-sm text-electric-blue font-medium">
-                - Ahmad, Pelajar Tingkatan 5
               </div>
             </div>
           </div>
@@ -425,7 +488,7 @@ export default function RegisterPage() {
                       </div>
                     </div>
 
-                    {/* Email Field */}
+                    {/* Email Field with MOE Validation */}
                     <div>
                       <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                         Email *
@@ -439,10 +502,61 @@ export default function RegisterPage() {
                           type="email"
                           value={formData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300"
-                          placeholder="ahmad@example.com"
+                          className={`w-full pl-10 pr-4 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-300 ${
+                            formData.email && emailValidation.isValid
+                              ? emailValidation.isMOE 
+                                ? 'border-green-500 focus:ring-green-500'
+                                : 'border-blue-500 focus:ring-blue-500'
+                              : formData.email && !emailValidation.isValid
+                              ? 'border-red-500 focus:ring-red-500'
+                              : 'border-gray-600 focus:ring-electric-blue'
+                          }`}
+                          placeholder="m-1234567@moe-dl.edu.my atau email@example.com"
                           required
                         />
+                      </div>
+                      
+                      {/* Email Validation Feedback */}
+                      {formData.email && emailValidation.message && (
+                        <div className={`mt-2 flex items-center text-xs ${
+                          emailValidation.isValid
+                            ? emailValidation.isMOE
+                              ? 'text-green-400'
+                              : 'text-blue-400'
+                            : 'text-red-400'
+                        }`}>
+                          {emailValidation.isValid ? (
+                            emailValidation.isMOE ? (
+                              <div className="flex items-center">
+                                <GraduationCap className="w-3 h-3 mr-1" />
+                                <span>{emailValidation.message}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center">
+                                <UserCheck className="w-3 h-3 mr-1" />
+                                <span>{emailValidation.message}</span>
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex items-center">
+                              <X className="w-3 h-3 mr-1" />
+                              <span>{emailValidation.message}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* MOE Email Format Help */}
+                      <div className="mt-2 p-3 bg-gray-800/30 rounded-lg">
+                        <div className="flex items-center mb-2">
+                          <Info className="w-4 h-4 text-blue-400 mr-2" />
+                          <span className="text-sm font-medium text-blue-400">Format Email MOE</span>
+                        </div>
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <div>• <span className="font-mono text-green-400">m-1234567@moe-dl.edu.my</span> (7 digit)</div>
+                          <div>• <span className="font-mono text-green-400">m-12345678@moe-dl.edu.my</span> (8 digit)</div>
+                          <div className="text-gray-500 mt-1">Email MOE akan mendapat akses penuh sebagai Murid</div>
+                        </div>
                       </div>
                     </div>
 
@@ -487,26 +601,6 @@ export default function RegisterPage() {
                       </div>
                     </div>
 
-                    {/* Address Field */}
-                    <div>
-                      <label htmlFor="alamat" className="block text-sm font-medium text-gray-300 mb-2">
-                        Alamat
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <MapPin className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <textarea
-                          id="alamat"
-                          value={formData.alamat}
-                          onChange={(e) => handleInputChange('alamat', e.target.value)}
-                          rows={3}
-                          className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300 resize-none"
-                          placeholder="Alamat rumah anda"
-                        />
-                      </div>
-                    </div>
-
                     {/* Next Button */}
                     <button
                       type="submit"
@@ -518,6 +612,32 @@ export default function RegisterPage() {
                   </>
                 ) : (
                   <>
+                    {/* Role Display */}
+                    <div className={`p-4 rounded-lg border ${
+                      emailValidation.isMOE 
+                        ? 'bg-green-500/10 border-green-500/30' 
+                        : 'bg-blue-500/10 border-blue-500/30'
+                    }`}>
+                      <div className="flex items-center">
+                        {emailValidation.isMOE ? (
+                          <GraduationCap className="w-5 h-5 text-green-400 mr-2" />
+                        ) : (
+                          <UserCheck className="w-5 h-5 text-blue-400 mr-2" />
+                        )}
+                        <div>
+                          <div className={`font-medium ${emailValidation.isMOE ? 'text-green-400' : 'text-blue-400'}`}>
+                            Pendaftaran sebagai: {emailValidation.role.toUpperCase()}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {emailValidation.isMOE 
+                              ? 'Akses penuh ke semua features dan XP system'
+                              : 'Akses terhad ke features awam'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Password Field */}
                     <div>
                       <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
