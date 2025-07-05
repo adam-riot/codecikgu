@@ -66,7 +66,152 @@ interface PlaygroundSession {
   userRole: string
 }
 
-// Language patterns for auto-detection
+// Syntax highlighting patterns for different languages
+const syntaxPatterns = {
+  javascript: {
+    keywords: /\b(const|let|var|function|return|if|else|for|while|do|break|continue|switch|case|default|try|catch|finally|throw|new|this|typeof|instanceof|in|of|class|extends|super|static|async|await|import|export|from|as|default)\b/g,
+    strings: /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(\/\/.*$|\/\*[\s\S]*?\*\/)/gm,
+    numbers: /\b\d+\.?\d*\b/g,
+    operators: /[+\-*/%=<>!&|^~?:]/g,
+    brackets: /[(){}[\]]/g,
+    functions: /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()/g,
+    properties: /\.([a-zA-Z_$][a-zA-Z0-9_$]*)/g
+  },
+  php: {
+    keywords: /\b(echo|print|if|else|elseif|endif|for|foreach|endfor|while|endwhile|do|break|continue|switch|case|default|function|return|class|extends|public|private|protected|static|const|var|new|this|parent|self|try|catch|finally|throw|include|require|include_once|require_once|namespace|use|as|global|isset|empty|unset|array|true|false|null)\b/g,
+    variables: /\$[a-zA-Z_][a-zA-Z0-9_]*/g,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(\/\/.*$|\/\*[\s\S]*?\*\/|#.*$)/gm,
+    numbers: /\b\d+\.?\d*\b/g,
+    operators: /[+\-*/%=<>!&|^~?:.]/g,
+    brackets: /[(){}[\]]/g,
+    tags: /(<\?php|\?>)/g,
+    functions: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g
+  },
+  html: {
+    tags: /(<\/?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?>)/g,
+    attributes: /\s([a-zA-Z-]+)(?==)/g,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(<!--[\s\S]*?-->)/g,
+    doctype: /(<!DOCTYPE[^>]*>)/gi
+  },
+  css: {
+    selectors: /([.#]?[a-zA-Z][a-zA-Z0-9_-]*(?:\s*[>+~]\s*[a-zA-Z][a-zA-Z0-9_-]*)*)\s*(?={)/g,
+    properties: /([a-zA-Z-]+)\s*(?=:)/g,
+    values: /:\s*([^;{}]+)/g,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(\/\*[\s\S]*?\*\/)/g,
+    numbers: /\b\d+\.?\d*(px|em|rem|%|vh|vw|pt|pc|in|cm|mm|ex|ch|vmin|vmax)?\b/g,
+    colors: /#[0-9a-fA-F]{3,6}\b/g,
+    important: /!important/g
+  },
+  python: {
+    keywords: /\b(def|class|if|elif|else|for|while|break|continue|return|import|from|as|try|except|finally|raise|with|pass|lambda|and|or|not|in|is|True|False|None|global|nonlocal|yield|async|await)\b/g,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1|"""[\s\S]*?"""|'''[\s\S]*?'''/g,
+    comments: /(#.*$)/gm,
+    numbers: /\b\d+\.?\d*\b/g,
+    operators: /[+\-*/%=<>!&|^~]/g,
+    brackets: /[(){}[\]]/g,
+    functions: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g,
+    decorators: /@[a-zA-Z_][a-zA-Z0-9_]*/g
+  },
+  java: {
+    keywords: /\b(public|private|protected|static|final|abstract|class|interface|extends|implements|import|package|if|else|for|while|do|break|continue|return|try|catch|finally|throw|throws|new|this|super|void|int|double|float|long|short|byte|char|boolean|String|true|false|null)\b/g,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(\/\/.*$|\/\*[\s\S]*?\*\/)/gm,
+    numbers: /\b\d+\.?\d*[fFdDlL]?\b/g,
+    operators: /[+\-*/%=<>!&|^~?:]/g,
+    brackets: /[(){}[\]]/g,
+    functions: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g,
+    annotations: /@[a-zA-Z_][a-zA-Z0-9_]*/g
+  },
+  cpp: {
+    keywords: /\b(int|double|float|char|bool|void|string|auto|const|static|extern|inline|virtual|public|private|protected|class|struct|enum|union|namespace|using|template|typename|if|else|for|while|do|break|continue|return|switch|case|default|try|catch|throw|new|delete|this|true|false|nullptr|sizeof|typedef|include|define|ifdef|ifndef|endif|pragma)\b/g,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(\/\/.*$|\/\*[\s\S]*?\*\/)/gm,
+    numbers: /\b\d+\.?\d*[fFlLuU]?\b/g,
+    operators: /[+\-*/%=<>!&|^~?:]/g,
+    brackets: /[(){}[\]]/g,
+    preprocessor: /#[a-zA-Z_][a-zA-Z0-9_]*/g,
+    functions: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g
+  },
+  sql: {
+    keywords: /\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TABLE|DATABASE|INDEX|VIEW|PROCEDURE|FUNCTION|TRIGGER|IF|ELSE|BEGIN|END|DECLARE|SET|EXEC|EXECUTE|RETURN|PRINT|GO|USE|AS|ON|IN|EXISTS|NOT|NULL|AND|OR|LIKE|BETWEEN|ORDER|BY|GROUP|HAVING|UNION|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|CROSS|DISTINCT|TOP|LIMIT|OFFSET|CASE|WHEN|THEN|ELSE|END|COUNT|SUM|AVG|MIN|MAX|CAST|CONVERT)\b/gi,
+    strings: /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+    comments: /(--.*$|\/\*[\s\S]*?\*\/)/gm,
+    numbers: /\b\d+\.?\d*\b/g,
+    operators: /[+\-*/%=<>!]/g,
+    brackets: /[()]/g,
+    functions: /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g
+  }
+}
+
+// Theme-based color schemes
+const syntaxThemes = {
+  dark: {
+    keywords: '#569cd6',      // Blue
+    strings: '#ce9178',       // Orange
+    comments: '#6a9955',      // Green
+    numbers: '#b5cea8',       // Light green
+    operators: '#d4d4d4',     // Light gray
+    brackets: '#ffd700',      // Gold
+    functions: '#dcdcaa',     // Yellow
+    properties: '#9cdcfe',    // Light blue
+    variables: '#4fc1ff',     // Cyan
+    tags: '#569cd6',          // Blue
+    attributes: '#92c5f8',    // Light blue
+    selectors: '#d7ba7d',     // Tan
+    values: '#ce9178',        // Orange
+    colors: '#4ec9b0',        // Teal
+    important: '#ff6b6b',     // Red
+    decorators: '#4ec9b0',    // Teal
+    annotations: '#4ec9b0',   // Teal
+    preprocessor: '#c586c0'   // Purple
+  },
+  light: {
+    keywords: '#0000ff',      // Blue
+    strings: '#a31515',       // Red
+    comments: '#008000',      // Green
+    numbers: '#098658',       // Dark green
+    operators: '#000000',     // Black
+    brackets: '#000000',      // Black
+    functions: '#795e26',     // Brown
+    properties: '#001080',    // Dark blue
+    variables: '#001080',     // Dark blue
+    tags: '#800000',          // Maroon
+    attributes: '#ff0000',    // Red
+    selectors: '#800000',     // Maroon
+    values: '#0451a5',        // Blue
+    colors: '#0451a5',        // Blue
+    important: '#ff0000',     // Red
+    decorators: '#0451a5',    // Blue
+    annotations: '#0451a5',   // Blue
+    preprocessor: '#800080'   // Purple
+  },
+  monokai: {
+    keywords: '#f92672',      // Pink
+    strings: '#e6db74',       // Yellow
+    comments: '#75715e',      // Gray
+    numbers: '#ae81ff',       // Purple
+    operators: '#f8f8f2',     // White
+    brackets: '#f8f8f2',      // White
+    functions: '#a6e22e',     // Green
+    properties: '#66d9ef',    // Cyan
+    variables: '#fd971f',     // Orange
+    tags: '#f92672',          // Pink
+    attributes: '#a6e22e',    // Green
+    selectors: '#f92672',     // Pink
+    values: '#e6db74',        // Yellow
+    colors: '#ae81ff',        // Purple
+    important: '#f92672',     // Pink
+    decorators: '#66d9ef',    // Cyan
+    annotations: '#66d9ef',   // Cyan
+    preprocessor: '#66d9ef'   // Cyan
+  }
+}
+
+// Language patterns for auto-detection (same as before)
 const languagePatterns = {
   javascript: {
     name: 'JavaScript',
@@ -223,7 +368,117 @@ const languagePatterns = {
   }
 }
 
-// Storage utilities with user-specific keys
+// Syntax highlighting function
+const applySyntaxHighlighting = (code: string, language: string, theme: string): string => {
+  if (!code) return ''
+  
+  const patterns = syntaxPatterns[language as keyof typeof syntaxPatterns]
+  const colors = syntaxThemes[theme as keyof typeof syntaxThemes]
+  
+  if (!patterns || !colors) return code
+  
+  let highlightedCode = code
+  
+  // Apply highlighting in order of precedence
+  const replacements: Array<{pattern: RegExp, replacement: (match: string, ...args: any[]) => string}> = []
+  
+  // Comments first (to avoid highlighting keywords inside comments)
+  if (patterns.comments) {
+    replacements.push({
+      pattern: patterns.comments,
+      replacement: (match) => `<span style="color: ${colors.comments}; font-style: italic;">${match}</span>`
+    })
+  }
+  
+  // Strings
+  if (patterns.strings) {
+    replacements.push({
+      pattern: patterns.strings,
+      replacement: (match) => `<span style="color: ${colors.strings};">${match}</span>`
+    })
+  }
+  
+  // Keywords
+  if (patterns.keywords) {
+    replacements.push({
+      pattern: patterns.keywords,
+      replacement: (match) => `<span style="color: ${colors.keywords}; font-weight: bold;">${match}</span>`
+    })
+  }
+  
+  // Variables (PHP)
+  if (patterns.variables) {
+    replacements.push({
+      pattern: patterns.variables,
+      replacement: (match) => `<span style="color: ${colors.variables};">${match}</span>`
+    })
+  }
+  
+  // Functions
+  if (patterns.functions) {
+    replacements.push({
+      pattern: patterns.functions,
+      replacement: (match) => `<span style="color: ${colors.functions};">${match}</span>`
+    })
+  }
+  
+  // Numbers
+  if (patterns.numbers) {
+    replacements.push({
+      pattern: patterns.numbers,
+      replacement: (match) => `<span style="color: ${colors.numbers};">${match}</span>`
+    })
+  }
+  
+  // HTML Tags
+  if (patterns.tags) {
+    replacements.push({
+      pattern: patterns.tags,
+      replacement: (match) => `<span style="color: ${colors.tags};">${match}</span>`
+    })
+  }
+  
+  // CSS Selectors
+  if (patterns.selectors) {
+    replacements.push({
+      pattern: patterns.selectors,
+      replacement: (match) => `<span style="color: ${colors.selectors};">${match}</span>`
+    })
+  }
+  
+  // Properties
+  if (patterns.properties) {
+    replacements.push({
+      pattern: patterns.properties,
+      replacement: (match) => `<span style="color: ${colors.properties};">${match}</span>`
+    })
+  }
+  
+  // Operators
+  if (patterns.operators) {
+    replacements.push({
+      pattern: patterns.operators,
+      replacement: (match) => `<span style="color: ${colors.operators};">${match}</span>`
+    })
+  }
+  
+  // Brackets
+  if (patterns.brackets) {
+    replacements.push({
+      pattern: patterns.brackets,
+      replacement: (match) => `<span style="color: ${colors.brackets}; font-weight: bold;">${match}</span>`
+    })
+  }
+  
+  // Apply all replacements
+  replacements.forEach(({pattern, replacement}) => {
+    highlightedCode = highlightedCode.replace(pattern, replacement)
+  })
+  
+  return highlightedCode
+}
+
+// Storage utilities with user-specific keys (same as before)
 const getUserStorageKey = (userId: string, key: string): string => {
   return `codecikgu_${userId}_${key}`
 }
@@ -243,7 +498,6 @@ const loadSessionFromStorage = (userId: string): PlaygroundSession | null => {
     const stored = localStorage.getItem(storageKey)
     if (stored) {
       const session = JSON.parse(stored)
-      // Verify session belongs to current user
       if (session.userId === userId) {
         return session
       }
@@ -265,7 +519,6 @@ const clearSessionFromStorage = (userId: string) => {
 
 const clearAllUserSessions = (userId: string) => {
   try {
-    // Clear all keys that belong to this user
     const keysToRemove: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
@@ -279,7 +532,7 @@ const clearAllUserSessions = (userId: string) => {
   }
 }
 
-// Utility functions
+// Utility functions (same as before)
 const detectLanguage = (content: string): string => {
   if (!content.trim()) return 'javascript'
   
@@ -290,7 +543,6 @@ const detectLanguage = (content: string): string => {
     }
   }
   
-  // Single pattern matches
   for (const [lang, config] of Object.entries(languagePatterns)) {
     if (config.patterns.some(pattern => pattern.test(content))) {
       return lang
@@ -325,7 +577,7 @@ const ensureCorrectExtension = (filename: string, language: string): string => {
   return nameWithoutExt + config.extensions[0]
 }
 
-// Error detection and execution functions (same as before)
+// Error detection and execution functions (same as before - keeping them for brevity)
 const detectErrors = (content: string, language: string): CodeError[] => {
   const errors: CodeError[] = []
   const lines = content.split('\n')
@@ -628,6 +880,7 @@ export default function PlaygroundPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
+  const highlightedCodeRef = useRef<HTMLDivElement>(null)
 
   // Check File System API support
   useEffect(() => {
@@ -652,9 +905,7 @@ export default function PlaygroundPage() {
   // Clear session when user changes (logout detection)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      // Detect if user logged out by checking auth state
       if (e.key?.includes('supabase.auth.token')) {
-        // User might have logged out, clear current session
         setSessionSaved(false)
         setLastSaveTime(null)
       }
@@ -668,7 +919,7 @@ export default function PlaygroundPage() {
   useEffect(() => {
     if (autoSave && user?.id) {
       const interval = setInterval(() => {
-        saveSession(true) // Silent save
+        saveSession(true)
       }, 30000)
 
       return () => clearInterval(interval)
@@ -679,29 +930,28 @@ export default function PlaygroundPage() {
   useEffect(() => {
     const textarea = textareaRef.current
     const lineNumbers = lineNumbersRef.current
+    const highlightedCode = highlightedCodeRef.current
     
-    if (textarea && lineNumbers) {
+    if (textarea && lineNumbers && highlightedCode) {
       const syncScroll = () => {
-        // Force synchronization of scroll positions
         lineNumbers.scrollTop = textarea.scrollTop
         lineNumbers.scrollLeft = textarea.scrollLeft
+        highlightedCode.scrollTop = textarea.scrollTop
+        highlightedCode.scrollLeft = textarea.scrollLeft
       }
       
-      // Multiple event listeners for comprehensive sync
       const events = ['scroll', 'input', 'keyup', 'mouseup', 'touchend']
       
       events.forEach(event => {
         textarea.addEventListener(event, syncScroll)
       })
       
-      // Also sync on window resize
       const handleResize = () => {
         setTimeout(syncScroll, 0)
       }
       
       window.addEventListener('resize', handleResize)
       
-      // Initial sync
       setTimeout(syncScroll, 0)
       
       return () => {
@@ -711,7 +961,15 @@ export default function PlaygroundPage() {
         window.removeEventListener('resize', handleResize)
       }
     }
-  }, [activeTabId, activeTab.content]) // Re-run when tab or content changes
+  }, [activeTabId, activeTab.content])
+
+  // Update syntax highlighting when content or theme changes
+  useEffect(() => {
+    if (highlightedCodeRef.current) {
+      const highlightedHTML = applySyntaxHighlighting(activeTab.content, activeTab.language, theme)
+      highlightedCodeRef.current.innerHTML = highlightedHTML
+    }
+  }, [activeTab.content, activeTab.language, theme])
 
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -737,7 +995,6 @@ export default function PlaygroundPage() {
           const role = await getUserRole(userData)
           setUserRole(role)
         } else {
-          // User not logged in, clear any existing sessions
           setSessionSaved(false)
           setLastSaveTime(null)
         }
@@ -791,7 +1048,7 @@ export default function PlaygroundPage() {
     const session: PlaygroundSession = {
       tabs: tabs.map(tab => ({
         ...tab,
-        fileHandle: undefined, // Don't save file handles
+        fileHandle: undefined,
         lastSaved: Date.now()
       })),
       activeTabId,
@@ -832,12 +1089,10 @@ export default function PlaygroundPage() {
       return
     }
 
-    // Auto-detect correct file extension based on language
     const correctFilename = ensureCorrectExtension(currentActiveTab.name, currentActiveTab.language)
     
     if (supportsFileSystemAPI) {
       try {
-        // Use File System Access API for directory picker
         const fileHandle = await (window as any).showSaveFilePicker({
           suggestedName: correctFilename,
           types: [{
@@ -867,12 +1122,10 @@ export default function PlaygroundPage() {
         addNotification('success', `File ${correctFilename} telah disimpan`)
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-          // Fallback to regular download
           downloadFileRegular(correctFilename, currentActiveTab.content)
         }
       }
     } else {
-      // Fallback for browsers without File System Access API
       downloadFileRegular(correctFilename, currentActiveTab.content)
     }
   }
@@ -929,7 +1182,6 @@ export default function PlaygroundPage() {
       const content = await file.text()
       const language = detectLanguageFromExtension(file.name)
       
-      // Check if file is already open
       const existingTab = tabs.find(tab => tab.fileHandle === fileHandle)
       if (existingTab) {
         setActiveTabId(existingTab.id)
@@ -1124,7 +1376,7 @@ export default function PlaygroundPage() {
                 CodeCikgu Playground
               </h1>
               <p className="text-gray-400 mt-2">
-                Editor kod online dengan auto error detection dan output panel
+                Editor kod online dengan syntax highlighting dan auto error detection
               </p>
               {user && (
                 <div className="flex items-center space-x-2 mt-2">
@@ -1411,10 +1663,10 @@ export default function PlaygroundPage() {
                     </button>
                   </div>
 
-                  {/* Code Editor with PROPERLY FIXED Synchronized Line Numbers */}
+                  {/* Code Editor with Syntax Highlighting */}
                   <div ref={editorContainerRef} className="relative">
                     <div className="flex">
-                      {/* Line Numbers - FIXED SCROLLING */}
+                      {/* Line Numbers */}
                       {showLineNumbers && (
                         <div 
                           ref={lineNumbersRef}
@@ -1445,20 +1697,36 @@ export default function PlaygroundPage() {
                         </div>
                       )}
                       
-                      {/* Code Textarea */}
-                      <textarea
-                        ref={textareaRef}
-                        value={activeTab.content}
-                        onChange={(e) => handleContentChange(e.target.value)}
-                        placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
-                        className={`flex-1 h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
-                        style={{ 
-                          fontSize: `${fontSize}px`,
-                          lineHeight: '1.5',
-                          minHeight: '384px'
-                        }}
-                        spellCheck={false}
-                      />
+                      {/* Syntax Highlighted Code Background */}
+                      <div className="relative flex-1">
+                        <div
+                          ref={highlightedCodeRef}
+                          className="absolute inset-0 p-4 font-mono pointer-events-none select-none whitespace-pre-wrap break-words"
+                          style={{ 
+                            fontSize: `${fontSize}px`,
+                            lineHeight: '1.5',
+                            minHeight: '384px',
+                            overflow: 'hidden',
+                            zIndex: 1
+                          }}
+                        />
+                        
+                        {/* Code Textarea (Transparent) */}
+                        <textarea
+                          ref={textareaRef}
+                          value={activeTab.content}
+                          onChange={(e) => handleContentChange(e.target.value)}
+                          placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
+                          className="relative w-full h-96 p-4 resize-none focus:outline-none font-mono bg-transparent text-transparent caret-white"
+                          style={{ 
+                            fontSize: `${fontSize}px`,
+                            lineHeight: '1.5',
+                            minHeight: '384px',
+                            zIndex: 2
+                          }}
+                          spellCheck={false}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1479,6 +1747,7 @@ export default function PlaygroundPage() {
                     <div className="flex items-center space-x-2">
                       {user && sessionSaved && <span className="text-green-400">🔒 Saved</span>}
                       <span>Tema: {theme}</span>
+                      <span className="text-electric-blue">🎨 Syntax Highlighting</span>
                       {supportsFileSystemAPI && <span className="text-blue-400">FS API: ✓</span>}
                     </div>
                   </div>
