@@ -1,17 +1,16 @@
-"use client"
+'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase, getUserRole, getDashboardUrl, getUserDisplayName, type CustomUser } from '@/utils/supabase'
-import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
 
 export default function Navbar() {
   const router = useRouter()
   const [user, setUser] = useState<CustomUser | null>(null)
   const [userRole, setUserRole] = useState<string>('awam')
   const [userName, setUserName] = useState<string>('Tetamu')
-  const [dashboardUrl, setDashboardUrl] = useState<string>('/dashboard-awam')
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -19,30 +18,27 @@ export default function Navbar() {
     const fetchUserData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('Auth user data:', user) // Debug log
+        console.log('Navbar - Auth user:', user) // Debug log
         
         if (user) {
-          setUser(user as CustomUser)
+          const userData = user as CustomUser
+          setUser(userData)
           
-          // Fetch role, name, and dashboard URL from database
-          const [role, name, dashUrl] = await Promise.all([
-            getUserRole(user as CustomUser),
-            getUserDisplayName(user as CustomUser),
-            getDashboardUrl(user as CustomUser)
+          // Fetch role and name from database
+          const [role, name] = await Promise.all([
+            getUserRole(userData),
+            getUserDisplayName(userData)
           ])
           
-          console.log('Fetched role:', role) // Debug log
-          console.log('Fetched name:', name) // Debug log
-          console.log('Dashboard URL:', dashUrl) // Debug log
+          console.log('Navbar - Fetched role:', role) // Debug log
+          console.log('Navbar - Fetched name:', name) // Debug log
           
           setUserRole(role)
           setUserName(name)
-          setDashboardUrl(dashUrl)
         } else {
           setUser(null)
           setUserRole('awam')
           setUserName('Tetamu')
-          setDashboardUrl('/dashboard-awam')
         }
       } catch (error) {
         console.error('Error fetching user data:', error)
@@ -53,143 +49,167 @@ export default function Navbar() {
 
     fetchUserData()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Auth state changed:', session?.user) // Debug log
-      
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Navbar - Auth state changed:', event, session?.user) // Debug log
       if (session?.user) {
         const userData = session.user as CustomUser
         setUser(userData)
         
-        // Fetch updated role and dashboard info
-        const [role, name, dashUrl] = await Promise.all([
+        const [role, name] = await Promise.all([
           getUserRole(userData),
-          getUserDisplayName(userData),
-          getDashboardUrl(userData)
+          getUserDisplayName(userData)
         ])
         
         setUserRole(role)
         setUserName(name)
-        setDashboardUrl(dashUrl)
       } else {
         setUser(null)
         setUserRole('awam')
         setUserName('Tetamu')
-        setDashboardUrl('/dashboard-awam')
       }
+      setLoading(false)
     })
 
-    return () => {
-      authListener?.subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
-  const handleSignOut = async (): Promise<void> => {
-    const { error } = await supabase.auth.signOut()
-    if (!error) {
-      router.push('/login')
-    } else {
-      console.error('Error signing out:', error.message)
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setUserRole('awam')
+      setUserName('Tetamu')
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
     }
   }
 
-  // Get role-specific navigation items
-  const getNavigationItems = () => {
-    // Common items for all users
-    const commonItems = [
-      { href: '/', label: 'Laman Utama' },
-      { href: '/playground', label: 'Playground' },
-      { href: '/nota', label: 'Nota' },
-      { href: '/leaderboard', label: 'Leaderboard' }
-    ]
+  // Navigation items - ALWAYS include "Laman Utama" pointing to "/"
+  const navigationItems = [
+    { href: '/', label: 'Laman Utama' }, // ← FIXED: Always point to root
+    { href: '/playground', label: 'Playground' },
+    { href: '/nota', label: 'Nota' },
+    { href: '/leaderboard', label: 'Leaderboard' }
+  ]
 
-    // Role-specific additional items
-    const roleSpecificItems = []
-    
-    if (userRole === 'admin') {
-      roleSpecificItems.push(
-        { href: '/dashboard-admin/nota', label: 'Urus Nota' },
-        { href: '/dashboard-admin/cabaran', label: 'Urus Cabaran' }
-      )
-    }
-
-    return [...commonItems, ...roleSpecificItems]
+  // Add role-specific navigation items
+  if (user && userRole === 'admin') {
+    navigationItems.push(
+      { href: '/dashboard-admin/nota', label: 'Urus Nota' },
+      { href: '/dashboard-admin/cabaran', label: 'Urus Cabaran' }
+    )
   }
 
-  // Get role-specific dashboard link
+  // Dashboard link based on role
   const getDashboardLink = () => {
+    if (!user) return null
+    
     switch (userRole) {
       case 'admin':
-        return { href: '/dashboard-admin', label: 'Dashboard Admin', color: 'neon-green' }
+        return {
+          href: '/dashboard-admin',
+          label: 'Dashboard Admin',
+          color: 'neon-green'
+        }
       case 'murid':
-        return { href: '/dashboard-murid', label: 'Dashboard Murid', color: 'electric-blue' }
+        return {
+          href: '/dashboard-murid',
+          label: 'Dashboard Murid',
+          color: 'electric-blue'
+        }
       case 'awam':
+        return {
+          href: '/dashboard-awam',
+          label: 'Dashboard Awam',
+          color: 'electric-blue'
+        }
       default:
-        return { href: '/dashboard-awam', label: 'Dashboard Awam', color: 'electric-blue' }
+        return {
+          href: '/dashboard-awam',
+          label: 'Dashboard Awam',
+          color: 'electric-blue'
+        }
     }
   }
+
+  const dashboardLink = getDashboardLink()
 
   if (loading) {
     return (
       <nav className="bg-dark-black/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gray-700 rounded animate-pulse"></div>
-              <div className="w-24 h-6 bg-gray-700 rounded animate-pulse"></div>
+            <div className="flex items-center space-x-8">
+              <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-300">
+                <Image 
+                  src="/favicon.svg" 
+                  alt="CodeCikgu" 
+                  width={32} 
+                  height={32}
+                  className="hover:scale-110 transition-transform duration-300"
+                />
+                <span className="text-xl font-bold text-gradient">CodeCikgu</span>
+              </Link>
             </div>
-            <div className="w-20 h-8 bg-gray-700 rounded animate-pulse"></div>
+            <div className="flex items-center space-x-4">
+              <div className="w-20 h-8 bg-gray-800/50 rounded animate-pulse"></div>
+              <div className="w-16 h-8 bg-gray-800/50 rounded animate-pulse"></div>
+            </div>
           </div>
         </div>
       </nav>
     )
   }
 
-  const navigationItems = getNavigationItems()
-  const dashboardLink = getDashboardLink()
-
   return (
     <nav className="bg-dark-black/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-300">
-            <Image
-              src="/favicon.svg"
-              alt="CodeCikgu"
-              width={32}
-              height={32}
-              className="hover:scale-110 transition-transform duration-300"
-            />
-            <span className="text-xl font-bold text-gradient">CodeCikgu</span>
-          </Link>
+          <div className="flex items-center space-x-8">
+            <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-300">
+              <Image 
+                src="/favicon.svg" 
+                alt="CodeCikgu" 
+                width={32} 
+                height={32}
+                className="hover:scale-110 transition-transform duration-300"
+              />
+              <span className="text-xl font-bold text-gradient">CodeCikgu</span>
+            </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-gray-300 hover:text-electric-blue transition-colors duration-300 font-medium"
-              >
-                {item.label}
-              </Link>
-            ))}
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-6">
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-gray-300 hover:text-electric-blue transition-colors duration-300 font-medium"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
           </div>
 
           {/* User Actions */}
           <div className="hidden md:flex items-center space-x-4">
             {user ? (
               <>
-                <Link
-                  href={dashboardLink.href}
-                  className={`px-4 py-2 rounded-lg border transition-all duration-300 font-medium ${
-                    dashboardLink.color === 'neon-green'
-                      ? 'bg-neon-green/20 border-neon-green/30 text-neon-green hover:bg-neon-green/30'
-                      : 'bg-electric-blue/20 border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30'
-                  }`}
-                >
-                  {dashboardLink.label}
-                </Link>
+                {dashboardLink && (
+                  <Link
+                    href={dashboardLink.href}
+                    className={`px-4 py-2 rounded-lg border transition-all duration-300 font-medium ${
+                      dashboardLink.color === 'neon-green'
+                        ? 'bg-neon-green/20 border-neon-green/30 text-neon-green hover:bg-neon-green/30'
+                        : 'bg-electric-blue/20 border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30'
+                    }`}
+                  >
+                    {dashboardLink.label}
+                  </Link>
+                )}
                 <Link
                   href="/profile"
                   className="text-gray-300 hover:text-white transition-colors duration-300"
@@ -248,15 +268,17 @@ export default function Navbar() {
             
             {user ? (
               <>
-                <Link
-                  href={dashboardLink.href}
-                  className={`block py-2 ${
-                    dashboardLink.color === 'neon-green' ? 'text-neon-green' : 'text-electric-blue'
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {dashboardLink.label}
-                </Link>
+                {dashboardLink && (
+                  <Link
+                    href={dashboardLink.href}
+                    className={`block py-2 ${
+                      dashboardLink.color === 'neon-green' ? 'text-neon-green' : 'text-electric-blue'
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {dashboardLink.label}
+                  </Link>
+                )}
                 <Link
                   href="/profile"
                   className="block text-gray-300 hover:text-white transition-colors duration-300 py-2"
@@ -298,3 +320,4 @@ export default function Navbar() {
     </nav>
   )
 }
+
