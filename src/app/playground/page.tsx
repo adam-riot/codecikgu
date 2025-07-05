@@ -22,7 +22,9 @@ import {
   AlertCircle,
   Folder,
   File,
-  HardDrive
+  HardDrive,
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react'
 
 // Language detection patterns
@@ -95,7 +97,7 @@ const languagePatterns = {
       /\/\*[\s\S]*?\*\/|\/\/.*$/m,
       /::/
     ],
-    extensions: ['.cpp', '.cc', '.cxx', '.c++'],
+    extensions: ['.cpp', '.cc', '.cxx', '.c++', '.c', '.h'],
     name: 'C++'
   },
   java: {
@@ -188,6 +190,21 @@ const detectLanguageFromExtension = (filename: string): string => {
   return 'javascript'
 }
 
+// Ensure filename has correct extension
+const ensureCorrectExtension = (filename: string, language: string): string => {
+  const correctExtension = getFileExtension(language)
+  const currentExtension = '.' + filename.split('.').pop()?.toLowerCase()
+  
+  // If filename already has the correct extension, return as is
+  if (filename.includes('.') && languagePatterns[language as keyof typeof languagePatterns]?.extensions.includes(currentExtension)) {
+    return filename
+  }
+  
+  // If filename has no extension or wrong extension, add/replace with correct one
+  const nameWithoutExt = filename.includes('.') ? filename.substring(0, filename.lastIndexOf('.')) : filename
+  return nameWithoutExt + correctExtension
+}
+
 // Tab interface
 interface Tab {
   id: string
@@ -205,6 +222,7 @@ interface FileTreeItem {
   type: 'file' | 'directory'
   handle: FileSystemFileHandle | FileSystemDirectoryHandle
   children?: FileTreeItem[]
+  expanded?: boolean
 }
 
 // Notification interface
@@ -305,7 +323,7 @@ export default function PlaygroundPage() {
       if (detectedLang !== activeTab.language) {
         updateTab(activeTabId, { 
           language: detectedLang,
-          name: activeTab.name.replace(/\.[^.]*$/, getFileExtension(detectedLang))
+          name: ensureCorrectExtension(activeTab.name, detectedLang)
         })
       }
     }
@@ -382,7 +400,8 @@ export default function PlaygroundPage() {
             name,
             type: 'directory',
             handle,
-            children
+            children,
+            expanded: false
           })
         }
       }
@@ -401,6 +420,23 @@ export default function PlaygroundPage() {
     const textExtensions = ['.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less', '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt', '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf']
     const ext = '.' + filename.split('.').pop()?.toLowerCase()
     return textExtensions.includes(ext)
+  }
+
+  // Toggle directory expansion
+  const toggleDirectory = (targetItem: FileTreeItem) => {
+    const updateTree = (items: FileTreeItem[]): FileTreeItem[] => {
+      return items.map(item => {
+        if (item === targetItem) {
+          return { ...item, expanded: !item.expanded }
+        }
+        if (item.children) {
+          return { ...item, children: updateTree(item.children) }
+        }
+        return item
+      })
+    }
+    
+    setFileTree(updateTree(fileTree))
   }
 
   // Open file from file system
@@ -472,7 +508,7 @@ export default function PlaygroundPage() {
     if (activeTab.isFromFileSystem && activeTab.fileHandle) {
       await saveFileToSystem(activeTab)
     } else {
-      // For non-file system tabs, use download
+      // For non-file system tabs, use download with correct extension
       downloadFile()
     }
   }
@@ -525,17 +561,20 @@ export default function PlaygroundPage() {
       return
     }
     
+    // Ensure filename has correct extension based on detected language
+    const correctFilename = ensureCorrectExtension(activeTab.name, activeTab.language)
+    
     const blob = new Blob([activeTab.content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = activeTab.name
+    a.download = correctFilename
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    addNotification('success', `File ${activeTab.name} telah dimuat turun`)
+    addNotification('success', `File ${correctFilename} telah dimuat turun`)
   }
 
   const handleSearch = () => {
@@ -587,25 +626,33 @@ export default function PlaygroundPage() {
     }
   }
 
-  // Render file tree
+  // Render file tree with proper click handlers
   const renderFileTree = (items: FileTreeItem[], depth: number = 0) => {
     return items.map((item) => (
       <div key={item.name} style={{ marginLeft: `${depth * 16}px` }}>
         {item.type === 'directory' ? (
-          <div className="flex items-center py-1 text-gray-400">
+          <button
+            onClick={() => toggleDirectory(item)}
+            className="flex items-center py-1 text-gray-400 hover:text-white transition-colors duration-300 w-full text-left"
+          >
+            {item.expanded ? (
+              <ChevronDown className="w-4 h-4 mr-1" />
+            ) : (
+              <ChevronRight className="w-4 h-4 mr-1" />
+            )}
             <Folder className="w-4 h-4 mr-2" />
             <span className="text-sm">{item.name}</span>
-          </div>
+          </button>
         ) : (
           <button
             onClick={() => openFileFromSystem(item.handle as FileSystemFileHandle)}
-            className="flex items-center py-1 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left"
+            className="flex items-center py-1 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left cursor-pointer"
           >
-            <File className="w-4 h-4 mr-2" />
-            <span className="text-sm">{item.name}</span>
+            <File className="w-4 h-4 mr-2 ml-5" />
+            <span className="text-sm hover:underline">{item.name}</span>
           </button>
         )}
-        {item.children && renderFileTree(item.children, depth + 1)}
+        {item.type === 'directory' && item.expanded && item.children && renderFileTree(item.children, depth + 1)}
       </div>
     ))
   }
@@ -756,7 +803,13 @@ export default function PlaygroundPage() {
                   </div>
                   
                   <div className="max-h-64 overflow-y-auto">
-                    {renderFileTree(fileTree)}
+                    {fileTree.length > 0 ? (
+                      renderFileTree(fileTree)
+                    ) : (
+                      <div className="text-gray-500 text-sm text-center py-4">
+                        Tiada fail text dijumpai dalam folder
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -778,6 +831,11 @@ export default function PlaygroundPage() {
                       className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
                       disabled={activeTab.isFromFileSystem}
                     />
+                    {!activeTab.isFromFileSystem && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Extension akan auto-adjust berdasarkan bahasa yang didetect
+                      </div>
+                    )}
                   </div>
                   
                   <div>
