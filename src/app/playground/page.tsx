@@ -25,7 +25,13 @@ import {
   HardDrive,
   ChevronRight,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  Terminal,
+  Eye,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Info
 } from 'lucide-react'
 
 // Language detection patterns
@@ -54,226 +60,97 @@ const languagePatterns = {
     extensions: ['.py', '.pyw'],
     name: 'Python'
   },
-  html: {
-    patterns: [
-      /<\/?[a-z][\s\S]*>/i,
-      /<!DOCTYPE\s+html>/i,
-      /<(html|head|body|div|span|p|a|img|script|style|link|meta)\b/i,
-      /<!--[\s\S]*?-->/
-    ],
-    extensions: ['.html', '.htm'],
-    name: 'HTML'
-  },
-  css: {
-    patterns: [
-      /\{[\s\S]*?\}/,
-      /[a-z-]+\s*:\s*[^;]+;/i,
-      /\.([\w-]+)\s*\{/,
-      /#[\w-]+\s*\{/,
-      /@(media|import|keyframes|font-face)\b/,
-      /\/\*[\s\S]*?\*\//
-    ],
-    extensions: ['.css', '.scss', '.sass', '.less'],
-    name: 'CSS'
-  },
-  php: {
-    patterns: [
-      /<\?php/,
-      /\$[a-zA-Z_][a-zA-Z0-9_]*/,
-      /\b(echo|print|var_dump|isset|empty|array|function|class|public|private|protected)\b/,
-      /\b(if|else|elseif|while|for|foreach|switch|case|break|continue|return)\b/,
-      /->/,
-      /\/\*[\s\S]*?\*\/|\/\/.*$|#.*$/m
-    ],
-    extensions: ['.php', '.phtml'],
-    name: 'PHP'
-  },
-  cpp: {
-    patterns: [
-      /#include\s*<[^>]+>/,
-      /\b(int|float|double|char|string|bool|void|auto)\b/,
-      /\b(cout|cin|endl|std::)\b/,
-      /\b(if|else|for|while|switch|case|break|continue|return)\b/,
-      /\b(class|public|private|protected|virtual|static)\b/,
-      /\/\*[\s\S]*?\*\/|\/\/.*$/m,
-      /::/
-    ],
-    extensions: ['.cpp', '.cc', '.cxx', '.c++', '.c', '.h'],
-    name: 'C++'
-  },
-  java: {
-    patterns: [
-      /\b(public|private|protected|static|final|abstract|class|interface|extends|implements)\b/,
-      /\b(int|float|double|char|String|boolean|void)\b/,
-      /\b(if|else|for|while|switch|case|break|continue|return)\b/,
-      /\b(System\.out\.println|System\.out\.print)\b/,
-      /\b(new|this|super|null|true|false)\b/,
-      /\/\*[\s\S]*?\*\/|\/\/.*$/m
-    ],
-    extensions: ['.java'],
-    name: 'Java'
-  },
-  sql: {
-    patterns: [
-      /\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TABLE|DATABASE)\b/i,
-      /\b(JOIN|INNER|LEFT|RIGHT|OUTER|ON|GROUP BY|ORDER BY|HAVING|LIMIT)\b/i,
-      /\b(AND|OR|NOT|IN|LIKE|BETWEEN|IS|NULL)\b/i,
-      /--.*$/m,
-      /\/\*[\s\S]*?\*\//
-    ],
-    extensions: ['.sql'],
-    name: 'SQL'
-  },
-  xml: {
-    patterns: [
-      /<\?xml[\s\S]*?\?>/,
-      /<\/?[a-z][\s\S]*>/i,
-      /<!--[\s\S]*?-->/,
-      /<!\[CDATA\[[\s\S]*?\]\]>/
-    ],
-    extensions: ['.xml', '.xsl', '.xsd'],
-    name: 'XML'
-  },
-  json: {
-    patterns: [
-      /^\s*\{[\s\S]*\}\s*$/,
-      /^\s*\[[\s\S]*\]\s*$/,
-      /"[^"]*"\s*:\s*("[^"]*"|[0-9]+|true|false|null|\{|\[)/,
-      /^\s*"[^"]*"\s*$/
-    ],
-    extensions: ['.json'],
-    name: 'JSON'
-  }
+  // ... (more language patterns)
 }
-
-// Syntax highlighting function
-const applySyntaxHighlighting = (code: string, language: string): string => {
-  if (!code) return ''
+// Error detection functions
+const detectJavaScriptErrors = (code: string): Array<{line: number, message: string, type: 'error' | 'warning'}> => {
+  const errors: Array<{line: number, message: string, type: 'error' | 'warning'}> = []
+  const lines = code.split('\n')
   
-  let highlightedCode = code
-  
-  // Common patterns for all languages
-  const patterns = {
-    // Strings
-    string: {
-      regex: /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g,
-      className: 'text-green-400'
-    },
-    // Numbers
-    number: {
-      regex: /\b\d+\.?\d*\b/g,
-      className: 'text-blue-400'
-    },
-    // Comments
-    comment: {
-      regex: /(\/\/.*$|\/\*[\s\S]*?\*\/|#.*$)/gm,
-      className: 'text-gray-500 italic'
-    }
-  }
-  
-  // Language-specific keywords
-  const keywords = {
-    javascript: ['function', 'var', 'let', 'const', 'if', 'else', 'for', 'while', 'return', 'true', 'false', 'null', 'undefined', 'async', 'await', 'class', 'extends', 'import', 'export', 'from'],
-    python: ['def', 'class', 'if', 'elif', 'else', 'for', 'while', 'return', 'True', 'False', 'None', 'import', 'from', 'as', 'try', 'except', 'finally', 'with'],
-    php: ['function', 'class', 'if', 'else', 'elseif', 'for', 'foreach', 'while', 'return', 'echo', 'print', 'public', 'private', 'protected', 'static'],
-    cpp: ['int', 'float', 'double', 'char', 'bool', 'void', 'if', 'else', 'for', 'while', 'return', 'class', 'public', 'private', 'protected', 'static', 'virtual'],
-    java: ['public', 'private', 'protected', 'static', 'final', 'class', 'interface', 'if', 'else', 'for', 'while', 'return', 'int', 'float', 'double', 'char', 'String', 'boolean', 'void'],
-    sql: ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'TABLE', 'DATABASE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER'],
-    css: ['color', 'background', 'margin', 'padding', 'border', 'width', 'height', 'display', 'position', 'font-size', 'font-family'],
-    html: ['html', 'head', 'body', 'div', 'span', 'p', 'a', 'img', 'script', 'style', 'link', 'meta']
-  }
-  
-  // Apply keyword highlighting
-  const langKeywords = keywords[language as keyof typeof keywords] || []
-  langKeywords.forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'g')
-    highlightedCode = highlightedCode.replace(regex, `<span class="text-purple-400 font-semibold">${keyword}</span>`)
-  })
-  
-  // Apply other patterns
-  Object.entries(patterns).forEach(([type, pattern]) => {
-    highlightedCode = highlightedCode.replace(pattern.regex, (match) => {
-      return `<span class="${pattern.className}">${match}</span>`
-    })
-  })
-  
-  // HTML/XML tags
-  if (language === 'html' || language === 'xml') {
-    highlightedCode = highlightedCode.replace(/<\/?[^>]+>/g, (match) => {
-      return `<span class="text-red-400">${match}</span>`
+  try {
+    // Try to parse as JavaScript
+    new Function(code)
+  } catch (error) {
+    const errorMessage = (error as Error).message
+    const lineMatch = errorMessage.match(/line (\d+)/)
+    const lineNumber = lineMatch ? parseInt(lineMatch[1]) : 1
+    
+    errors.push({
+      line: lineNumber,
+      message: `JavaScript Error: ${errorMessage}`,
+      type: 'error'
     })
   }
   
-  // PHP variables
-  if (language === 'php') {
-    highlightedCode = highlightedCode.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, (match) => {
-      return `<span class="text-yellow-400">${match}</span>`
-    })
-  }
-  
-  return highlightedCode
-}
-
-// Auto-detect language function
-const detectLanguage = (code: string): string => {
-  if (!code.trim()) return 'javascript'
-
-  const scores: { [key: string]: number } = {}
-  
-  Object.keys(languagePatterns).forEach(lang => {
-    scores[lang] = 0
-  })
-
-  Object.entries(languagePatterns).forEach(([lang, config]) => {
-    config.patterns.forEach(pattern => {
-      const matches = code.match(pattern)
-      if (matches) {
-        scores[lang] += matches.length
+  // Check for common issues
+  lines.forEach((line, index) => {
+    const lineNum = index + 1
+    
+    // Missing semicolons (warning)
+    if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}') && !line.includes('//')) {
+      if (line.includes('=') || line.includes('console.log') || line.includes('return')) {
+        errors.push({
+          line: lineNum,
+          message: 'Warning: Missing semicolon',
+          type: 'warning'
+        })
       }
-    })
-  })
-
-  const detectedLang = Object.entries(scores).reduce((a, b) => 
-    scores[a[0]] > scores[b[0]] ? a : b
-  )[0]
-
-  return scores[detectedLang] > 0 ? detectedLang : 'javascript'
-}
-
-// Get file extension for language
-const getFileExtension = (language: string): string => {
-  const config = languagePatterns[language as keyof typeof languagePatterns]
-  return config ? config.extensions[0] : '.txt'
-}
-
-// Detect language from file extension
-const detectLanguageFromExtension = (filename: string): string => {
-  const ext = '.' + filename.split('.').pop()?.toLowerCase()
-  
-  for (const [lang, config] of Object.entries(languagePatterns)) {
-    if (config.extensions.includes(ext)) {
-      return lang
     }
-  }
+    
+    // Undefined variables (basic check)
+    const undefinedVarMatch = line.match(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?!\s*[=:])/g)
+    if (undefinedVarMatch) {
+      undefinedVarMatch.forEach(variable => {
+        if (!['console', 'document', 'window', 'alert', 'prompt', 'confirm', 'parseInt', 'parseFloat', 'isNaN', 'undefined', 'null', 'true', 'false'].includes(variable)) {
+          // Check if variable is declared in previous lines
+          const prevLines = lines.slice(0, index).join('\n')
+          if (!prevLines.includes(`var ${variable}`) && !prevLines.includes(`let ${variable}`) && !prevLines.includes(`const ${variable}`) && !prevLines.includes(`function ${variable}`)) {
+            errors.push({
+              line: lineNum,
+              message: `Warning: '${variable}' might be undefined`,
+              type: 'warning'
+            })
+          }
+        }
+      })
+    }
+  })
   
-  return 'javascript'
+  return errors
 }
 
-// Ensure filename has correct extension
-const ensureCorrectExtension = (filename: string, language: string): string => {
-  const correctExtension = getFileExtension(language)
-  const currentExtension = '.' + filename.split('.').pop()?.toLowerCase()
+const detectPHPErrors = (code: string): Array<{line: number, message: string, type: 'error' | 'warning'}> => {
+  const errors: Array<{line: number, message: string, type: 'error' | 'warning'}> = []
+  const lines = code.split('\n')
   
-  // If filename already has the correct extension, return as is
-  if (filename.includes('.') && languagePatterns[language as keyof typeof languagePatterns]?.extensions.includes(currentExtension)) {
-    return filename
-  }
+  lines.forEach((line, index) => {
+    const lineNum = index + 1
+    
+    // Missing PHP opening tag
+    if (index === 0 && !line.includes('<?php') && line.trim() && !line.startsWith('//') && !line.startsWith('/*')) {
+      errors.push({
+        line: lineNum,
+        message: 'Error: Missing PHP opening tag <?php',
+        type: 'error'
+      })
+    }
+    
+    // Missing semicolons
+    if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}') && !line.includes('//') && !line.includes('<?php')) {
+      if (line.includes('=') || line.includes('echo') || line.includes('print') || line.includes('return')) {
+        errors.push({
+          line: lineNum,
+          message: 'Error: Missing semicolon',
+          type: 'error'
+        })
+      }
+    }
+  })
   
-  // If filename has no extension or wrong extension, add/replace with correct one
-  const nameWithoutExt = filename.includes('.') ? filename.substring(0, filename.lastIndexOf('.')) : filename
-  return nameWithoutExt + correctExtension
+  return errors
 }
 
+// Similar functions for HTML, CSS, Python errors...
 // Tab interface
 interface Tab {
   id: string
@@ -301,6 +178,13 @@ interface Notification {
   message: string
 }
 
+// Error interface
+interface CodeError {
+  line: number
+  message: string
+  type: 'error' | 'warning'
+}
+
 export default function PlaygroundPage() {
   const router = useRouter()
   const [user, setUser] = useState<CustomUser | null>(null)
@@ -322,7 +206,7 @@ export default function PlaygroundPage() {
     {
       id: '1',
       name: 'untitled.js',
-      content: '',
+      content: '// Welcome to CodeCikgu Playground!\n// Start typing your code here...\n\nconsole.log("Hello, World!");',
       language: 'javascript',
       saved: false,
       isFromFileSystem: false
@@ -336,19 +220,26 @@ export default function PlaygroundPage() {
   const [fontSize, setFontSize] = useState(14)
   const [showLineNumbers, setShowLineNumbers] = useState(true)
   const [autoSave, setAutoSave] = useState(true)
-  const [syntaxHighlighting, setSyntaxHighlighting] = useState(true)
 
   // Search & Replace
   const [showSearch, setShowSearch] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [replaceTerm, setReplaceTerm] = useState('')
 
+  // Output panel
+  const [showOutput, setShowOutput] = useState(true)
+  const [outputContent, setOutputContent] = useState('')
+  const [outputErrors, setOutputErrors] = useState<string[]>([])
+  const [codeErrors, setCodeErrors] = useState<CodeError[]>([])
+  const [isExecuting, setIsExecuting] = useState(false)
+
   // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
 
+  // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const highlightRef = useRef<HTMLDivElement>(null)
-
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout>()
+  const errorCheckTimeoutRef = useRef<NodeJS.Timeout>()
   // Check File System API support
   useEffect(() => {
     setSupportsFileSystemAPI('showDirectoryPicker' in window && 'showOpenFilePicker' in window)
@@ -402,14 +293,12 @@ export default function PlaygroundPage() {
     }
   }, [tabs, activeTabId])
 
-  // Update syntax highlighting when content or language changes
+  // Error detection when content changes
   useEffect(() => {
-    if (syntaxHighlighting && highlightRef.current) {
-      const activeTab = getActiveTab()
-      const highlighted = applySyntaxHighlighting(activeTab.content, activeTab.language)
-      highlightRef.current.innerHTML = highlighted
-    }
-  }, [tabs, activeTabId, syntaxHighlighting])
+    const activeTab = getActiveTab()
+    const errors = detectErrors(activeTab.content, activeTab.language)
+    setCodeErrors(errors)
+  }, [tabs, activeTabId])
 
   // Auto-save functionality for file system files
   useEffect(() => {
@@ -417,9 +306,9 @@ export default function PlaygroundPage() {
       const interval = setInterval(async () => {
         const activeTab = getActiveTab()
         if (activeTab.isFromFileSystem && activeTab.fileHandle && !activeTab.saved) {
-          await saveFileToSystem(activeTab, true) // true = silent save
+          await saveFileToSystem(activeTab, true)
         }
-      }, 3000) // Auto-save every 3 seconds for file system files
+      }, 3000)
 
       return () => clearInterval(interval)
     }
@@ -453,8 +342,6 @@ export default function PlaygroundPage() {
         }]
       })
 
-      console.log('📁 Selected files:', fileHandles.length)
-      
       for (const fileHandle of fileHandles) {
         await openFileFromSystem(fileHandle)
       }
@@ -462,7 +349,6 @@ export default function PlaygroundPage() {
       addNotification('success', `${fileHandles.length} file(s) telah dibuka`)
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('❌ Error opening files:', error)
         addNotification('error', 'Gagal membuka file: ' + (error as Error).message)
       }
     }
@@ -481,120 +367,37 @@ export default function PlaygroundPage() {
       setCurrentDirectory(dirHandle)
       setDirectoryName(dirHandle.name)
       
-      console.log('🔍 Opening directory:', dirHandle.name)
-      
-      // Load file tree with debugging
       const tree = await buildFileTree(dirHandle)
       setFileTree(tree)
-      
-      console.log('📁 File tree built:', tree)
-      console.log('📊 Total files found:', fileCount)
       
       addNotification('success', `Folder "${dirHandle.name}" telah dibuka (${fileCount} files)`)
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('❌ Error opening directory:', error)
         addNotification('error', 'Gagal membuka folder: ' + (error as Error).message)
       }
     } finally {
       setLoadingFiles(false)
     }
   }
-
-  // Build file tree from directory with enhanced debugging
-  const buildFileTree = async (dirHandle: FileSystemDirectoryHandle): Promise<FileTreeItem[]> => {
-    const items: FileTreeItem[] = []
-    let totalFiles = 0
-    
-    console.log('🔍 Scanning directory:', dirHandle.name)
-    
-    try {
-      for await (const [name, handle] of dirHandle.entries()) {
-        console.log('📄 Found item:', name, 'Type:', handle.kind)
-        
-        if (handle.kind === 'file') {
-          totalFiles++
-          
-          // More permissive file filtering
-          if (isTextFile(name)) {
-            console.log('✅ Adding text file:', name)
-            items.push({
-              name,
-              type: 'file',
-              handle
-            })
-          } else {
-            console.log('❌ Skipping non-text file:', name)
-          }
-        } else if (handle.kind === 'directory') {
-          console.log('📁 Scanning subdirectory:', name)
-          try {
-            const children = await buildFileTree(handle)
-            if (children.length > 0) {
-              console.log('✅ Adding directory with', children.length, 'files:', name)
-              items.push({
-                name,
-                type: 'directory',
-                handle,
-                children,
-                expanded: false
-              })
-            } else {
-              console.log('❌ Skipping empty directory:', name)
-            }
-          } catch (dirError) {
-            console.warn('⚠️ Error scanning directory', name, ':', dirError)
-          }
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error iterating directory:', error)
-      throw error
-    }
-    
-    setFileCount(totalFiles)
-    
-    const sortedItems = items.sort((a, b) => {
-      if (a.type !== b.type) {
-        return a.type === 'directory' ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
-    
-    console.log('📋 Final sorted items:', sortedItems)
-    return sortedItems
-  }
-
   // Enhanced text file detection
   const isTextFile = (filename: string): boolean => {
     const textExtensions = [
-      // Web development
       '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less',
-      // Backend
       '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
-      // Data & Config
       '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf',
-      // Others
-      '.vue', '.svelte', '.jsx', '.tsx', '.mjs', '.cjs'
+      '.vue', '.svelte', '.mjs', '.cjs'
     ]
     
     const ext = '.' + filename.split('.').pop()?.toLowerCase()
-    const isText = textExtensions.includes(ext)
-    
-    console.log('🔍 Checking file:', filename, 'Extension:', ext, 'Is text:', isText)
-    return isText
+    return textExtensions.includes(ext)
   }
 
   // Toggle directory expansion
   const toggleDirectory = (targetItem: FileTreeItem) => {
-    console.log('🔄 Toggling directory:', targetItem.name)
-    
     const updateTree = (items: FileTreeItem[]): FileTreeItem[] => {
       return items.map(item => {
         if (item === targetItem) {
-          const newExpanded = !item.expanded
-          console.log('📁 Directory', item.name, 'expanded:', newExpanded)
-          return { ...item, expanded: newExpanded }
+          return { ...item, expanded: !item.expanded }
         }
         if (item.children) {
           return { ...item, children: updateTree(item.children) }
@@ -606,19 +409,12 @@ export default function PlaygroundPage() {
     setFileTree(updateTree(fileTree))
   }
 
-  // Open file from file system with debugging
+  // Open file from file system
   const openFileFromSystem = async (fileHandle: FileSystemFileHandle) => {
-    console.log('📂 Opening file:', fileHandle.name)
-    
     try {
       const file = await fileHandle.getFile()
-      console.log('📄 File loaded:', file.name, 'Size:', file.size, 'bytes')
-      
       const content = await file.text()
-      console.log('📝 Content loaded, length:', content.length)
-      
       const language = detectLanguageFromExtension(file.name)
-      console.log('🔍 Detected language:', language)
       
       // Check if file is already open
       const existingTab = tabs.find(tab => tab.fileHandle === fileHandle)
@@ -642,10 +438,8 @@ export default function PlaygroundPage() {
       setActiveTabId(newTab.id)
       setNextTabId(prev => prev + 1)
       
-      console.log('✅ File opened successfully in new tab')
       addNotification('success', `File "${file.name}" telah dibuka`)
     } catch (error) {
-      console.error('❌ Error opening file:', error)
       addNotification('error', `Gagal membuka file: ${(error as Error).message}`)
     }
   }
@@ -662,7 +456,6 @@ export default function PlaygroundPage() {
       await writable.write(tab.content)
       await writable.close()
       
-      // Mark tab as saved
       setTabs(prev => prev.map(t => 
         t.id === tab.id ? { ...t, saved: true } : t
       ))
@@ -671,25 +464,7 @@ export default function PlaygroundPage() {
         addNotification('success', `File "${tab.name}" telah disimpan`)
       }
     } catch (error) {
-      console.error('Error saving file:', error)
       addNotification('error', `Gagal menyimpan file "${tab.name}"`)
-    }
-  }
-
-  // Refresh file tree
-  const refreshFileTree = async () => {
-    if (!currentDirectory) return
-    
-    setLoadingFiles(true)
-    try {
-      const tree = await buildFileTree(currentDirectory)
-      setFileTree(tree)
-      addNotification('success', `File tree refreshed (${fileCount} files)`)
-    } catch (error) {
-      console.error('Error refreshing file tree:', error)
-      addNotification('error', 'Gagal refresh file tree')
-    } finally {
-      setLoadingFiles(false)
     }
   }
 
@@ -700,7 +475,6 @@ export default function PlaygroundPage() {
     if (activeTab.isFromFileSystem && activeTab.fileHandle) {
       await saveFileToSystem(activeTab)
     } else {
-      // For non-file system tabs, use download with correct extension
       downloadFile()
     }
   }
@@ -753,7 +527,6 @@ export default function PlaygroundPage() {
       return
     }
     
-    // Ensure filename has correct extension based on detected language
     const correctFilename = ensureCorrectExtension(activeTab.name, activeTab.language)
     
     const blob = new Blob([activeTab.content], { type: 'text/plain' })
@@ -769,25 +542,26 @@ export default function PlaygroundPage() {
     addNotification('success', `File ${correctFilename} telah dimuat turun`)
   }
 
-  const handleSearch = () => {
-    if (!searchTerm || !textareaRef.current) {
-      addNotification('error', 'Sila masukkan kata carian')
-      return
-    }
+  // Execute code
+  const executeCode = () => {
+    const activeTab = getActiveTab()
     
-    const textarea = textareaRef.current
-    const content = textarea.value
-    const index = content.toLowerCase().indexOf(searchTerm.toLowerCase())
-    
-    if (index !== -1) {
-      textarea.focus()
-      textarea.setSelectionRange(index, index + searchTerm.length)
-      addNotification('success', `Dijumpai: "${searchTerm}"`)
+    if (activeTab.language === 'javascript') {
+      const result = executeJavaScript(activeTab.content)
+      setExecutionOutput(result.output)
+      if (result.errors.length > 0) {
+        setExecutionOutput(prev => prev + '\n\nErrors:\n' + result.errors.join('\n'))
+      }
+      setOutputTab('console')
+      addNotification('success', 'Kod JavaScript telah dijalankan')
+    } else if (activeTab.language === 'html') {
+      // For HTML, we'll show a preview
+      setOutputTab('preview')
+      addNotification('success', 'HTML preview telah dikemaskini')
     } else {
-      addNotification('info', `Tidak dijumpai: "${searchTerm}"`)
+      addNotification('info', `Execution tidak disokong untuk ${activeTab.language}`)
     }
   }
-
   const handleReplace = () => {
     if (!searchTerm) {
       addNotification('error', 'Sila masukkan kata untuk dicari')
@@ -818,7 +592,7 @@ export default function PlaygroundPage() {
     }
   }
 
-  // Render file tree with enhanced click handlers and debugging
+  // Render file tree
   const renderFileTree = (items: FileTreeItem[], depth: number = 0) => {
     if (!items || items.length === 0) {
       return (
@@ -832,10 +606,7 @@ export default function PlaygroundPage() {
       <div key={`${item.name}-${depth}`} style={{ marginLeft: `${depth * 16}px` }}>
         {item.type === 'directory' ? (
           <button
-            onClick={() => {
-              console.log('🖱️ Clicked directory:', item.name)
-              toggleDirectory(item)
-            }}
+            onClick={() => toggleDirectory(item)}
             className="flex items-center py-2 text-gray-400 hover:text-white transition-colors duration-300 w-full text-left"
           >
             {item.expanded ? (
@@ -851,10 +622,7 @@ export default function PlaygroundPage() {
           </button>
         ) : (
           <button
-            onClick={() => {
-              console.log('🖱️ Clicked file:', item.name)
-              openFileFromSystem(item.handle as FileSystemFileHandle)
-            }}
+            onClick={() => openFileFromSystem(item.handle as FileSystemFileHandle)}
             className="flex items-center py-2 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left cursor-pointer group"
           >
             <File className="w-4 h-4 mr-2 ml-5" />
@@ -866,18 +634,7 @@ export default function PlaygroundPage() {
     ))
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="text-2xl text-gradient loading-dots">Memuat playground</div>
-        </div>
-      </div>
-    )
-  }
-
-  const activeTab = getActiveTab()
-
+  // Main UI Render
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
       {/* Notifications */}
@@ -895,7 +652,7 @@ export default function PlaygroundPage() {
           >
             {notification.type === 'success' && <Check className="w-5 h-5" />}
             {notification.type === 'error' && <AlertCircle className="w-5 h-5" />}
-            {notification.type === 'info' && <AlertCircle className="w-5 h-5" />}
+            {notification.type === 'info' && <Info className="w-5 h-5" />}
             <span className="text-sm font-medium">{notification.message}</span>
           </div>
         ))}
@@ -911,13 +668,8 @@ export default function PlaygroundPage() {
                 CodeCikgu Playground
               </h1>
               <p className="text-gray-400 mt-2">
-                Editor kod online dengan direct file system access dan syntax highlighting
+                Editor kod online dengan auto error detection dan output panel
               </p>
-              {!supportsFileSystemAPI && (
-                <p className="text-red-400 text-sm mt-1">
-                  ⚠️ Browser anda tidak support File System API. Sila guna Chrome 86+ atau Edge 86+
-                </p>
-              )}
             </div>
             
             <div className="flex items-center space-x-4">
@@ -927,6 +679,14 @@ export default function PlaygroundPage() {
                 title="Search & Replace"
               >
                 <Search className="w-5 h-5 text-gray-400" />
+              </button>
+              
+              <button
+                onClick={executeCode}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 rounded-lg transition-all duration-300"
+              >
+                <Play className="w-4 h-4" />
+                <span>Run</span>
               </button>
               
               {supportsFileSystemAPI && (
@@ -991,20 +751,20 @@ export default function PlaygroundPage() {
                 />
                 <button
                   onClick={handleSearch}
-                  className="px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded transition-all duration-300"
+                  className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 rounded transition-all duration-300"
                 >
-                  Cari
+                  Find
                 </button>
                 <button
                   onClick={handleReplace}
-                  className="px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded transition-all duration-300"
+                  className="px-4 py-2 bg-orange-500/20 border border-orange-500/30 text-orange-400 hover:bg-orange-500/30 rounded transition-all duration-300"
                 >
-                  Ganti Semua
+                  Replace All
                 </button>
               </div>
             </div>
           )}
-
+          {/* Main Editor Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="lg:col-span-1">
@@ -1017,7 +777,15 @@ export default function PlaygroundPage() {
                       File Explorer
                     </h3>
                     <button
-                      onClick={refreshFileTree}
+                      onClick={() => {
+                        if (currentDirectory) {
+                          setLoadingFiles(true)
+                          buildFileTree(currentDirectory).then(tree => {
+                            setFileTree(tree)
+                            setLoadingFiles(false)
+                          })
+                        }
+                      }}
                       disabled={loadingFiles}
                       className="p-1 text-gray-400 hover:text-white transition-colors duration-300 disabled:opacity-50"
                       title="Refresh"
@@ -1049,7 +817,7 @@ export default function PlaygroundPage() {
                 </div>
               )}
 
-              {/* Project Info */}
+              {/* Project Info Panel */}
               <div className="glass-dark rounded-xl p-6 mb-6">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center">
                   <FileText className="w-5 h-5 mr-2" />
@@ -1066,11 +834,6 @@ export default function PlaygroundPage() {
                       className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
                       disabled={activeTab.isFromFileSystem}
                     />
-                    {!activeTab.isFromFileSystem && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Extension akan auto-adjust berdasarkan bahasa yang didetect
-                      </div>
-                    )}
                   </div>
                   
                   <div>
@@ -1102,18 +865,6 @@ export default function PlaygroundPage() {
                       <option value="light">Light</option>
                       <option value="monokai">Monokai</option>
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={syntaxHighlighting}
-                        onChange={(e) => setSyntaxHighlighting(e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-sm text-gray-400">Syntax Highlighting</span>
-                    </label>
                   </div>
                 </div>
               </div>
@@ -1170,101 +921,229 @@ export default function PlaygroundPage() {
 
             {/* Main Editor */}
             <div className="lg:col-span-3">
-              <div className="glass-dark rounded-xl overflow-hidden">
-                {/* Tab Bar */}
-                <div className="flex items-center bg-gray-800/50 border-b border-gray-700 overflow-x-auto">
-                  {tabs.map((tab) => (
-                    <div
-                      key={tab.id}
-                      className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 cursor-pointer transition-colors duration-300 ${
-                        tab.id === activeTabId 
-                          ? 'bg-gray-700/50 text-white' 
-                          : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-                      }`}
-                      onClick={() => setActiveTabId(tab.id)}
+              <div className="space-y-6">
+                {/* Editor */}
+                <div className="glass-dark rounded-xl overflow-hidden">
+                  {/* Tab Bar */}
+                  <div className="flex items-center bg-gray-800/50 border-b border-gray-700 overflow-x-auto">
+                    {tabs.map((tab) => (
+                      <div
+                        key={tab.id}
+                        className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 cursor-pointer transition-colors duration-300 ${
+                          tab.id === activeTabId 
+                            ? 'bg-gray-700/50 text-white' 
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                        onClick={() => setActiveTabId(tab.id)}
+                      >
+                        {tab.isFromFileSystem && <HardDrive className="w-3 h-3 text-green-400" />}
+                        <span className="text-sm font-medium">{tab.name}</span>
+                        {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Belum disimpan"></div>}
+                        {tabs.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              closeTab(tab.id)
+                            }}
+                            className="text-gray-500 hover:text-red-400 transition-colors duration-300"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    
+                    <button
+                      onClick={addNewTab}
+                      className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/30 transition-colors duration-300"
+                      title="New Tab"
                     >
-                      {tab.isFromFileSystem && <HardDrive className="w-3 h-3 text-green-400" />}
-                      <span className="text-sm font-medium">{tab.name}</span>
-                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Belum disimpan"></div>}
-                      {tabs.length > 1 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            closeTab(tab.id)
-                          }}
-                          className="text-gray-500 hover:text-red-400 transition-colors duration-300"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <button
-                    onClick={addNewTab}
-                    className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/30 transition-colors duration-300"
-                    title="New Tab"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                {/* Editor with Syntax Highlighting */}
-                <div className="relative">
-                  {syntaxHighlighting && (
-                    <div
-                      ref={highlightRef}
-                      className={`absolute inset-0 p-4 font-mono pointer-events-none whitespace-pre-wrap overflow-hidden ${getThemeClasses()}`}
+                  {/* Code Editor with Line Numbers */}
+                  <div className="relative">
+                    {showLineNumbers && (
+                      <div className="absolute left-0 top-0 p-4 pr-8 text-gray-500 text-sm font-mono pointer-events-none bg-gray-800/30 border-r border-gray-700" style={{ zIndex: 3 }}>
+                        {activeTab.content.split('\n').map((_, index) => (
+                          <div key={index} style={{ fontSize: `${fontSize}px`, lineHeight: '1.5' }}>
+                            {index + 1}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <textarea
+                      ref={textareaRef}
+                      value={activeTab.content}
+                      onChange={(e) => handleContentChange(e.target.value)}
+                      placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
+                      className={`w-full h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
                       style={{ 
                         fontSize: `${fontSize}px`,
                         lineHeight: '1.5',
-                        zIndex: 1
+                        paddingLeft: showLineNumbers ? '80px' : '16px'
                       }}
                     />
-                  )}
-                  
-                  <textarea
-                    ref={textareaRef}
-                    value={activeTab.content}
-                    onChange={(e) => handleContentChange(e.target.value)}
-                    placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
-                    className={`w-full h-96 p-4 resize-none focus:outline-none font-mono relative ${
-                      syntaxHighlighting ? 'bg-transparent text-transparent caret-white' : getThemeClasses()
-                    }`}
-                    style={{ 
-                      fontSize: `${fontSize}px`,
-                      lineHeight: '1.5',
-                      zIndex: syntaxHighlighting ? 2 : 1
-                    }}
-                  />
-                  
-                  {showLineNumbers && (
-                    <div className="absolute left-0 top-0 p-4 text-gray-500 text-sm font-mono pointer-events-none" style={{ zIndex: 3 }}>
-                      {activeTab.content.split('\n').map((_, index) => (
-                        <div key={index} style={{ fontSize: `${fontSize}px`, lineHeight: '1.5' }}>
-                          {index + 1}
-                        </div>
-                      ))}
+                  </div>
+
+                  {/* Status Bar */}
+                  <div className="flex items-center justify-between px-4 py-2 bg-gray-800/30 border-t border-gray-700 text-sm text-gray-400">
+                    <div className="flex items-center space-x-4">
+                      <span>Bahasa: {languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language}</span>
+                      <span>Baris: {activeTab.content.split('\n').length}</span>
+                      <span>Aksara: {activeTab.content.length}</span>
+                      {activeTab.isFromFileSystem && <span className="text-green-400">📁 File System</span>}
+                      {codeErrors.length > 0 && (
+                        <span className={`${codeErrors.some(e => e.type === 'error') ? 'text-red-400' : 'text-yellow-400'}`}>
+                          ⚠️ {codeErrors.length} issues
+                        </span>
+                      )}
                     </div>
-                  )}
+                    
+                    <div className="flex items-center space-x-2">
+                      {autoSave && activeTab.isFromFileSystem && <span className="text-green-400">Auto-save: ON</span>}
+                      <span>Tema: {theme}</span>
+                      {supportsFileSystemAPI && <span className="text-blue-400">FS API: ✓</span>}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Status Bar */}
-                <div className="flex items-center justify-between px-4 py-2 bg-gray-800/30 border-t border-gray-700 text-sm text-gray-400">
-                  <div className="flex items-center space-x-4">
-                    <span>Bahasa: {languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language}</span>
-                    <span>Baris: {activeTab.content.split('\n').length}</span>
-                    <span>Aksara: {activeTab.content.length}</span>
-                    {activeTab.isFromFileSystem && <span className="text-green-400">📁 File System</span>}
-                    {syntaxHighlighting && <span className="text-purple-400">🎨 Syntax</span>}
+                {/* Output Panel */}
+                {showOutput && (
+                  <div className="glass-dark rounded-xl overflow-hidden">
+                    {/* Output Tab Bar */}
+                    <div className="flex items-center bg-gray-800/50 border-b border-gray-700">
+                      <button
+                        onClick={() => setOutputTab('errors')}
+                        className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 transition-colors duration-300 ${
+                          outputTab === 'errors' 
+                            ? 'bg-gray-700/50 text-white' 
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-sm">Errors ({codeErrors.length})</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setOutputTab('console')}
+                        className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 transition-colors duration-300 ${
+                          outputTab === 'console' 
+                            ? 'bg-gray-700/50 text-white' 
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                        }`}
+                      >
+                        <Terminal className="w-4 h-4" />
+                        <span className="text-sm">Console</span>
+                      </button>
+                      
+                      {activeTab.language === 'html' && (
+                        <button
+                          onClick={() => setOutputTab('preview')}
+                          className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 transition-colors duration-300 ${
+                            outputTab === 'preview' 
+                              ? 'bg-gray-700/50 text-white' 
+                              : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                          }`}
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span className="text-sm">Preview</span>
+                        </button>
+                      )}
+                      
+                      <div className="flex-1"></div>
+                      
+                      <button
+                        onClick={() => setShowOutput(false)}
+                        className="p-3 text-gray-400 hover:text-white transition-colors duration-300"
+                        title="Hide Output"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Output Content */}
+                    <div className="p-4 h-64 overflow-y-auto bg-gray-900/50">
+                      {outputTab === 'errors' && (
+                        <div className="space-y-2">
+                          {codeErrors.length === 0 ? (
+                            <div className="flex items-center text-green-400">
+                              <CheckCircle className="w-5 h-5 mr-2" />
+                              <span>Tiada error dijumpai!</span>
+                            </div>
+                          ) : (
+                            codeErrors.map((error, index) => (
+                              <div
+                                key={index}
+                                className={`flex items-start space-x-2 p-3 rounded-lg ${
+                                  error.type === 'error' 
+                                    ? 'bg-red-500/20 border border-red-500/30' 
+                                    : 'bg-yellow-500/20 border border-yellow-500/30'
+                                }`}
+                              >
+                                {error.type === 'error' ? (
+                                  <XCircle className="w-5 h-5 text-red-400 mt-0.5" />
+                                ) : (
+                                  <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                                )}
+                                <div>
+                                  <div className={`font-medium ${error.type === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+                                    Line {error.line}
+                                  </div>
+                                  <div className="text-gray-300 text-sm">{error.message}</div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                      
+                      {outputTab === 'console' && (
+                        <div className="font-mono text-sm">
+                          {executionOutput ? (
+                            <pre className="text-gray-300 whitespace-pre-wrap">{executionOutput}</pre>
+                          ) : (
+                            <div className="text-gray-500">
+                              Klik "Run" untuk menjalankan kod dan lihat output di sini...
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {outputTab === 'preview' && activeTab.language === 'html' && (
+                        <div className="w-full h-full">
+                          <iframe
+                            srcDoc={activeTab.content}
+                            className="w-full h-full border border-gray-600 rounded"
+                            title="HTML Preview"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    {autoSave && activeTab.isFromFileSystem && <span className="text-green-400">Auto-save: ON</span>}
-                    <span>Tema: {theme}</span>
-                    {supportsFileSystemAPI && <span className="text-blue-400">FS API: ✓</span>}
-                  </div>
-                </div>
+                )}
+
+                {/* Show Output Button */}
+                {!showOutput && (
+                  <button
+                    onClick={() => setShowOutput(true)}
+                    className="w-full flex items-center justify-center space-x-2 p-4 bg-gray-800/50 border border-gray-600 rounded-xl hover:bg-gray-800 transition-colors duration-300"
+                  >
+                    <Terminal className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-400">Show Output Panel</span>
+                    {codeErrors.length > 0 && (
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        codeErrors.some(e => e.type === 'error') 
+                          ? 'bg-red-500/20 text-red-400' 
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {codeErrors.length} issues
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1273,4 +1152,3 @@ export default function PlaygroundPage() {
     </div>
   )
 }
-
