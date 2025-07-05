@@ -172,6 +172,18 @@ const languagePatterns = {
       /std::/
     ]
   },
+  c: {
+    name: 'C',
+    extensions: ['.c', '.h'],
+    patterns: [
+      /#include\s*<.*>/,
+      /int\s+main\s*\(/,
+      /printf\s*\(/,
+      /scanf\s*\(/,
+      /malloc\s*\(/,
+      /free\s*\(/
+    ]
+  },
   sql: {
     name: 'SQL',
     extensions: ['.sql'],
@@ -248,8 +260,37 @@ const ensureCorrectExtension = (filename: string, language: string): string => {
     return filename
   }
   
-  const nameWithoutExt = filename.split('.').slice(0, -1).join('.')
+  const nameWithoutExt = filename.split('.').slice(0, -1).join('.') || filename
   return nameWithoutExt + config.extensions[0]
+}
+
+// Helper function for typo detection
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const matrix = []
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i]
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        )
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length]
 }
 
 const detectErrors = (content: string, language: string): CodeError[] => {
@@ -282,8 +323,15 @@ const detectErrors = (content: string, language: string): CodeError[] => {
   
   if (language === 'php') {
     lines.forEach((line, index) => {
+      const trimmedLine = line.trim()
+      
+      // Skip empty lines and comments
+      if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('/*') || trimmedLine.startsWith('*')) {
+        return
+      }
+      
       // Check for missing PHP opening tag
-      if (index === 0 && !line.includes('<?php') && line.trim() && !line.startsWith('//')) {
+      if (index === 0 && !line.includes('<?php') && trimmedLine && !trimmedLine.startsWith('//')) {
         errors.push({
           line: index + 1,
           message: 'Missing PHP opening tag <?php',
@@ -291,9 +339,24 @@ const detectErrors = (content: string, language: string): CodeError[] => {
         })
       }
       
-      // Check for missing semicolons in PHP
-      if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}') && !line.trim().endsWith('?>')) {
-        if (line.includes('echo') || line.includes('$') || line.includes('=')) {
+      // Check for missing semicolons (more accurate)
+      if (trimmedLine && 
+          !trimmedLine.endsWith(';') && 
+          !trimmedLine.endsWith('{') && 
+          !trimmedLine.endsWith('}') && 
+          !trimmedLine.endsWith('?>') &&
+          !trimmedLine.startsWith('<?php') &&
+          !trimmedLine.includes('//') &&
+          !trimmedLine.includes('/*')) {
+        
+        // Check if it's a statement that needs semicolon
+        if (trimmedLine.includes('echo') || 
+            trimmedLine.includes('$') || 
+            trimmedLine.includes('=') ||
+            trimmedLine.includes('date(') ||
+            trimmedLine.includes('time(') ||
+            trimmedLine.includes('print') ||
+            /\w+\s*\([^)]*\)/.test(trimmedLine)) {
           errors.push({
             line: index + 1,
             message: 'Missing semicolon',
@@ -302,17 +365,65 @@ const detectErrors = (content: string, language: string): CodeError[] => {
         }
       }
       
-      // Check for undefined variables (basic check)
+      // Check for undefined variables (improved)
       const varMatches = line.match(/\$(\w+)/g)
       if (varMatches) {
         varMatches.forEach(varMatch => {
-          if (!content.includes(`${varMatch} =`) && !content.includes(`${varMatch}=`)) {
+          const varName = varMatch.substring(1) // Remove $
+          
+          // Skip superglobals
+          if (['_GET', '_POST', '_SESSION', '_COOKIE', '_SERVER', '_FILES', '_ENV', 'GLOBALS'].includes(varName)) {
+            return
+          }
+          
+          // Check if variable is defined before this line
+          const beforeLines = lines.slice(0, index).join('\n')
+          const isDefinedBefore = beforeLines.includes(`${varMatch} =`) || 
+                                 beforeLines.includes(`${varMatch}=`) ||
+                                 beforeLines.includes(`function`) // Could be function parameter
+          
+          // Check if it's being defined on this line
+          const isBeingDefined = line.includes(`${varMatch} =`) || line.includes(`${varMatch}=`)
+          
+          if (!isDefinedBefore && !isBeingDefined) {
             errors.push({
               line: index + 1,
               message: `Variable ${varMatch} may be undefined`,
               type: 'warning'
             })
           }
+        })
+      }
+      
+      // Unmatched quotes
+      const singleQuotes = (line.match(/'/g) || []).length
+      const doubleQuotes = (line.match(/"/g) || []).length
+      
+      if (singleQuotes % 2 !== 0) {
+        errors.push({
+          line: index + 1,
+          message: 'Unmatched single quote',
+          type: 'error'
+        })
+      }
+      
+      if (doubleQuotes % 2 !== 0) {
+        errors.push({
+          line: index + 1,
+          message: 'Unmatched double quote',
+          type: 'error'
+        })
+      }
+      
+      // Unmatched parentheses
+      const openParens = (line.match(/\(/g) || []).length
+      const closeParens = (line.match(/\)/g) || []).length
+      
+      if (openParens !== closeParens) {
+        errors.push({
+          line: index + 1,
+          message: 'Unmatched parentheses',
+          type: 'error'
         })
       }
     })
@@ -373,74 +484,175 @@ const executeJavaScript = (code: string) => {
   }
 }
 
+// Improved PHP execution function with better parsing
 const executePHP = (code: string) => {
   const output: string[] = []
   const errors: string[] = []
   
   try {
-    // Mock PHP execution - parse basic PHP syntax
+    // Mock PHP execution - parse basic PHP syntax with improved accuracy
     const lines = code.split('\n')
     let variables: { [key: string]: any } = {}
+    
+    // Helper function to evaluate PHP expressions
+    const evaluateExpression = (expr: string): string => {
+      // Handle date() function
+      if (expr.includes('date(')) {
+        const dateMatch = expr.match(/date\s*\(\s*["']([^"']+)["']\s*\)/)
+        if (dateMatch) {
+          const format = dateMatch[1]
+          const now = new Date()
+          
+          // Convert PHP date format to JavaScript equivalent
+          let jsFormat = format
+            .replace(/d/g, now.getDate().toString().padStart(2, '0'))
+            .replace(/m/g, (now.getMonth() + 1).toString().padStart(2, '0'))
+            .replace(/Y/g, now.getFullYear().toString())
+            .replace(/y/g, now.getFullYear().toString().slice(-2))
+            .replace(/H/g, now.getHours().toString().padStart(2, '0'))
+            .replace(/h/g, (now.getHours() % 12 || 12).toString().padStart(2, '0'))
+            .replace(/i/g, now.getMinutes().toString().padStart(2, '0'))
+            .replace(/s/g, now.getSeconds().toString().padStart(2, '0'))
+            .replace(/A/g, now.getHours() >= 12 ? 'PM' : 'AM')
+            .replace(/a/g, now.getHours() >= 12 ? 'pm' : 'am')
+          
+          return jsFormat
+        }
+      }
+      
+      // Handle time() function
+      if (expr.includes('time()')) {
+        return Math.floor(Date.now() / 1000).toString()
+      }
+      
+      // Handle variables
+      expr = expr.replace(/\$(\w+)/g, (match, varName) => {
+        return variables[varName] !== undefined ? variables[varName] : `[undefined: ${match}]`
+      })
+      
+      // Handle $_GET, $_POST
+      if (expr.includes('$_GET')) {
+        const getMatch = expr.match(/\$_GET\[['"](\w+)['"]\]/)
+        if (getMatch) {
+          return `[GET: ${getMatch[1]}]`
+        }
+      }
+      
+      if (expr.includes('$_POST')) {
+        const postMatch = expr.match(/\$_POST\[['"](\w+)['"]\]/)
+        if (postMatch) {
+          return `[POST: ${postMatch[1]}]`
+        }
+      }
+      
+      // Handle quoted strings
+      expr = expr.replace(/["']/g, '')
+      
+      return expr
+    }
+    
+    // Helper function to handle string concatenation
+    const handleConcatenation = (expr: string): string => {
+      // Split by concatenation operator (.)
+      const parts = expr.split(/\s*\.\s*/)
+      let result = ''
+      
+      for (let part of parts) {
+        part = part.trim()
+        
+        // Evaluate each part
+        const evaluated = evaluateExpression(part)
+        result += evaluated
+      }
+      
+      return result
+    }
     
     lines.forEach((line, index) => {
       const trimmedLine = line.trim()
       
-      // Skip empty lines and comments
-      if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('<?php') || trimmedLine === '?>') {
+      // Skip empty lines, comments, and PHP tags
+      if (!trimmedLine || 
+          trimmedLine.startsWith('//') || 
+          trimmedLine.startsWith('/*') ||
+          trimmedLine.startsWith('*') ||
+          trimmedLine.startsWith('<?php') || 
+          trimmedLine === '?>') {
         return
       }
       
-      // Handle echo statements
+      // Handle echo statements with improved parsing
       const echoMatch = trimmedLine.match(/echo\s+(.+);?/)
       if (echoMatch) {
-        let echoContent = echoMatch[1].replace(/;$/, '')
+        let echoContent = echoMatch[1].replace(/;$/, '').trim()
         
-        // Handle string concatenation
-        echoContent = echoContent.replace(/\s*\.\s*/g, '')
-        
-        // Handle variables
-        echoContent = echoContent.replace(/\$(\w+)/g, (match, varName) => {
-          return variables[varName] !== undefined ? variables[varName] : `[undefined: ${match}]`
-        })
-        
-        // Handle quoted strings
-        echoContent = echoContent.replace(/["']/g, '')
-        
-        // Handle htmlspecialchars function
-        echoContent = echoContent.replace(/htmlspecialchars\(([^)]+)\)/g, '$1')
+        // Handle concatenation
+        if (echoContent.includes('.')) {
+          echoContent = handleConcatenation(echoContent)
+        } else {
+          echoContent = evaluateExpression(echoContent)
+        }
         
         output.push(echoContent)
+        return
       }
       
-      // Handle variable assignments
+      // Handle variable assignments with improved parsing
       const varMatch = trimmedLine.match(/\$(\w+)\s*=\s*(.+);?/)
       if (varMatch) {
         const varName = varMatch[1]
-        let varValue = varMatch[2].replace(/;$/, '')
+        let varValue = varMatch[2].replace(/;$/, '').trim()
         
-        // Handle $_GET, $_POST
-        if (varValue.includes('$_GET')) {
-          const getMatch = varValue.match(/\$_GET\[['"](\w+)['"]\]/)
-          if (getMatch) {
-            variables[varName] = `[GET: ${getMatch[1]}]`
-          }
-        } else if (varValue.includes('$_POST')) {
-          const postMatch = varValue.match(/\$_POST\[['"](\w+)['"]\]/)
-          if (postMatch) {
-            variables[varName] = `[POST: ${postMatch[1]}]`
-          }
+        // Evaluate the value
+        if (varValue.includes('.')) {
+          varValue = handleConcatenation(varValue)
         } else {
-          // Handle string values
-          varValue = varValue.replace(/["']/g, '')
-          variables[varName] = varValue
+          varValue = evaluateExpression(varValue)
         }
+        
+        variables[varName] = varValue
+        return
+      }
+      
+      // Handle function calls (basic)
+      const funcMatch = trimmedLine.match(/(\w+)\s*\(([^)]*)\)\s*;?/)
+      if (funcMatch) {
+        const funcName = funcMatch[1]
+        const funcArgs = funcMatch[2]
+        
+        switch (funcName) {
+          case 'date_default_timezone_set':
+            output.push(`Timezone set to: ${funcArgs.replace(/["']/g, '')}`)
+            break
+          case 'phpinfo':
+            output.push('PHP Info: Mock PHP environment for CodeCikgu Playground')
+            break
+          case 'var_dump':
+            output.push(`var_dump: ${funcArgs}`)
+            break
+          default:
+            output.push(`Function called: ${funcName}(${funcArgs})`)
+        }
+        return
+      }
+      
+      // Handle other PHP constructs
+      if (trimmedLine.includes('if') || trimmedLine.includes('for') || trimmedLine.includes('while')) {
+        output.push(`Control structure detected: ${trimmedLine}`)
+        return
       }
     })
     
     if (output.length === 0) {
       output.push('PHP code parsed successfully. No output generated.')
-      output.push('Note: This is a mock PHP execution for syntax checking.')
-      output.push('To run actual PHP code, download the file and use XAMPP or similar.')
+      output.push('')
+      output.push('💡 Tips:')
+      output.push('- Use echo statements to display output')
+      output.push('- Try: echo "Hello World!";')
+      output.push('- Try: echo date("d/m/Y H:i:s");')
+      output.push('')
+      output.push('Note: This is a mock PHP execution for learning purposes.')
+      output.push('Download the file and use XAMPP for actual PHP execution.')
     }
     
   } catch (error) {
@@ -571,6 +783,7 @@ export default function PlaygroundPage() {
 
   // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const lineNumbersRef = useRef<HTMLDivElement>(null)
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout>()
   const errorCheckTimeoutRef = useRef<NodeJS.Timeout>()
 
@@ -611,6 +824,24 @@ export default function PlaygroundPage() {
     }
 
     fetchUserData()
+  }, [])
+
+  // Sync scroll between textarea and line numbers
+  useEffect(() => {
+    const textarea = textareaRef.current
+    const lineNumbers = lineNumbersRef.current
+    
+    if (textarea && lineNumbers) {
+      const handleScroll = () => {
+        lineNumbers.scrollTop = textarea.scrollTop
+      }
+      
+      textarea.addEventListener('scroll', handleScroll)
+      
+      return () => {
+        textarea.removeEventListener('scroll', handleScroll)
+      }
+    }
   }, [])
 
   // Auto-detect language when content changes
@@ -802,6 +1033,7 @@ export default function PlaygroundPage() {
       return
     }
     
+    // Auto-detect correct file extension based on language
     const correctFilename = ensureCorrectExtension(currentActiveTab.name, currentActiveTab.language)
     
     const blob = new Blob([currentActiveTab.content], { type: 'text/plain' })
@@ -983,15 +1215,13 @@ export default function PlaygroundPage() {
                 <span>Save</span>
               </button>
               
-              {!activeTab.isFromFileSystem && (
-                <button
-                  onClick={downloadFile}
-                  className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download</span>
-                </button>
-              )}
+              <button
+                onClick={downloadFile}
+                className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download</span>
+              </button>
             </div>
           </div>
 
@@ -1165,28 +1395,38 @@ export default function PlaygroundPage() {
                     </button>
                   </div>
 
-                  {/* Code Editor with Line Numbers */}
-                  <div className="relative">
+                  {/* Code Editor with Synchronized Line Numbers */}
+                  <div className="relative flex">
+                    {/* Line Numbers */}
                     {showLineNumbers && (
-                      <div className="absolute left-0 top-0 p-4 pr-8 text-gray-500 text-sm font-mono pointer-events-none bg-gray-800/30 border-r border-gray-700" style={{ zIndex: 3 }}>
+                      <div 
+                        ref={lineNumbersRef}
+                        className="flex-shrink-0 p-4 pr-2 text-gray-500 text-sm font-mono bg-gray-800/30 border-r border-gray-700 overflow-hidden"
+                        style={{ 
+                          fontSize: `${fontSize}px`, 
+                          lineHeight: '1.5',
+                          width: '60px',
+                          height: '384px' // Match textarea height
+                        }}
+                      >
                         {activeTab.content.split('\n').map((_, index) => (
-                          <div key={index} style={{ fontSize: `${fontSize}px`, lineHeight: '1.5' }}>
+                          <div key={index} className="text-right">
                             {index + 1}
                           </div>
                         ))}
                       </div>
                     )}
                     
+                    {/* Code Textarea */}
                     <textarea
                       ref={textareaRef}
                       value={activeTab.content}
                       onChange={(e) => handleContentChange(e.target.value)}
                       placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
-                      className={`w-full h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
+                      className={`flex-1 h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
                       style={{ 
                         fontSize: `${fontSize}px`,
-                        lineHeight: '1.5',
-                        paddingLeft: showLineNumbers ? '80px' : '16px'
+                        lineHeight: '1.5'
                       }}
                     />
                   </div>
