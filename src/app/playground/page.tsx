@@ -24,7 +24,8 @@ import {
   File,
   HardDrive,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react'
 
 // Language detection patterns
@@ -72,7 +73,7 @@ const languagePatterns = {
       /@(media|import|keyframes|font-face)\b/,
       /\/\*[\s\S]*?\*\//
     ],
-    extensions: ['.css'],
+    extensions: ['.css', '.scss', '.sass', '.less'],
     name: 'CSS'
   },
   php: {
@@ -245,6 +246,8 @@ export default function PlaygroundPage() {
   const [currentDirectory, setCurrentDirectory] = useState<FileSystemDirectoryHandle | null>(null)
   const [fileTree, setFileTree] = useState<FileTreeItem[]>([])
   const [directoryName, setDirectoryName] = useState<string>('')
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [fileCount, setFileCount] = useState(0)
   
   // Tab management
   const [tabs, setTabs] = useState<Tab[]>([
@@ -361,73 +364,125 @@ export default function PlaygroundPage() {
     }
 
     try {
+      setLoadingFiles(true)
       const dirHandle = await (window as any).showDirectoryPicker()
       setCurrentDirectory(dirHandle)
       setDirectoryName(dirHandle.name)
       
-      // Load file tree
+      console.log('🔍 Opening directory:', dirHandle.name)
+      
+      // Load file tree with debugging
       const tree = await buildFileTree(dirHandle)
       setFileTree(tree)
       
-      addNotification('success', `Folder "${dirHandle.name}" telah dibuka`)
+      console.log('📁 File tree built:', tree)
+      console.log('📊 Total files found:', fileCount)
+      
+      addNotification('success', `Folder "${dirHandle.name}" telah dibuka (${fileCount} files)`)
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('Error opening directory:', error)
-        addNotification('error', 'Gagal membuka folder')
+        console.error('❌ Error opening directory:', error)
+        addNotification('error', 'Gagal membuka folder: ' + (error as Error).message)
       }
+    } finally {
+      setLoadingFiles(false)
     }
   }
 
-  // Build file tree from directory
+  // Build file tree from directory with enhanced debugging
   const buildFileTree = async (dirHandle: FileSystemDirectoryHandle): Promise<FileTreeItem[]> => {
     const items: FileTreeItem[] = []
+    let totalFiles = 0
     
-    for await (const [name, handle] of dirHandle.entries()) {
-      if (handle.kind === 'file') {
-        // Only include text files
-        const file = await handle.getFile()
-        if (isTextFile(file.name)) {
-          items.push({
-            name,
-            type: 'file',
-            handle
-          })
-        }
-      } else if (handle.kind === 'directory') {
-        const children = await buildFileTree(handle)
-        if (children.length > 0) { // Only include directories with text files
-          items.push({
-            name,
-            type: 'directory',
-            handle,
-            children,
-            expanded: false
-          })
+    console.log('🔍 Scanning directory:', dirHandle.name)
+    
+    try {
+      for await (const [name, handle] of dirHandle.entries()) {
+        console.log('📄 Found item:', name, 'Type:', handle.kind)
+        
+        if (handle.kind === 'file') {
+          totalFiles++
+          
+          // More permissive file filtering
+          if (isTextFile(name)) {
+            console.log('✅ Adding text file:', name)
+            items.push({
+              name,
+              type: 'file',
+              handle
+            })
+          } else {
+            console.log('❌ Skipping non-text file:', name)
+          }
+        } else if (handle.kind === 'directory') {
+          console.log('📁 Scanning subdirectory:', name)
+          try {
+            const children = await buildFileTree(handle)
+            if (children.length > 0) {
+              console.log('✅ Adding directory with', children.length, 'files:', name)
+              items.push({
+                name,
+                type: 'directory',
+                handle,
+                children,
+                expanded: false
+              })
+            } else {
+              console.log('❌ Skipping empty directory:', name)
+            }
+          } catch (dirError) {
+            console.warn('⚠️ Error scanning directory', name, ':', dirError)
+          }
         }
       }
+    } catch (error) {
+      console.error('❌ Error iterating directory:', error)
+      throw error
     }
     
-    return items.sort((a, b) => {
+    setFileCount(totalFiles)
+    
+    const sortedItems = items.sort((a, b) => {
       if (a.type !== b.type) {
         return a.type === 'directory' ? -1 : 1
       }
       return a.name.localeCompare(b.name)
     })
+    
+    console.log('📋 Final sorted items:', sortedItems)
+    return sortedItems
   }
 
-  // Check if file is a text file
+  // Enhanced text file detection
   const isTextFile = (filename: string): boolean => {
-    const textExtensions = ['.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less', '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt', '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf']
+    const textExtensions = [
+      // Web development
+      '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less',
+      // Backend
+      '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
+      // Data & Config
+      '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf',
+      // Others
+      '.vue', '.svelte', '.jsx', '.tsx', '.mjs', '.cjs'
+    ]
+    
     const ext = '.' + filename.split('.').pop()?.toLowerCase()
-    return textExtensions.includes(ext)
+    const isText = textExtensions.includes(ext)
+    
+    console.log('🔍 Checking file:', filename, 'Extension:', ext, 'Is text:', isText)
+    return isText
   }
 
   // Toggle directory expansion
   const toggleDirectory = (targetItem: FileTreeItem) => {
+    console.log('🔄 Toggling directory:', targetItem.name)
+    
     const updateTree = (items: FileTreeItem[]): FileTreeItem[] => {
       return items.map(item => {
         if (item === targetItem) {
-          return { ...item, expanded: !item.expanded }
+          const newExpanded = !item.expanded
+          console.log('📁 Directory', item.name, 'expanded:', newExpanded)
+          return { ...item, expanded: newExpanded }
         }
         if (item.children) {
           return { ...item, children: updateTree(item.children) }
@@ -439,12 +494,19 @@ export default function PlaygroundPage() {
     setFileTree(updateTree(fileTree))
   }
 
-  // Open file from file system
+  // Open file from file system with debugging
   const openFileFromSystem = async (fileHandle: FileSystemFileHandle) => {
+    console.log('📂 Opening file:', fileHandle.name)
+    
     try {
       const file = await fileHandle.getFile()
+      console.log('📄 File loaded:', file.name, 'Size:', file.size, 'bytes')
+      
       const content = await file.text()
+      console.log('📝 Content loaded, length:', content.length)
+      
       const language = detectLanguageFromExtension(file.name)
+      console.log('🔍 Detected language:', language)
       
       // Check if file is already open
       const existingTab = tabs.find(tab => tab.fileHandle === fileHandle)
@@ -468,10 +530,11 @@ export default function PlaygroundPage() {
       setActiveTabId(newTab.id)
       setNextTabId(prev => prev + 1)
       
+      console.log('✅ File opened successfully in new tab')
       addNotification('success', `File "${file.name}" telah dibuka`)
     } catch (error) {
-      console.error('Error opening file:', error)
-      addNotification('error', `Gagal membuka file`)
+      console.error('❌ Error opening file:', error)
+      addNotification('error', `Gagal membuka file: ${(error as Error).message}`)
     }
   }
 
@@ -498,6 +561,23 @@ export default function PlaygroundPage() {
     } catch (error) {
       console.error('Error saving file:', error)
       addNotification('error', `Gagal menyimpan file "${tab.name}"`)
+    }
+  }
+
+  // Refresh file tree
+  const refreshFileTree = async () => {
+    if (!currentDirectory) return
+    
+    setLoadingFiles(true)
+    try {
+      const tree = await buildFileTree(currentDirectory)
+      setFileTree(tree)
+      addNotification('success', `File tree refreshed (${fileCount} files)`)
+    } catch (error) {
+      console.error('Error refreshing file tree:', error)
+      addNotification('error', 'Gagal refresh file tree')
+    } finally {
+      setLoadingFiles(false)
     }
   }
 
@@ -626,14 +706,25 @@ export default function PlaygroundPage() {
     }
   }
 
-  // Render file tree with proper click handlers
+  // Render file tree with enhanced click handlers and debugging
   const renderFileTree = (items: FileTreeItem[], depth: number = 0) => {
+    if (!items || items.length === 0) {
+      return (
+        <div className="text-gray-500 text-sm text-center py-4">
+          Tiada fail text dijumpai dalam folder
+        </div>
+      )
+    }
+
     return items.map((item) => (
-      <div key={item.name} style={{ marginLeft: `${depth * 16}px` }}>
+      <div key={`${item.name}-${depth}`} style={{ marginLeft: `${depth * 16}px` }}>
         {item.type === 'directory' ? (
           <button
-            onClick={() => toggleDirectory(item)}
-            className="flex items-center py-1 text-gray-400 hover:text-white transition-colors duration-300 w-full text-left"
+            onClick={() => {
+              console.log('🖱️ Clicked directory:', item.name)
+              toggleDirectory(item)
+            }}
+            className="flex items-center py-2 text-gray-400 hover:text-white transition-colors duration-300 w-full text-left"
           >
             {item.expanded ? (
               <ChevronDown className="w-4 h-4 mr-1" />
@@ -642,14 +733,20 @@ export default function PlaygroundPage() {
             )}
             <Folder className="w-4 h-4 mr-2" />
             <span className="text-sm">{item.name}</span>
+            {item.children && (
+              <span className="text-xs text-gray-500 ml-2">({item.children.length})</span>
+            )}
           </button>
         ) : (
           <button
-            onClick={() => openFileFromSystem(item.handle as FileSystemFileHandle)}
-            className="flex items-center py-1 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left cursor-pointer"
+            onClick={() => {
+              console.log('🖱️ Clicked file:', item.name)
+              openFileFromSystem(item.handle as FileSystemFileHandle)
+            }}
+            className="flex items-center py-2 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left cursor-pointer group"
           >
             <File className="w-4 h-4 mr-2 ml-5" />
-            <span className="text-sm hover:underline">{item.name}</span>
+            <span className="text-sm group-hover:underline">{item.name}</span>
           </button>
         )}
         {item.type === 'directory' && item.expanded && item.children && renderFileTree(item.children, depth + 1)}
@@ -723,10 +820,11 @@ export default function PlaygroundPage() {
               {supportsFileSystemAPI && (
                 <button
                   onClick={openDirectory}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-all duration-300"
+                  disabled={loadingFiles}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
                 >
                   <HardDrive className="w-4 h-4" />
-                  <span>Open Folder</span>
+                  <span>{loadingFiles ? 'Loading...' : 'Open Folder'}</span>
                 </button>
               )}
               
@@ -790,25 +888,39 @@ export default function PlaygroundPage() {
               {/* File Explorer */}
               {currentDirectory && (
                 <div className="glass-dark rounded-xl p-6 mb-6">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                    <HardDrive className="w-5 h-5 mr-2" />
-                    File Explorer
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center">
+                      <HardDrive className="w-5 h-5 mr-2" />
+                      File Explorer
+                    </h3>
+                    <button
+                      onClick={refreshFileTree}
+                      disabled={loadingFiles}
+                      className="p-1 text-gray-400 hover:text-white transition-colors duration-300 disabled:opacity-50"
+                      title="Refresh"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loadingFiles ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                   
                   <div className="mb-4 p-3 bg-gray-800/30 rounded-lg">
-                    <div className="flex items-center text-electric-blue">
-                      <Folder className="w-4 h-4 mr-2" />
-                      <span className="text-sm font-medium">{directoryName}</span>
+                    <div className="flex items-center justify-between text-electric-blue">
+                      <div className="flex items-center">
+                        <Folder className="w-4 h-4 mr-2" />
+                        <span className="text-sm font-medium">{directoryName}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">{fileCount} files</span>
                     </div>
                   </div>
                   
                   <div className="max-h-64 overflow-y-auto">
-                    {fileTree.length > 0 ? (
-                      renderFileTree(fileTree)
-                    ) : (
-                      <div className="text-gray-500 text-sm text-center py-4">
-                        Tiada fail text dijumpai dalam folder
+                    {loadingFiles ? (
+                      <div className="text-center py-4">
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-electric-blue" />
+                        <div className="text-sm text-gray-400 mt-2">Loading files...</div>
                       </div>
+                    ) : (
+                      renderFileTree(fileTree)
                     )}
                   </div>
                 </div>
@@ -887,10 +999,13 @@ export default function PlaygroundPage() {
                   {supportsFileSystemAPI && (
                     <button
                       onClick={openDirectory}
-                      className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300"
+                      disabled={loadingFiles}
+                      className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
                     >
                       <HardDrive className="w-4 h-4 text-purple-400 mr-2" />
-                      <span className="text-purple-400 text-sm">Open Folder</span>
+                      <span className="text-purple-400 text-sm">
+                        {loadingFiles ? 'Loading...' : 'Open Folder'}
+                      </span>
                     </button>
                   )}
                   
