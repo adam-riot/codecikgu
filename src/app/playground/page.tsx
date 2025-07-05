@@ -29,7 +29,9 @@ import {
   ChevronRight, 
   RefreshCw,
   Cloud,
-  FolderOpen
+  FolderOpen,
+  Shield,
+  User
 } from 'lucide-react'
 
 // Types
@@ -61,6 +63,8 @@ interface PlaygroundSession {
   activeTabId: string
   nextTabId: number
   lastSaved: number
+  userId: string
+  userRole: string
 }
 
 // Language patterns for auto-detection
@@ -220,10 +224,60 @@ const languagePatterns = {
   }
 }
 
-// Storage keys
-const STORAGE_KEYS = {
-  PLAYGROUND_SESSION: 'codecikgu_playground_session',
-  USER_PREFERENCES: 'codecikgu_playground_preferences'
+// Storage utilities with user-specific keys
+const getUserStorageKey = (userId: string, key: string): string => {
+  return `codecikgu_${userId}_${key}`
+}
+
+const saveSessionToStorage = (session: PlaygroundSession, userId: string) => {
+  try {
+    const storageKey = getUserStorageKey(userId, 'playground_session')
+    localStorage.setItem(storageKey, JSON.stringify(session))
+  } catch (error) {
+    console.error('Failed to save session to storage:', error)
+  }
+}
+
+const loadSessionFromStorage = (userId: string): PlaygroundSession | null => {
+  try {
+    const storageKey = getUserStorageKey(userId, 'playground_session')
+    const stored = localStorage.getItem(storageKey)
+    if (stored) {
+      const session = JSON.parse(stored)
+      // Verify session belongs to current user
+      if (session.userId === userId) {
+        return session
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load session from storage:', error)
+  }
+  return null
+}
+
+const clearSessionFromStorage = (userId: string) => {
+  try {
+    const storageKey = getUserStorageKey(userId, 'playground_session')
+    localStorage.removeItem(storageKey)
+  } catch (error) {
+    console.error('Failed to clear session from storage:', error)
+  }
+}
+
+const clearAllUserSessions = (userId: string) => {
+  try {
+    // Clear all keys that belong to this user
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(`codecikgu_${userId}_`)) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key))
+  } catch (error) {
+    console.error('Failed to clear user sessions:', error)
+  }
 }
 
 // Utility functions
@@ -270,35 +324,6 @@ const ensureCorrectExtension = (filename: string, language: string): string => {
   
   const nameWithoutExt = filename.split('.').slice(0, -1).join('.') || filename
   return nameWithoutExt + config.extensions[0]
-}
-
-// Storage utilities
-const saveSessionToStorage = (session: PlaygroundSession) => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.PLAYGROUND_SESSION, JSON.stringify(session))
-  } catch (error) {
-    console.error('Failed to save session to storage:', error)
-  }
-}
-
-const loadSessionFromStorage = (): PlaygroundSession | null => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.PLAYGROUND_SESSION)
-    if (stored) {
-      return JSON.parse(stored)
-    }
-  } catch (error) {
-    console.error('Failed to load session from storage:', error)
-  }
-  return null
-}
-
-const clearSessionFromStorage = () => {
-  try {
-    localStorage.removeItem(STORAGE_KEYS.PLAYGROUND_SESSION)
-  } catch (error) {
-    console.error('Failed to clear session from storage:', error)
-  }
 }
 
 // Error detection and execution functions (same as before)
@@ -610,29 +635,46 @@ export default function PlaygroundPage() {
     setSupportsFileSystemAPI('showDirectoryPicker' in window && 'showOpenFilePicker' in window)
   }, [])
 
-  // Load session from storage on mount
+  // Load session from storage on mount (user-specific)
   useEffect(() => {
-    const savedSession = loadSessionFromStorage()
-    if (savedSession) {
-      setTabs(savedSession.tabs)
-      setActiveTabId(savedSession.activeTabId)
-      setNextTabId(savedSession.nextTabId)
-      setSessionSaved(true)
-      setLastSaveTime(new Date(savedSession.lastSaved))
-      addNotification('success', 'Session telah dipulihkan dari simpanan')
+    if (user?.id) {
+      const savedSession = loadSessionFromStorage(user.id)
+      if (savedSession) {
+        setTabs(savedSession.tabs)
+        setActiveTabId(savedSession.activeTabId)
+        setNextTabId(savedSession.nextTabId)
+        setSessionSaved(true)
+        setLastSaveTime(new Date(savedSession.lastSaved))
+        addNotification('success', `Session dipulihkan untuk ${userRole}`)
+      }
     }
+  }, [user?.id, userRole])
+
+  // Clear session when user changes (logout detection)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      // Detect if user logged out by checking auth state
+      if (e.key?.includes('supabase.auth.token')) {
+        // User might have logged out, clear current session
+        setSessionSaved(false)
+        setLastSaveTime(null)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
-  // Auto-save session every 30 seconds
+  // Auto-save session every 30 seconds (user-specific)
   useEffect(() => {
-    if (autoSave) {
+    if (autoSave && user?.id) {
       const interval = setInterval(() => {
         saveSession(true) // Silent save
       }, 30000)
 
       return () => clearInterval(interval)
     }
-  }, [tabs, activeTabId, nextTabId, autoSave])
+  }, [tabs, activeTabId, nextTabId, autoSave, user?.id])
 
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -657,6 +699,10 @@ export default function PlaygroundPage() {
           
           const role = await getUserRole(userData)
           setUserRole(role)
+        } else {
+          // User not logged in, clear any existing sessions
+          setSessionSaved(false)
+          setLastSaveTime(null)
         }
       } catch (error) {
         console.error('Error fetching user data:', error)
@@ -668,23 +714,35 @@ export default function PlaygroundPage() {
     fetchUserData()
   }, [])
 
-  // Sync scroll between textarea and line numbers
+  // Fixed scroll synchronization between textarea and line numbers
   useEffect(() => {
     const textarea = textareaRef.current
     const lineNumbers = lineNumbersRef.current
     
     if (textarea && lineNumbers) {
       const handleScroll = () => {
+        // Sync scroll position
         lineNumbers.scrollTop = textarea.scrollTop
+        lineNumbers.scrollLeft = textarea.scrollLeft
       }
       
+      // Add scroll event listener
       textarea.addEventListener('scroll', handleScroll)
+      
+      // Also sync on content change to ensure alignment
+      const handleInput = () => {
+        // Small delay to ensure DOM is updated
+        setTimeout(handleScroll, 0)
+      }
+      
+      textarea.addEventListener('input', handleInput)
       
       return () => {
         textarea.removeEventListener('scroll', handleScroll)
+        textarea.removeEventListener('input', handleInput)
       }
     }
-  }, [])
+  }, [activeTabId]) // Re-run when active tab changes
 
   // Auto-detect language when content changes
   useEffect(() => {
@@ -714,8 +772,15 @@ export default function PlaygroundPage() {
     setSessionSaved(false)
   }
 
-  // Save session to localStorage
+  // Save session to localStorage (user-specific)
   const saveSession = (silent: boolean = false) => {
+    if (!user?.id) {
+      if (!silent) {
+        addNotification('error', 'Sila login untuk menyimpan session')
+      }
+      return
+    }
+
     const session: PlaygroundSession = {
       tabs: tabs.map(tab => ({
         ...tab,
@@ -724,24 +789,40 @@ export default function PlaygroundPage() {
       })),
       activeTabId,
       nextTabId,
-      lastSaved: Date.now()
+      lastSaved: Date.now(),
+      userId: user.id,
+      userRole: userRole
     }
     
-    saveSessionToStorage(session)
+    saveSessionToStorage(session, user.id)
     setSessionSaved(true)
     setLastSaveTime(new Date())
     
     if (!silent) {
-      addNotification('success', 'Session telah disimpan ke browser storage')
+      addNotification('success', `Session disimpan untuk ${userRole}`)
     }
   }
 
-  // Clear saved session
+  // Clear saved session (user-specific)
   const clearSession = () => {
-    clearSessionFromStorage()
+    if (!user?.id) {
+      addNotification('error', 'Tiada user untuk clear session')
+      return
+    }
+
+    clearSessionFromStorage(user.id)
     setSessionSaved(false)
     setLastSaveTime(null)
-    addNotification('info', 'Session telah dibersihkan dari storage')
+    addNotification('info', 'Session telah dibersihkan')
+  }
+
+  // Logout handler (clear all user sessions)
+  const handleLogout = async () => {
+    if (user?.id) {
+      clearAllUserSessions(user.id)
+    }
+    await supabase.auth.signOut()
+    router.push('/')
   }
 
   // Download file with directory picker
@@ -1047,6 +1128,14 @@ export default function PlaygroundPage() {
               <p className="text-gray-400 mt-2">
                 Editor kod online dengan auto error detection dan output panel
               </p>
+              {user && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <Shield className="w-4 h-4 text-green-400" />
+                  <span className="text-green-400 text-sm">
+                    Secure session untuk {userRole}: {user.email}
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="flex items-center space-x-4">
@@ -1079,8 +1168,9 @@ export default function PlaygroundPage() {
               
               <button
                 onClick={() => saveSession()}
-                className="flex items-center space-x-2 px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300"
-                title="Save session to browser storage"
+                disabled={!user}
+                className="flex items-center space-x-2 px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300 disabled:opacity-50"
+                title={user ? "Save session to browser storage" : "Login required to save"}
               >
                 <Cloud className="w-4 h-4" />
                 <span>Save</span>
@@ -1095,17 +1185,28 @@ export default function PlaygroundPage() {
                 <FolderOpen className="w-4 h-4" />
                 <span>Download</span>
               </button>
+
+              {user && (
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300"
+                  title="Logout and clear session"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Session Status */}
-          {(sessionSaved || lastSaveTime) && (
+          {/* User Session Status */}
+          {user && (sessionSaved || lastSaveTime) && (
             <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Cloud className="w-5 h-5 text-green-400" />
+                  <Shield className="w-5 h-5 text-green-400" />
                   <span className="text-green-400 font-medium">
-                    Session Saved
+                    Session Saved untuk {userRole}
                   </span>
                   {lastSaveTime && (
                     <span className="text-gray-400 text-sm">
@@ -1120,6 +1221,18 @@ export default function PlaygroundPage() {
                 >
                   <X className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Login Required Notice */}
+          {!user && (
+            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                <span className="text-yellow-400 font-medium">
+                  Login diperlukan untuk menyimpan session secara selamat
+                </span>
               </div>
             </div>
           )}
@@ -1198,6 +1311,15 @@ export default function PlaygroundPage() {
                       {activeTab.isFromFileSystem ? '🔗 File System' : '📝 Memory'}
                     </div>
                   </div>
+
+                  {user && (
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">User Session</label>
+                      <div className="px-3 py-2 bg-green-500/20 border border-green-500/30 rounded text-green-400 text-sm">
+                        🔒 {userRole}
+                      </div>
+                    </div>
+                  )}
                   
                   <div>
                     <label className="block text-sm text-gray-400 mb-2">Tema</label>
@@ -1239,10 +1361,13 @@ export default function PlaygroundPage() {
                   
                   <button
                     onClick={() => saveSession()}
-                    className="w-full flex items-center p-3 bg-neon-green/20 hover:bg-neon-green/30 border border-neon-green/30 rounded-lg transition-colors duration-300"
+                    disabled={!user}
+                    className="w-full flex items-center p-3 bg-neon-green/20 hover:bg-neon-green/30 border border-neon-green/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
                   >
                     <Cloud className="w-4 h-4 text-neon-green mr-2" />
-                    <span className="text-neon-green text-sm">Save Session</span>
+                    <span className="text-neon-green text-sm">
+                      {user ? 'Save Session' : 'Login Required'}
+                    </span>
                   </button>
                   
                   <button
@@ -1299,22 +1424,23 @@ export default function PlaygroundPage() {
                     </button>
                   </div>
 
-                  {/* Code Editor with Synchronized Line Numbers */}
+                  {/* Code Editor with Fixed Synchronized Line Numbers */}
                   <div className="relative flex">
                     {/* Line Numbers */}
                     {showLineNumbers && (
                       <div 
                         ref={lineNumbersRef}
-                        className="flex-shrink-0 p-4 pr-2 text-gray-500 text-sm font-mono bg-gray-800/30 border-r border-gray-700 overflow-hidden"
+                        className="flex-shrink-0 p-4 pr-2 text-gray-500 text-sm font-mono bg-gray-800/30 border-r border-gray-700 select-none pointer-events-none"
                         style={{ 
                           fontSize: `${fontSize}px`, 
                           lineHeight: '1.5',
                           width: '60px',
-                          height: '384px'
+                          height: '384px',
+                          overflow: 'hidden'
                         }}
                       >
                         {activeTab.content.split('\n').map((_, index) => (
-                          <div key={index} className="text-right">
+                          <div key={index} className="text-right whitespace-nowrap">
                             {index + 1}
                           </div>
                         ))}
@@ -1350,7 +1476,7 @@ export default function PlaygroundPage() {
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      {sessionSaved && <span className="text-green-400">💾 Saved</span>}
+                      {user && sessionSaved && <span className="text-green-400">🔒 Saved</span>}
                       <span>Tema: {theme}</span>
                       {supportsFileSystemAPI && <span className="text-blue-400">FS API: ✓</span>}
                     </div>
