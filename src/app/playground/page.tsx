@@ -1,521 +1,383 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { Code, Save, Download, FolderOpen, Settings, Play, Square } from 'lucide-react'
-import { Project } from '@/types' // Import Project type from shared types file
+import { supabase, getUserRole, type CustomUser } from '@/utils/supabase'
+import { 
+  Play, 
+  Download, 
+  Save, 
+  FolderOpen, 
+  Plus, 
+  X, 
+  Settings, 
+  FileText,
+  Code,
+  Palette,
+  Search,
+  RotateCcw,
+  Copy,
+  Trash2
+} from 'lucide-react'
 
-// Import CodeEditor with SSR disabled
-const CodeEditor = dynamic(
-  () => import('@/components/playground/CodeEditor'),
-  { ssr: false } // Disable server-side rendering
-)
+// Language detection patterns
+const languagePatterns = {
+  javascript: {
+    patterns: [
+      /\b(function|var|let|const|=>|console\.log|document\.|window\.)\b/,
+      /\b(if|else|for|while|switch|case|break|continue|return)\b/,
+      /\b(true|false|null|undefined)\b/,
+      /\/\*[\s\S]*?\*\/|\/\/.*$/m,
+      /\$\{.*?\}/,
+      /\b(async|await|Promise|fetch)\b/
+    ],
+    extensions: ['.js', '.mjs', '.jsx'],
+    name: 'JavaScript'
+  },
+  python: {
+    patterns: [
+      /\b(def|class|import|from|if|elif|else|for|while|try|except|finally|with|as)\b/,
+      /\b(print|input|len|range|str|int|float|list|dict|tuple)\b/,
+      /\b(True|False|None)\b/,
+      /#.*$/m,
+      /'''[\s\S]*?'''|"""[\s\S]*?"""/,
+      /\bself\b/
+    ],
+    extensions: ['.py', '.pyw'],
+    name: 'Python'
+  },
+  html: {
+    patterns: [
+      /<\/?[a-z][\s\S]*>/i,
+      /<!DOCTYPE\s+html>/i,
+      /<(html|head|body|div|span|p|a|img|script|style|link|meta)\b/i,
+      /<!--[\s\S]*?-->/
+    ],
+    extensions: ['.html', '.htm'],
+    name: 'HTML'
+  },
+  css: {
+    patterns: [
+      /\{[\s\S]*?\}/,
+      /[a-z-]+\s*:\s*[^;]+;/i,
+      /\.([\w-]+)\s*\{/,
+      /#[\w-]+\s*\{/,
+      /@(media|import|keyframes|font-face)\b/,
+      /\/\*[\s\S]*?\*\//
+    ],
+    extensions: ['.css'],
+    name: 'CSS'
+  },
+  php: {
+    patterns: [
+      /<\?php/,
+      /\$[a-zA-Z_][a-zA-Z0-9_]*/,
+      /\b(echo|print|var_dump|isset|empty|array|function|class|public|private|protected)\b/,
+      /\b(if|else|elseif|while|for|foreach|switch|case|break|continue|return)\b/,
+      /->/,
+      /\/\*[\s\S]*?\*\/|\/\/.*$|#.*$/m
+    ],
+    extensions: ['.php', '.phtml'],
+    name: 'PHP'
+  },
+  cpp: {
+    patterns: [
+      /#include\s*<[^>]+>/,
+      /\b(int|float|double|char|string|bool|void|auto)\b/,
+      /\b(cout|cin|endl|std::)\b/,
+      /\b(if|else|for|while|switch|case|break|continue|return)\b/,
+      /\b(class|public|private|protected|virtual|static)\b/,
+      /\/\*[\s\S]*?\*\/|\/\/.*$/m,
+      /::/
+    ],
+    extensions: ['.cpp', '.cc', '.cxx', '.c++'],
+    name: 'C++'
+  },
+  java: {
+    patterns: [
+      /\b(public|private|protected|static|final|abstract|class|interface|extends|implements)\b/,
+      /\b(int|float|double|char|String|boolean|void)\b/,
+      /\b(if|else|for|while|switch|case|break|continue|return)\b/,
+      /\b(System\.out\.println|System\.out\.print)\b/,
+      /\b(new|this|super|null|true|false)\b/,
+      /\/\*[\s\S]*?\*\/|\/\/.*$/m
+    ],
+    extensions: ['.java'],
+    name: 'Java'
+  },
+  sql: {
+    patterns: [
+      /\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TABLE|DATABASE)\b/i,
+      /\b(JOIN|INNER|LEFT|RIGHT|OUTER|ON|GROUP BY|ORDER BY|HAVING|LIMIT)\b/i,
+      /\b(AND|OR|NOT|IN|LIKE|BETWEEN|IS|NULL)\b/i,
+      /--.*$/m,
+      /\/\*[\s\S]*?\*\//
+    ],
+    extensions: ['.sql'],
+    name: 'SQL'
+  },
+  xml: {
+    patterns: [
+      /<\?xml[\s\S]*?\?>/,
+      /<\/?[a-z][\s\S]*>/i,
+      /<!--[\s\S]*?-->/,
+      /<!\[CDATA\[[\s\S]*?\]\]>/
+    ],
+    extensions: ['.xml', '.xsl', '.xsd'],
+    name: 'XML'
+  },
+  json: {
+    patterns: [
+      /^\s*\{[\s\S]*\}\s*$/,
+      /^\s*\[[\s\S]*\]\s*$/,
+      /"[^"]*"\s*:\s*("[^"]*"|[0-9]+|true|false|null|\{|\[)/,
+      /^\s*"[^"]*"\s*$/
+    ],
+    extensions: ['.json'],
+    name: 'JSON'
+  }
+}
 
-// Import ProjectManager with SSR disabled
-const ProjectManager = dynamic(
-  () => import('@/components/playground/ProjectManager'),
-  { ssr: false } // Disable server-side rendering
-)
+// Auto-detect language function
+const detectLanguage = (code: string): string => {
+  if (!code.trim()) return 'javascript' // Default
 
-// Global variable to store Monaco Editor instance - only in browser
-let globalMonacoEditor: any
-if (typeof window !== 'undefined') {
-  globalMonacoEditor = null
+  const scores: { [key: string]: number } = {}
+  
+  // Initialize scores
+  Object.keys(languagePatterns).forEach(lang => {
+    scores[lang] = 0
+  })
+
+  // Check patterns for each language
+  Object.entries(languagePatterns).forEach(([lang, config]) => {
+    config.patterns.forEach(pattern => {
+      const matches = code.match(pattern)
+      if (matches) {
+        scores[lang] += matches.length
+      }
+    })
+  })
+
+  // Find language with highest score
+  const detectedLang = Object.entries(scores).reduce((a, b) => 
+    scores[a[0]] > scores[b[0]] ? a : b
+  )[0]
+
+  // Return detected language or default to javascript
+  return scores[detectedLang] > 0 ? detectedLang : 'javascript'
+}
+
+// Get file extension for language
+const getFileExtension = (language: string): string => {
+  const config = languagePatterns[language as keyof typeof languagePatterns]
+  return config ? config.extensions[0] : '.txt'
+}
+
+// Tab interface
+interface Tab {
+  id: string
+  name: string
+  content: string
+  language: string
+  saved: boolean
 }
 
 export default function PlaygroundPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [currentProject, setCurrentProject] = useState<Project | null>(null)
-  const [projects, setProjects] = useState<Project[]>([])
+  const [user, setUser] = useState<CustomUser | null>(null)
+  const [userRole, setUserRole] = useState<string>('awam')
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [showProjectManager, setShowProjectManager] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-
-  // Editor state
-  const [code, setCode] = useState('')
-  const [language, setLanguage] = useState('javascript')
-  const [theme, setTheme] = useState('vs-dark')
-  const [fileName, setFileName] = useState('untitled')
-
-  // Output state
-  const [output, setOutput] = useState('')
-  const [isRunning, setIsRunning] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      setUser(user)
-      await fetchProjects(user.id)
-    }
-
-    checkAuth()
-  }, [router])
-
-  useEffect(() => {
-    // Auto-save every 30 seconds
-    const interval = setInterval(() => {
-      if (currentProject && code !== currentProject.code) {
-        handleAutoSave()
-      }
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [currentProject, code])
-
-  const fetchProjects = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('code_projects')
-        .select('*')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false })
-
-      if (error) throw error
-      setProjects(data || [])
-
-      // Load the most recent project or create a new one
-      if (data && data.length > 0) {
-        loadProject(data[0])
-      } else {
-        createNewProject()
-      }
-
-    } catch (error) {
-      console.error('Error fetching projects:', error)
-    }
-    setLoading(false)
-  }
-
-  const createNewProject = () => {
-    const newProject: Project = {
-      id: '',
-      title: 'Untitled Project',
+  
+  // Tab management
+  const [tabs, setTabs] = useState<Tab[]>([
+    {
+      id: '1',
+      name: 'untitled.js',
+      content: '',
       language: 'javascript',
-      code: getDefaultCode('javascript'),
-      theme: 'vs-dark',
-      is_public: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      user_id: user?.id
+      saved: false
     }
-    setCurrentProject(newProject)
-    setCode(newProject.code)
-    setLanguage(newProject.language)
-    setTheme(newProject.theme)
-    setFileName(newProject.title)
-    setOutput('')
-    setError('')
-  }
+  ])
+  const [activeTabId, setActiveTabId] = useState('1')
+  const [nextTabId, setNextTabId] = useState(2)
 
-  const loadProject = (project: Project) => {
-    setCurrentProject(project)
-    setCode(project.code)
-    setLanguage(project.language)
-    setTheme(project.theme)
-    setFileName(project.title)
-    setOutput('')
-    setError('')
-  }
+  // Editor settings
+  const [theme, setTheme] = useState<'dark' | 'light' | 'monokai'>('dark')
+  const [fontSize, setFontSize] = useState(14)
+  const [showLineNumbers, setShowLineNumbers] = useState(true)
+  const [autoSave, setAutoSave] = useState(true)
 
-  // Function to get current code directly from Monaco Editor
-  const getCurrentCodeFromMonaco = () => {
-    // Check if we're in the browser
-    if (typeof window === 'undefined') return code
-    
-    if (globalMonacoEditor && globalMonacoEditor.getValue) {
-      const currentCode = globalMonacoEditor.getValue()
-      console.log('Monaco Editor Code:', currentCode) // Debug log
-      return currentCode
-    }
-    console.log('Fallback to state code:', code) // Debug log
-    return code // fallback to state
-  }
+  // Search & Replace
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [replaceTerm, setReplaceTerm] = useState('')
 
-  const handleRunCode = async () => {
-    setIsRunning(true)
-    setError('')
-    setOutput('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-    // Get current code from Monaco Editor
-    const currentCode = getCurrentCodeFromMonaco()
-
-    try {
-      if (language === 'javascript') {
-        await runJavaScript(currentCode)
-      } else if (language === 'html') {
-        runHTML(currentCode)
-      } else if (language === 'css') {
-        runCSS(currentCode)
-      } else {
-        simulateCodeExecution(language, currentCode)
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error menjalankan kod')
-    }
-
-    setIsRunning(false)
-  }
-
-  const runJavaScript = async (jsCode: string) => {
-    return new Promise((resolve, reject) => {
+  useEffect(() => {
+    const fetchUserData = async () => {
       try {
-        // Check if we're in the browser
-        if (typeof window === 'undefined') {
-          setOutput('JavaScript execution only available in browser')
-          resolve('JavaScript execution only available in browser')
-          return
-        }
+        const { data: { user } } = await supabase.auth.getUser()
         
-        // Capture console.log output
-        const originalLog = console.log
-        const originalError = console.error
-        const originalWarn = console.warn
-        let output = ''
-
-        console.log = (...args) => {
-          output += args.map(arg => 
-            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-          ).join(' ') + '\n'
-        }
-
-        console.error = (...args) => {
-          output += 'ERROR: ' + args.map(arg => String(arg)).join(' ') + '\n'
-        }
-
-        console.warn = (...args) => {
-          output += 'WARNING: ' + args.map(arg => String(arg)).join(' ') + '\n'
-        }
-
-        // Execute the code in a try-catch block
-        try {
-          // Use Function constructor to execute code in a controlled environment
-          const func = new Function(jsCode)
-          const result = func()
+        if (user) {
+          const userData = user as CustomUser
+          setUser(userData)
           
-          if (result !== undefined) {
-            output += 'Return value: ' + (typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)) + '\n'
-          }
-
-          if (output.trim() === '') {
-            output = '✅ Kod JavaScript berjaya dijalankan!\nTiada output untuk dipaparkan.'
-          }
-
-          setOutput(output)
-        } catch (execError: any) {
-          output += '❌ EXECUTION ERROR: ' + execError.message + '\n'
-          setOutput(output)
-          setError(execError.message)
+          const role = await getUserRole(userData)
+          setUserRole(role)
         }
-
-        // Restore original console methods
-        console.log = originalLog
-        console.error = originalError
-        console.warn = originalWarn
-
-        resolve(output)
-      } catch (err: any) {
-        reject(err)
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+      } finally {
+        setLoading(false)
       }
-    })
-  }
-
-  const runHTML = (htmlCode: string) => {
-    // For HTML, we can show a preview
-    setOutput('🌐 HTML Preview tersedia. Muat turun fail untuk melihat hasil penuh dalam browser.')
-  }
-
-  const runCSS = (cssCode: string) => {
-    // For CSS, we can show basic validation
-    setOutput('🎨 CSS kod telah disimpan. Muat turun fail untuk menggunakan dalam projek HTML.')
-  }
-
-  const simulateCodeExecution = (lang: string, code: string) => {
-    const simulations: Record<string, string> = {
-      'python': `🐍 Simulasi output Python:
->>> Kod Python anda telah dianalisis
->>> Untuk menjalankan kod Python sebenar, muat turun fail dan gunakan Python interpreter
->>> Contoh: python ${fileName}.py`,
-      
-      'java': `☕ Simulasi output Java:
-Compiling ${fileName}.java...
-Compilation successful!
-Running ${fileName}...
-
-Untuk menjalankan kod Java sebenar:
-1. Muat turun fail ${fileName}.java
-2. Compile: javac ${fileName}.java
-3. Run: java ${fileName.replace('.java', '')}`,
-      
-      'cpp': `⚡ Simulasi output C++:
-Compiling ${fileName}.cpp...
-Compilation successful!
-
-Untuk menjalankan kod C++ sebenar:
-1. Muat turun fail ${fileName}.cpp
-2. Compile: g++ -o ${fileName.replace('.cpp', '')} ${fileName}.cpp
-3. Run: ./${fileName.replace('.cpp', '')}`,
-      
-      'php': `🐘 Simulasi output PHP:
-PHP kod telah dianalisis.
-
-Untuk menjalankan kod PHP sebenar:
-1. Muat turun fail ${fileName}.php
-2. Gunakan XAMPP atau server PHP
-3. Run: php ${fileName}.php`,
-      
-      'sql': `🗄️ Simulasi output SQL:
-SQL query telah dianalisis.
-
-Untuk menjalankan SQL sebenar:
-1. Muat turun fail ${fileName}.sql
-2. Import ke MySQL/PostgreSQL/SQLite
-3. Execute dalam database management tool`,
-      
-      'default': `📝 Kod ${lang} telah disimpan.
-Muat turun fail untuk menjalankan dalam environment yang sesuai.`
     }
 
-    setOutput(simulations[lang] || simulations['default'])
+    fetchUserData()
+  }, [])
+
+  // Auto-detect language when content changes
+  useEffect(() => {
+    const activeTab = tabs.find(tab => tab.id === activeTabId)
+    if (activeTab && activeTab.content) {
+      const detectedLang = detectLanguage(activeTab.content)
+      if (detectedLang !== activeTab.language) {
+        updateTab(activeTabId, { 
+          language: detectedLang,
+          name: activeTab.name.replace(/\.[^.]*$/, getFileExtension(detectedLang))
+        })
+      }
+    }
+  }, [tabs, activeTabId])
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (autoSave && user) {
+      const interval = setInterval(() => {
+        saveToLocalStorage()
+      }, 5000) // Auto-save every 5 seconds
+
+      return () => clearInterval(interval)
+    }
+  }, [tabs, autoSave, user])
+
+  const getActiveTab = (): Tab => {
+    return tabs.find(tab => tab.id === activeTabId) || tabs[0]
   }
 
-  const handleAutoSave = async () => {
-    if (!currentProject || !user) return
+  const updateTab = (tabId: string, updates: Partial<Tab>) => {
+    setTabs(prev => prev.map(tab => 
+      tab.id === tabId ? { ...tab, ...updates, saved: false } : tab
+    ))
+  }
 
-    // Get current code from Monaco Editor
-    const currentCode = getCurrentCodeFromMonaco()
+  const addNewTab = () => {
+    const newTab: Tab = {
+      id: nextTabId.toString(),
+      name: `untitled${nextTabId}.js`,
+      content: '',
+      language: 'javascript',
+      saved: false
+    }
+    
+    setTabs(prev => [...prev, newTab])
+    setActiveTabId(newTab.id)
+    setNextTabId(prev => prev + 1)
+  }
 
-    try {
-      const updatedProject = {
-        ...currentProject,
-        code: currentCode,
-        language,
-        theme,
-        title: fileName,
-        updated_at: new Date().toISOString()
-      }
-
-      if (currentProject.id) {
-        // Update existing project
-        const { error } = await supabase
-          .from('code_projects')
-          .update(updatedProject)
-          .eq('id', currentProject.id)
-
-        if (error) throw error
-      } else {
-        // Create new project
-        const { data, error } = await supabase
-          .from('code_projects')
-          .insert({
-            ...updatedProject,
-            user_id: user.id
-          })
-          .select()
-          .single()
-
-        if (error) throw error
-        setCurrentProject(data)
-      }
-
-    } catch (error) {
-      console.error('Error auto-saving:', error)
+  const closeTab = (tabId: string) => {
+    if (tabs.length === 1) return // Don't close last tab
+    
+    const tabIndex = tabs.findIndex(tab => tab.id === tabId)
+    const newTabs = tabs.filter(tab => tab.id !== tabId)
+    
+    setTabs(newTabs)
+    
+    // Switch to adjacent tab
+    if (activeTabId === tabId) {
+      const newActiveIndex = Math.min(tabIndex, newTabs.length - 1)
+      setActiveTabId(newTabs[newActiveIndex].id)
     }
   }
 
-  const handleSave = async () => {
-    if (!user) return
-
-    setSaving(true)
-    
-    // Get current code from Monaco Editor
-    const currentCode = getCurrentCodeFromMonaco()
-    
-    try {
-      const projectData = {
-        title: fileName,
-        language,
-        code: currentCode,
-        theme,
-        is_public: false,
-        user_id: user.id
-      }
-
-      if (currentProject?.id) {
-        // Update existing project
-        const { data, error } = await supabase
-          .from('code_projects')
-          .update(projectData)
-          .eq('id', currentProject.id)
-          .select()
-          .single()
-
-        if (error) throw error
-        setCurrentProject(data)
-      } else {
-        // Create new project
-        const { data, error } = await supabase
-          .from('code_projects')
-          .insert(projectData)
-          .select()
-          .single()
-
-        if (error) throw error
-        setCurrentProject(data)
-      }
-
-      // Update local state
-      setCode(currentCode)
-
-      // Refresh projects list
-      await fetchProjects(user.id)
-
-    } catch (error) {
-      console.error('Error saving project:', error)
-      alert('Ralat menyimpan projek. Sila cuba lagi.')
-    }
-    setSaving(false)
+  const handleContentChange = (content: string) => {
+    updateTab(activeTabId, { content })
   }
 
-  const handleDownload = () => {
-    // Check if we're in the browser
-    if (typeof window === 'undefined') return
-    
-    // Get current code DIRECTLY from Monaco Editor
-    const currentCode = getCurrentCodeFromMonaco()
-    
-    console.log('Download - Current Code from Monaco:', currentCode) // Debug log
-    console.log('Download - Language:', language) // Debug log
-    console.log('Download - FileName:', fileName) // Debug log
-    
-    const fileExtension = getFileExtension(language)
-    const downloadFileName = `${fileName}.${fileExtension}`
-    
-    // Create blob with current code from Monaco Editor
-    const blob = new Blob([currentCode], { type: 'text/plain' })
+  const downloadFile = () => {
+    const activeTab = getActiveTab()
+    const blob = new Blob([activeTab.content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = downloadFileName
+    a.download = activeTab.name
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  const saveToLocalStorage = () => {
+    if (user) {
+      localStorage.setItem(`codecikgu_playground_${user.id}`, JSON.stringify({
+        tabs,
+        activeTabId,
+        theme,
+        fontSize,
+        showLineNumbers,
+        autoSave
+      }))
+    }
+  }
+
+  const loadFromLocalStorage = () => {
+    if (user) {
+      const saved = localStorage.getItem(`codecikgu_playground_${user.id}`)
+      if (saved) {
+        try {
+          const data = JSON.parse(saved)
+          setTabs(data.tabs || tabs)
+          setActiveTabId(data.activeTabId || activeTabId)
+          setTheme(data.theme || theme)
+          setFontSize(data.fontSize || fontSize)
+          setShowLineNumbers(data.showLineNumbers ?? showLineNumbers)
+          setAutoSave(data.autoSave ?? autoSave)
+        } catch (error) {
+          console.error('Error loading saved data:', error)
+        }
+      }
+    }
+  }
+
+  const handleSearch = () => {
+    if (!searchTerm || !textareaRef.current) return
     
-    // Show confirmation with code preview
-    const preview = currentCode.length > 100 ? currentCode.substring(0, 100) + '...' : currentCode
-    setOutput(`📥 Fail ${downloadFileName} telah dimuat turun!
-
-Kod yang dimuat turun:
-${preview}
-
-Jumlah aksara: ${currentCode.length}`)
-  }
-
-  const getFileExtension = (lang: string) => {
-    const extensions: Record<string, string> = {
-      'javascript': 'js',
-      'typescript': 'ts',
-      'html': 'html',
-      'css': 'css',
-      'python': 'py',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
-      'php': 'php',
-      'sql': 'sql',
-      'xml': 'xml',
-      'json': 'json',
-      'markdown': 'md',
-      'yaml': 'yml',
-      'shell': 'sh'
-    }
-    return extensions[lang] || 'txt'
-  }
-
-  const getDefaultCode = (lang: string) => {
-    const defaultCodes: Record<string, string> = {
-      'javascript': `// Welcome to CodeCikgu Playground!
-// Write your JavaScript code here and click "Jalankan" to see the output
-
-console.log("Hello, CodeCikgu!");
-
-function greet(name) {
-    return \`Hello, \${name}!\`;
-}
-
-console.log(greet("World"));`,
-      'html': `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeCikgu Project</title>
-</head>
-<body>
-    <h1>🚀 Welcome to CodeCikgu!</h1>
-    <p>Start building your amazing web project here.</p>
-</body>
-</html>`,
-      'css': `/* Welcome to CodeCikgu Playground! */
-/* Write your CSS code here */
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}`,
-      'python': `# Welcome to CodeCikgu Playground!
-# Write your Python code here
-
-print("Hello, CodeCikgu!")
-
-def greet(name):
-    return f"Hello, {name}!"
-
-print(greet("World"))`,
-      'java': `// Welcome to CodeCikgu Playground!
-// Write your Java code here
-
-public class HelloWorld {
-    public static void main(String[] args) {
-        System.out.println("Hello, CodeCikgu!");
-    }
-}`,
-      'php': `<?php
-// Welcome to CodeCikgu Playground!
-// Write your PHP code here
-
-echo "Hello, CodeCikgu!\\n";
-echo "Selamat datang ke PHP!\\n";
-
-function greet($name) {
-    return "Hello, " . $name . "!";
-}
-
-echo greet("World") . "\\n";
-?>`
-    }
-    return defaultCodes[lang] || '// Start coding here...'
-  }
-
-  // Function to register Monaco Editor instance
-  const registerMonacoEditor = (editor: any) => {
-    if (typeof window === 'undefined') return
+    const textarea = textareaRef.current
+    const content = textarea.value
+    const index = content.toLowerCase().indexOf(searchTerm.toLowerCase())
     
-    globalMonacoEditor = editor
-    console.log('Monaco Editor registered:', editor) // Debug log
+    if (index !== -1) {
+      textarea.focus()
+      textarea.setSelectionRange(index, index + searchTerm.length)
+    }
+  }
+
+  const handleReplace = () => {
+    const activeTab = getActiveTab()
+    const newContent = activeTab.content.replace(new RegExp(searchTerm, 'gi'), replaceTerm)
+    updateTab(activeTabId, { content: newContent })
+  }
+
+  const getThemeClasses = () => {
+    switch (theme) {
+      case 'light':
+        return 'bg-white text-gray-900 border-gray-300'
+      case 'monokai':
+        return 'bg-gray-900 text-green-400 border-gray-700'
+      default:
+        return 'bg-gray-800 text-gray-100 border-gray-600'
+    }
   }
 
   if (loading) {
@@ -528,241 +390,253 @@ echo greet("World") . "\\n";
     )
   }
 
+  const activeTab = getActiveTab()
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
-      {/* Header */}
-      <div className="border-b border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Code className="w-8 h-8 text-electric-blue" />
-              <h1 className="text-2xl font-bold text-gradient">CodeCikgu Playground</h1>
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gradient flex items-center">
+                <Code className="w-8 h-8 mr-3" />
+                CodeCikgu Playground
+              </h1>
+              <p className="text-gray-400 mt-2">
+                Editor kod online dengan auto-detect bahasa dan multi-tab support
+              </p>
             </div>
             
             <div className="flex items-center space-x-4">
               <button
-                onClick={handleRunCode}
-                disabled={isRunning}
-                className="btn-primary flex items-center space-x-2"
+                onClick={() => setShowSearch(!showSearch)}
+                className="p-2 bg-gray-800/50 hover:bg-gray-800 rounded-lg transition-colors duration-300"
+                title="Search & Replace"
               >
-                {isRunning ? (
-                  <>
-                    <Square className="w-4 h-4" />
-                    <span>Menjalankan...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    <span>Jalankan</span>
-                  </>
-                )}
+                <Search className="w-5 h-5 text-gray-400" />
               </button>
               
               <button
-                onClick={() => setShowProjectManager(true)}
-                className="btn-secondary flex items-center space-x-2"
-              >
-                <FolderOpen className="w-4 h-4" />
-                <span>Projek</span>
-              </button>
-              
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="btn-secondary flex items-center space-x-2"
-              >
-                <Save className="w-4 h-4" />
-                <span>{saving ? 'Menyimpan...' : 'Simpan'}</span>
-              </button>
-              
-              <button
-                onClick={handleDownload}
-                className="btn-secondary flex items-center space-x-2"
+                onClick={downloadFile}
+                className="flex items-center space-x-2 px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300"
               >
                 <Download className="w-4 h-4" />
                 <span>Muat Turun</span>
               </button>
+              
+              {user && (
+                <button
+                  onClick={saveToLocalStorage}
+                  className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan</span>
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex h-[calc(100vh-4rem)]">
-        {/* Sidebar */}
-        <div className="w-80 bg-gray-900/50 border-r border-gray-700/50 p-4">
-          <div className="space-y-6">
-            {/* Project Info */}
-            <div className="glass-dark rounded-xl p-4">
-              <h3 className="text-lg font-bold text-white mb-4">Maklumat Projek</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Nama Fail</label>
-                  <input
-                    type="text"
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:border-electric-blue focus:outline-none"
-                  />
-                </div>
+          {/* Search & Replace Panel */}
+          {showSearch && (
+            <div className="glass-dark rounded-lg p-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input
+                  type="text"
+                  placeholder="Cari..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue"
+                />
+                <input
+                  type="text"
+                  placeholder="Ganti dengan..."
+                  value={replaceTerm}
+                  onChange={(e) => setReplaceTerm(e.target.value)}
+                  className="px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-electric-blue"
+                />
+                <button
+                  onClick={handleSearch}
+                  className="px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded transition-all duration-300"
+                >
+                  Cari
+                </button>
+                <button
+                  onClick={handleReplace}
+                  className="px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded transition-all duration-300"
+                >
+                  Ganti Semua
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="glass-dark rounded-xl p-6 mb-6">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Maklumat Projek
+                </h3>
                 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Bahasa</label>
-                  <select
-                    value={language}
-                    onChange={(e) => {
-                      setLanguage(e.target.value)
-                      if (!currentProject?.id) {
-                        setCode(getDefaultCode(e.target.value))
-                      }
-                      setOutput('')
-                      setError('')
-                    }}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:border-electric-blue focus:outline-none"
-                  >
-                    <option value="javascript">JavaScript</option>
-                    <option value="typescript">TypeScript</option>
-                    <option value="html">HTML</option>
-                    <option value="css">CSS</option>
-                    <option value="python">Python</option>
-                    <option value="java">Java</option>
-                    <option value="cpp">C++</option>
-                    <option value="c">C</option>
-                    <option value="php">PHP</option>
-                    <option value="sql">SQL</option>
-                    <option value="xml">XML</option>
-                    <option value="json">JSON</option>
-                    <option value="markdown">Markdown</option>
-                    <option value="yaml">YAML</option>
-                    <option value="shell">Shell</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Tema</label>
-                  <select
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:border-electric-blue focus:outline-none"
-                  >
-                    <option value="vs-dark">Dark</option>
-                    <option value="vs-light">Light</option>
-                    <option value="hc-black">High Contrast</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="glass-dark rounded-xl p-4">
-              <h3 className="text-lg font-bold text-white mb-4">Tindakan Pantas</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={handleRunCode}
-                  disabled={isRunning}
-                  className="w-full btn-primary text-left flex items-center space-x-2"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>{isRunning ? 'Menjalankan...' : 'Jalankan Kod'}</span>
-                </button>
-                <button
-                  onClick={createNewProject}
-                  className="w-full btn-secondary text-left"
-                >
-                  📄 Projek Baru
-                </button>
-                <button
-                  onClick={() => setShowProjectManager(true)}
-                  className="w-full btn-secondary text-left"
-                >
-                  📁 Buka Projek
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="w-full btn-secondary text-left"
-                >
-                  💾 Simpan Projek
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="w-full btn-secondary text-left"
-                >
-                  📥 Muat Turun Fail
-                </button>
-              </div>
-            </div>
-
-            {/* Tips */}
-            <div className="glass-dark rounded-xl p-4">
-              <h3 className="text-lg font-bold text-white mb-4">Tips</h3>
-              <div className="space-y-2 text-sm text-gray-400">
-                <p>• Klik "Jalankan" untuk execute kod</p>
-                <p>• JavaScript berjalan dalam browser</p>
-                <p>• Bahasa lain menunjukkan simulasi</p>
-                <p>• Ctrl+S untuk simpan pantas</p>
-                <p>• Download mengambil kod dari editor</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Editor and Output */}
-        <div className="flex-1 flex flex-col">
-          {/* Editor */}
-          <div className="flex-1">
-            {typeof window !== 'undefined' && (
-              <CodeEditor
-                code={code}
-                language={language}
-                theme={theme}
-                onChange={setCode}
-                fileName={fileName}
-                onEditorMount={registerMonacoEditor}
-              />
-            )}
-          </div>
-
-          {/* Output Panel */}
-          <div className="h-64 border-t border-gray-700/50 bg-gray-900/50">
-            <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/50">
-                <h3 className="text-lg font-bold text-white">Output</h3>
-                <button
-                  onClick={() => {
-                    setOutput('')
-                    setError('')
-                  }}
-                  className="text-sm text-gray-400 hover:text-white"
-                >
-                  Clear
-                </button>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-900/30 border border-red-500/30 rounded text-red-400 text-sm">
-                    <strong>Error:</strong> {error}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Nama Fail</label>
+                    <input
+                      type="text"
+                      value={activeTab.name}
+                      onChange={(e) => updateTab(activeTabId, { name: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
+                    />
                   </div>
-                )}
-                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono">
-                  {output || 'Klik "Jalankan" untuk melihat output kod anda...'}
-                </pre>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Bahasa (Auto-Detect)</label>
+                    <div className="px-3 py-2 bg-gray-800/30 border border-gray-600 rounded text-electric-blue text-sm">
+                      {languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Tema</label>
+                    <select
+                      value={theme}
+                      onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'monokai')}
+                      className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
+                    >
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                      <option value="monokai">Monokai</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="glass-dark rounded-xl p-6">
+                <h3 className="text-lg font-bold text-white mb-4">Tindakan Pantas</h3>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={addNewTab}
+                    className="w-full flex items-center p-3 bg-electric-blue/20 hover:bg-electric-blue/30 border border-electric-blue/30 rounded-lg transition-colors duration-300"
+                  >
+                    <Plus className="w-4 h-4 text-electric-blue mr-2" />
+                    <span className="text-electric-blue text-sm">Tab Baru</span>
+                  </button>
+                  
+                  <button
+                    onClick={downloadFile}
+                    className="w-full flex items-center p-3 bg-neon-green/20 hover:bg-neon-green/30 border border-neon-green/30 rounded-lg transition-colors duration-300"
+                  >
+                    <Download className="w-4 h-4 text-neon-green mr-2" />
+                    <span className="text-neon-green text-sm">Muat Turun</span>
+                  </button>
+                  
+                  {user && (
+                    <>
+                      <button
+                        onClick={saveToLocalStorage}
+                        className="w-full flex items-center p-3 bg-neon-cyan/20 hover:bg-neon-cyan/30 border border-neon-cyan/30 rounded-lg transition-colors duration-300"
+                      >
+                        <Save className="w-4 h-4 text-neon-cyan mr-2" />
+                        <span className="text-neon-cyan text-sm">Simpan Projek</span>
+                      </button>
+                      
+                      <button
+                        onClick={loadFromLocalStorage}
+                        className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300"
+                      >
+                        <FolderOpen className="w-4 h-4 text-purple-400 mr-2" />
+                        <span className="text-purple-400 text-sm">Buka Projek</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Main Editor */}
+            <div className="lg:col-span-3">
+              <div className="glass-dark rounded-xl overflow-hidden">
+                {/* Tab Bar */}
+                <div className="flex items-center bg-gray-800/50 border-b border-gray-700 overflow-x-auto">
+                  {tabs.map((tab) => (
+                    <div
+                      key={tab.id}
+                      className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 cursor-pointer transition-colors duration-300 ${
+                        tab.id === activeTabId 
+                          ? 'bg-gray-700/50 text-white' 
+                          : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                      }`}
+                      onClick={() => setActiveTabId(tab.id)}
+                    >
+                      <span className="text-sm font-medium">{tab.name}</span>
+                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                      {tabs.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            closeTab(tab.id)
+                          }}
+                          className="text-gray-500 hover:text-red-400 transition-colors duration-300"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <button
+                    onClick={addNewTab}
+                    className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/30 transition-colors duration-300"
+                    title="Tab Baru"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Editor */}
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={activeTab.content}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
+                    className={`w-full h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
+                    style={{ fontSize: `${fontSize}px` }}
+                  />
+                  
+                  {showLineNumbers && (
+                    <div className="absolute left-0 top-0 p-4 text-gray-500 text-sm font-mono pointer-events-none">
+                      {activeTab.content.split('\n').map((_, index) => (
+                        <div key={index} style={{ fontSize: `${fontSize}px` }}>
+                          {index + 1}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Bar */}
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-800/30 border-t border-gray-700 text-sm text-gray-400">
+                  <div className="flex items-center space-x-4">
+                    <span>Bahasa: {languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language}</span>
+                    <span>Baris: {activeTab.content.split('\n').length}</span>
+                    <span>Aksara: {activeTab.content.length}</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    {autoSave && user && <span className="text-green-400">Auto-save: ON</span>}
+                    <span>Tema: {theme}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Project Manager Modal */}
-      {showProjectManager && typeof window !== 'undefined' && (
-        <ProjectManager
-          projects={projects}
-          onClose={() => setShowProjectManager(false)}
-          onSelectProject={loadProject}
-          onDeleteProject={(projectId: string) => {
-            setProjects(projects.filter(p => p.id !== projectId))
-          }}
-        />
-      )}
     </div>
   )
 }
