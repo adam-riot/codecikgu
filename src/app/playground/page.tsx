@@ -146,6 +146,74 @@ const languagePatterns = {
   }
 }
 
+// Syntax highlighting function
+const applySyntaxHighlighting = (code: string, language: string): string => {
+  if (!code) return ''
+  
+  let highlightedCode = code
+  
+  // Common patterns for all languages
+  const patterns = {
+    // Strings
+    string: {
+      regex: /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g,
+      className: 'text-green-400'
+    },
+    // Numbers
+    number: {
+      regex: /\b\d+\.?\d*\b/g,
+      className: 'text-blue-400'
+    },
+    // Comments
+    comment: {
+      regex: /(\/\/.*$|\/\*[\s\S]*?\*\/|#.*$)/gm,
+      className: 'text-gray-500 italic'
+    }
+  }
+  
+  // Language-specific keywords
+  const keywords = {
+    javascript: ['function', 'var', 'let', 'const', 'if', 'else', 'for', 'while', 'return', 'true', 'false', 'null', 'undefined', 'async', 'await', 'class', 'extends', 'import', 'export', 'from'],
+    python: ['def', 'class', 'if', 'elif', 'else', 'for', 'while', 'return', 'True', 'False', 'None', 'import', 'from', 'as', 'try', 'except', 'finally', 'with'],
+    php: ['function', 'class', 'if', 'else', 'elseif', 'for', 'foreach', 'while', 'return', 'echo', 'print', 'public', 'private', 'protected', 'static'],
+    cpp: ['int', 'float', 'double', 'char', 'bool', 'void', 'if', 'else', 'for', 'while', 'return', 'class', 'public', 'private', 'protected', 'static', 'virtual'],
+    java: ['public', 'private', 'protected', 'static', 'final', 'class', 'interface', 'if', 'else', 'for', 'while', 'return', 'int', 'float', 'double', 'char', 'String', 'boolean', 'void'],
+    sql: ['SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'TABLE', 'DATABASE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER'],
+    css: ['color', 'background', 'margin', 'padding', 'border', 'width', 'height', 'display', 'position', 'font-size', 'font-family'],
+    html: ['html', 'head', 'body', 'div', 'span', 'p', 'a', 'img', 'script', 'style', 'link', 'meta']
+  }
+  
+  // Apply keyword highlighting
+  const langKeywords = keywords[language as keyof typeof keywords] || []
+  langKeywords.forEach(keyword => {
+    const regex = new RegExp(`\\b${keyword}\\b`, 'g')
+    highlightedCode = highlightedCode.replace(regex, `<span class="text-purple-400 font-semibold">${keyword}</span>`)
+  })
+  
+  // Apply other patterns
+  Object.entries(patterns).forEach(([type, pattern]) => {
+    highlightedCode = highlightedCode.replace(pattern.regex, (match) => {
+      return `<span class="${pattern.className}">${match}</span>`
+    })
+  })
+  
+  // HTML/XML tags
+  if (language === 'html' || language === 'xml') {
+    highlightedCode = highlightedCode.replace(/<\/?[^>]+>/g, (match) => {
+      return `<span class="text-red-400">${match}</span>`
+    })
+  }
+  
+  // PHP variables
+  if (language === 'php') {
+    highlightedCode = highlightedCode.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, (match) => {
+      return `<span class="text-yellow-400">${match}</span>`
+    })
+  }
+  
+  return highlightedCode
+}
+
 // Auto-detect language function
 const detectLanguage = (code: string): string => {
   if (!code.trim()) return 'javascript'
@@ -268,6 +336,7 @@ export default function PlaygroundPage() {
   const [fontSize, setFontSize] = useState(14)
   const [showLineNumbers, setShowLineNumbers] = useState(true)
   const [autoSave, setAutoSave] = useState(true)
+  const [syntaxHighlighting, setSyntaxHighlighting] = useState(true)
 
   // Search & Replace
   const [showSearch, setShowSearch] = useState(false)
@@ -278,10 +347,11 @@ export default function PlaygroundPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
 
   // Check File System API support
   useEffect(() => {
-    setSupportsFileSystemAPI('showDirectoryPicker' in window)
+    setSupportsFileSystemAPI('showDirectoryPicker' in window && 'showOpenFilePicker' in window)
   }, [])
 
   // Add notification function
@@ -332,6 +402,15 @@ export default function PlaygroundPage() {
     }
   }, [tabs, activeTabId])
 
+  // Update syntax highlighting when content or language changes
+  useEffect(() => {
+    if (syntaxHighlighting && highlightRef.current) {
+      const activeTab = getActiveTab()
+      const highlighted = applySyntaxHighlighting(activeTab.content, activeTab.language)
+      highlightRef.current.innerHTML = highlighted
+    }
+  }, [tabs, activeTabId, syntaxHighlighting])
+
   // Auto-save functionality for file system files
   useEffect(() => {
     if (autoSave) {
@@ -354,6 +433,39 @@ export default function PlaygroundPage() {
     setTabs(prev => prev.map(tab => 
       tab.id === tabId ? { ...tab, ...updates, saved: false } : tab
     ))
+  }
+
+  // Open file picker (individual files)
+  const openFiles = async () => {
+    if (!supportsFileSystemAPI) {
+      addNotification('error', 'Browser anda tidak support File System API. Sila guna Chrome 86+ atau Edge 86+')
+      return
+    }
+
+    try {
+      const fileHandles = await (window as any).showOpenFilePicker({
+        multiple: true,
+        types: [{
+          description: 'Text files',
+          accept: {
+            'text/*': ['.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less', '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt', '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt']
+          }
+        }]
+      })
+
+      console.log('📁 Selected files:', fileHandles.length)
+      
+      for (const fileHandle of fileHandles) {
+        await openFileFromSystem(fileHandle)
+      }
+      
+      addNotification('success', `${fileHandles.length} file(s) telah dibuka`)
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error('❌ Error opening files:', error)
+        addNotification('error', 'Gagal membuka file: ' + (error as Error).message)
+      }
+    }
   }
 
   // Open directory picker
@@ -607,7 +719,7 @@ export default function PlaygroundPage() {
     setActiveTabId(newTab.id)
     setNextTabId(prev => prev + 1)
     
-    addNotification('success', 'Tab baru telah ditambah')
+    addNotification('success', 'New tab telah ditambah')
   }
 
   const closeTab = (tabId: string) => {
@@ -799,7 +911,7 @@ export default function PlaygroundPage() {
                 CodeCikgu Playground
               </h1>
               <p className="text-gray-400 mt-2">
-                Editor kod online dengan direct file system access (macam Notepad++)
+                Editor kod online dengan direct file system access dan syntax highlighting
               </p>
               {!supportsFileSystemAPI && (
                 <p className="text-red-400 text-sm mt-1">
@@ -818,14 +930,25 @@ export default function PlaygroundPage() {
               </button>
               
               {supportsFileSystemAPI && (
-                <button
-                  onClick={openDirectory}
-                  disabled={loadingFiles}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
-                >
-                  <HardDrive className="w-4 h-4" />
-                  <span>{loadingFiles ? 'Loading...' : 'Open Folder'}</span>
-                </button>
+                <>
+                  <button
+                    onClick={openFiles}
+                    disabled={loadingFiles}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
+                  >
+                    <File className="w-4 h-4" />
+                    <span>Open File</span>
+                  </button>
+                  
+                  <button
+                    onClick={openDirectory}
+                    disabled={loadingFiles}
+                    className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
+                  >
+                    <HardDrive className="w-4 h-4" />
+                    <span>{loadingFiles ? 'Loading...' : 'Open Folder'}</span>
+                  </button>
+                </>
               )}
               
               <button
@@ -980,6 +1103,18 @@ export default function PlaygroundPage() {
                       <option value="monokai">Monokai</option>
                     </select>
                   </div>
+
+                  <div>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={syntaxHighlighting}
+                        onChange={(e) => setSyntaxHighlighting(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-400">Syntax Highlighting</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -993,20 +1128,31 @@ export default function PlaygroundPage() {
                     className="w-full flex items-center p-3 bg-electric-blue/20 hover:bg-electric-blue/30 border border-electric-blue/30 rounded-lg transition-colors duration-300"
                   >
                     <Plus className="w-4 h-4 text-electric-blue mr-2" />
-                    <span className="text-electric-blue text-sm">Tab Baru</span>
+                    <span className="text-electric-blue text-sm">New Tab</span>
                   </button>
                   
                   {supportsFileSystemAPI && (
-                    <button
-                      onClick={openDirectory}
-                      disabled={loadingFiles}
-                      className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
-                    >
-                      <HardDrive className="w-4 h-4 text-purple-400 mr-2" />
-                      <span className="text-purple-400 text-sm">
-                        {loadingFiles ? 'Loading...' : 'Open Folder'}
-                      </span>
-                    </button>
+                    <>
+                      <button
+                        onClick={openFiles}
+                        disabled={loadingFiles}
+                        className="w-full flex items-center p-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
+                      >
+                        <File className="w-4 h-4 text-blue-400 mr-2" />
+                        <span className="text-blue-400 text-sm">Open File</span>
+                      </button>
+                      
+                      <button
+                        onClick={openDirectory}
+                        disabled={loadingFiles}
+                        className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
+                      >
+                        <HardDrive className="w-4 h-4 text-purple-400 mr-2" />
+                        <span className="text-purple-400 text-sm">
+                          {loadingFiles ? 'Loading...' : 'Open Folder'}
+                        </span>
+                      </button>
+                    </>
                   )}
                   
                   <button
@@ -1057,27 +1203,45 @@ export default function PlaygroundPage() {
                   <button
                     onClick={addNewTab}
                     className="p-3 text-gray-400 hover:text-white hover:bg-gray-700/30 transition-colors duration-300"
-                    title="Tab Baru"
+                    title="New Tab"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* Editor */}
+                {/* Editor with Syntax Highlighting */}
                 <div className="relative">
+                  {syntaxHighlighting && (
+                    <div
+                      ref={highlightRef}
+                      className={`absolute inset-0 p-4 font-mono pointer-events-none whitespace-pre-wrap overflow-hidden ${getThemeClasses()}`}
+                      style={{ 
+                        fontSize: `${fontSize}px`,
+                        lineHeight: '1.5',
+                        zIndex: 1
+                      }}
+                    />
+                  )}
+                  
                   <textarea
                     ref={textareaRef}
                     value={activeTab.content}
                     onChange={(e) => handleContentChange(e.target.value)}
                     placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
-                    className={`w-full h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
-                    style={{ fontSize: `${fontSize}px` }}
+                    className={`w-full h-96 p-4 resize-none focus:outline-none font-mono relative ${
+                      syntaxHighlighting ? 'bg-transparent text-transparent caret-white' : getThemeClasses()
+                    }`}
+                    style={{ 
+                      fontSize: `${fontSize}px`,
+                      lineHeight: '1.5',
+                      zIndex: syntaxHighlighting ? 2 : 1
+                    }}
                   />
                   
                   {showLineNumbers && (
-                    <div className="absolute left-0 top-0 p-4 text-gray-500 text-sm font-mono pointer-events-none">
+                    <div className="absolute left-0 top-0 p-4 text-gray-500 text-sm font-mono pointer-events-none" style={{ zIndex: 3 }}>
                       {activeTab.content.split('\n').map((_, index) => (
-                        <div key={index} style={{ fontSize: `${fontSize}px` }}>
+                        <div key={index} style={{ fontSize: `${fontSize}px`, lineHeight: '1.5' }}>
                           {index + 1}
                         </div>
                       ))}
@@ -1092,6 +1256,7 @@ export default function PlaygroundPage() {
                     <span>Baris: {activeTab.content.split('\n').length}</span>
                     <span>Aksara: {activeTab.content.length}</span>
                     {activeTab.isFromFileSystem && <span className="text-green-400">📁 File System</span>}
+                    {syntaxHighlighting && <span className="text-purple-400">🎨 Syntax</span>}
                   </div>
                   
                   <div className="flex items-center space-x-2">
