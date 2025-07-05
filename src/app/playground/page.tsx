@@ -17,7 +17,9 @@ import {
   Search,
   RotateCcw,
   Copy,
-  Trash2
+  Trash2,
+  Check,
+  AlertCircle
 } from 'lucide-react'
 
 // Language detection patterns
@@ -183,6 +185,13 @@ interface Tab {
   saved: boolean
 }
 
+// Notification interface
+interface Notification {
+  id: string
+  type: 'success' | 'error' | 'info'
+  message: string
+}
+
 export default function PlaygroundPage() {
   const router = useRouter()
   const [user, setUser] = useState<CustomUser | null>(null)
@@ -213,7 +222,23 @@ export default function PlaygroundPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [replaceTerm, setReplaceTerm] = useState('')
 
+  // Notifications
+  const [notifications, setNotifications] = useState<Notification[]>([])
+
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Add notification function
+  const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    const id = Date.now().toString()
+    const notification: Notification = { id, type, message }
+    
+    setNotifications(prev => [...prev, notification])
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id))
+    }, 3000)
+  }
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -226,6 +251,9 @@ export default function PlaygroundPage() {
           
           const role = await getUserRole(userData)
           setUserRole(role)
+          
+          // Auto-load saved project when user is available
+          loadFromLocalStorage(userData)
         }
       } catch (error) {
         console.error('Error fetching user data:', error)
@@ -255,8 +283,8 @@ export default function PlaygroundPage() {
   useEffect(() => {
     if (autoSave && user) {
       const interval = setInterval(() => {
-        saveToLocalStorage()
-      }, 5000) // Auto-save every 5 seconds
+        saveToLocalStorage(true) // true = silent save
+      }, 10000) // Auto-save every 10 seconds
 
       return () => clearInterval(interval)
     }
@@ -284,10 +312,15 @@ export default function PlaygroundPage() {
     setTabs(prev => [...prev, newTab])
     setActiveTabId(newTab.id)
     setNextTabId(prev => prev + 1)
+    
+    addNotification('success', 'Tab baru telah ditambah')
   }
 
   const closeTab = (tabId: string) => {
-    if (tabs.length === 1) return // Don't close last tab
+    if (tabs.length === 1) {
+      addNotification('info', 'Tidak boleh tutup tab terakhir')
+      return
+    }
     
     const tabIndex = tabs.findIndex(tab => tab.id === tabId)
     const newTabs = tabs.filter(tab => tab.id !== tabId)
@@ -299,6 +332,8 @@ export default function PlaygroundPage() {
       const newActiveIndex = Math.min(tabIndex, newTabs.length - 1)
       setActiveTabId(newTabs[newActiveIndex].id)
     }
+    
+    addNotification('success', 'Tab telah ditutup')
   }
 
   const handleContentChange = (content: string) => {
@@ -307,6 +342,12 @@ export default function PlaygroundPage() {
 
   const downloadFile = () => {
     const activeTab = getActiveTab()
+    
+    if (!activeTab.content.trim()) {
+      addNotification('error', 'Tiada kandungan untuk dimuat turun')
+      return
+    }
+    
     const blob = new Blob([activeTab.content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -316,42 +357,88 @@ export default function PlaygroundPage() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    
+    addNotification('success', `Fail ${activeTab.name} telah dimuat turun`)
   }
 
-  const saveToLocalStorage = () => {
-    if (user) {
-      localStorage.setItem(`codecikgu_playground_${user.id}`, JSON.stringify({
+  const saveToLocalStorage = (silent: boolean = false) => {
+    if (!user) {
+      addNotification('error', 'Sila log masuk untuk menyimpan projek')
+      return
+    }
+
+    try {
+      const projectData = {
         tabs,
         activeTabId,
         theme,
         fontSize,
         showLineNumbers,
-        autoSave
-      }))
+        autoSave,
+        savedAt: new Date().toISOString()
+      }
+      
+      const storageKey = `codecikgu_playground_${user.id}`
+      localStorage.setItem(storageKey, JSON.stringify(projectData))
+      
+      // Mark all tabs as saved
+      setTabs(prev => prev.map(tab => ({ ...tab, saved: true })))
+      
+      if (!silent) {
+        addNotification('success', 'Projek telah disimpan berjaya!')
+      }
+      
+      console.log('✅ Project saved to localStorage:', storageKey)
+    } catch (error) {
+      console.error('❌ Error saving to localStorage:', error)
+      addNotification('error', 'Gagal menyimpan projek. Sila cuba lagi.')
     }
   }
 
-  const loadFromLocalStorage = () => {
-    if (user) {
-      const saved = localStorage.getItem(`codecikgu_playground_${user.id}`)
+  const loadFromLocalStorage = (userData?: CustomUser) => {
+    const currentUser = userData || user
+    
+    if (!currentUser) {
+      addNotification('error', 'Sila log masuk untuk membuka projek')
+      return
+    }
+
+    try {
+      const storageKey = `codecikgu_playground_${currentUser.id}`
+      const saved = localStorage.getItem(storageKey)
+      
       if (saved) {
-        try {
-          const data = JSON.parse(saved)
-          setTabs(data.tabs || tabs)
-          setActiveTabId(data.activeTabId || activeTabId)
-          setTheme(data.theme || theme)
-          setFontSize(data.fontSize || fontSize)
-          setShowLineNumbers(data.showLineNumbers ?? showLineNumbers)
-          setAutoSave(data.autoSave ?? autoSave)
-        } catch (error) {
-          console.error('Error loading saved data:', error)
+        const data = JSON.parse(saved)
+        
+        if (data.tabs && data.tabs.length > 0) {
+          setTabs(data.tabs)
+          setActiveTabId(data.activeTabId || data.tabs[0].id)
+          setTheme(data.theme || 'dark')
+          setFontSize(data.fontSize || 14)
+          setShowLineNumbers(data.showLineNumbers ?? true)
+          setAutoSave(data.autoSave ?? true)
+          
+          const savedDate = data.savedAt ? new Date(data.savedAt).toLocaleString('ms-MY') : 'Tidak diketahui'
+          addNotification('success', `Projek telah dibuka (disimpan: ${savedDate})`)
+          
+          console.log('✅ Project loaded from localStorage:', storageKey)
+        } else {
+          addNotification('info', 'Tiada projek tersimpan dijumpai')
         }
+      } else {
+        addNotification('info', 'Tiada projek tersimpan dijumpai')
       }
+    } catch (error) {
+      console.error('❌ Error loading from localStorage:', error)
+      addNotification('error', 'Gagal membuka projek tersimpan')
     }
   }
 
   const handleSearch = () => {
-    if (!searchTerm || !textareaRef.current) return
+    if (!searchTerm || !textareaRef.current) {
+      addNotification('error', 'Sila masukkan kata carian')
+      return
+    }
     
     const textarea = textareaRef.current
     const content = textarea.value
@@ -360,13 +447,29 @@ export default function PlaygroundPage() {
     if (index !== -1) {
       textarea.focus()
       textarea.setSelectionRange(index, index + searchTerm.length)
+      addNotification('success', `Dijumpai: "${searchTerm}"`)
+    } else {
+      addNotification('info', `Tidak dijumpai: "${searchTerm}"`)
     }
   }
 
   const handleReplace = () => {
+    if (!searchTerm) {
+      addNotification('error', 'Sila masukkan kata untuk dicari')
+      return
+    }
+    
     const activeTab = getActiveTab()
-    const newContent = activeTab.content.replace(new RegExp(searchTerm, 'gi'), replaceTerm)
-    updateTab(activeTabId, { content: newContent })
+    const regex = new RegExp(searchTerm, 'gi')
+    const matches = activeTab.content.match(regex)
+    
+    if (matches) {
+      const newContent = activeTab.content.replace(regex, replaceTerm)
+      updateTab(activeTabId, { content: newContent })
+      addNotification('success', `${matches.length} penggantian dibuat`)
+    } else {
+      addNotification('info', `Tiada padanan dijumpai untuk "${searchTerm}"`)
+    }
   }
 
   const getThemeClasses = () => {
@@ -394,6 +497,27 @@ export default function PlaygroundPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+      {/* Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {notifications.map((notification) => (
+          <div
+            key={notification.id}
+            className={`flex items-center space-x-2 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+              notification.type === 'success' 
+                ? 'bg-green-500/20 border border-green-500/30 text-green-400'
+                : notification.type === 'error'
+                ? 'bg-red-500/20 border border-red-500/30 text-red-400'
+                : 'bg-blue-500/20 border border-blue-500/30 text-blue-400'
+            }`}
+          >
+            {notification.type === 'success' && <Check className="w-5 h-5" />}
+            {notification.type === 'error' && <AlertCircle className="w-5 h-5" />}
+            {notification.type === 'info' && <AlertCircle className="w-5 h-5" />}
+            <span className="text-sm font-medium">{notification.message}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -427,7 +551,7 @@ export default function PlaygroundPage() {
               
               {user && (
                 <button
-                  onClick={saveToLocalStorage}
+                  onClick={() => saveToLocalStorage(false)}
                   className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
                 >
                   <Save className="w-4 h-4" />
@@ -537,7 +661,7 @@ export default function PlaygroundPage() {
                   {user && (
                     <>
                       <button
-                        onClick={saveToLocalStorage}
+                        onClick={() => saveToLocalStorage(false)}
                         className="w-full flex items-center p-3 bg-neon-cyan/20 hover:bg-neon-cyan/30 border border-neon-cyan/30 rounded-lg transition-colors duration-300"
                       >
                         <Save className="w-4 h-4 text-neon-cyan mr-2" />
@@ -545,7 +669,7 @@ export default function PlaygroundPage() {
                       </button>
                       
                       <button
-                        onClick={loadFromLocalStorage}
+                        onClick={() => loadFromLocalStorage()}
                         className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300"
                       >
                         <FolderOpen className="w-4 h-4 text-purple-400 mr-2" />
@@ -573,7 +697,7 @@ export default function PlaygroundPage() {
                       onClick={() => setActiveTabId(tab.id)}
                     >
                       <span className="text-sm font-medium">{tab.name}</span>
-                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Belum disimpan"></div>}
                       {tabs.length > 1 && (
                         <button
                           onClick={(e) => {
@@ -630,6 +754,7 @@ export default function PlaygroundPage() {
                   <div className="flex items-center space-x-2">
                     {autoSave && user && <span className="text-green-400">Auto-save: ON</span>}
                     <span>Tema: {theme}</span>
+                    {user && <span className="text-blue-400">Logged in</span>}
                   </div>
                 </div>
               </div>
