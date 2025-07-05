@@ -184,22 +184,6 @@ export default function LoginPage() {
                 </div>
               </div>
             </div>
-
-            {/* Stats */}
-            <div className="mt-12 grid grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-electric-blue">1000+</div>
-                <div className="text-sm text-gray-400">Pelajar Aktif</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-neon-green">50+</div>
-                <div className="text-sm text-gray-400">Topik Pembelajaran</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-400">24/7</div>
-                <div className="text-sm text-gray-400">Akses Playground</div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -328,7 +312,7 @@ export default function LoginPage() {
                   <p className="text-gray-400">
                     Belum ada akaun?{' '}
                     <Link
-                      href="/register"
+                      href="/daftar"
                       className="text-electric-blue hover:text-electric-blue/80 font-medium transition-colors duration-300"
                     >
                       Daftar sekarang
