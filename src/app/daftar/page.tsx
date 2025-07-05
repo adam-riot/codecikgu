@@ -53,7 +53,6 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    telefon: '',
     sekolah: '',
     tingkatan: '',
     password: '',
@@ -74,7 +73,8 @@ export default function RegisterPage() {
     role: 'awam',
     message: ''
   })
-  const [step, setStep] = useState(1) // Multi-step form
+  const [step, setStep] = useState(1)
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
 
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -88,9 +88,14 @@ export default function RegisterPage() {
     }, 5000)
   }
 
+  // Debug logging function
+  const addDebugInfo = (info: string) => {
+    console.log('DEBUG:', info)
+    setDebugInfo(prev => [...prev, `${new Date().toISOString()}: ${info}`])
+  }
+
   // MOE Email validation function
   const validateMOEEmail = (email: string): EmailValidation => {
-    // Basic email format check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return {
@@ -101,7 +106,6 @@ export default function RegisterPage() {
       }
     }
 
-    // MOE email pattern: m-xxxxxxx@moe-dl.edu.my (7 digits) or m-xxxxxxxx@moe-dl.edu.my (8 digits)
     const moePattern = /^m-\d{7,8}@moe-dl\.edu\.my$/i
     
     if (moePattern.test(email)) {
@@ -164,14 +168,12 @@ export default function RegisterPage() {
     return { score, feedback, color }
   }
 
-  // Update password strength when password changes
   useEffect(() => {
     if (formData.password) {
       setPasswordStrength(checkPasswordStrength(formData.password))
     }
   }, [formData.password])
 
-  // Update email validation when email changes
   useEffect(() => {
     if (formData.email) {
       setEmailValidation(validateMOEEmail(formData.email))
@@ -233,9 +235,15 @@ export default function RegisterPage() {
     if (!validateStep2()) return
 
     setLoading(true)
+    setDebugInfo([]) // Clear previous debug info
+    addDebugInfo('Starting registration process...')
 
     try {
-      // Register with Supabase Auth
+      addDebugInfo(`Attempting to register user with email: ${formData.email}`)
+      addDebugInfo(`Role will be: ${emailValidation.role}`)
+
+      // Step 1: Register with Supabase Auth
+      addDebugInfo('Step 1: Calling supabase.auth.signUp...')
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -250,43 +258,98 @@ export default function RegisterPage() {
       })
 
       if (authError) {
-        console.error('Auth error:', authError)
-        addNotification('error', authError.message)
+        addDebugInfo(`Auth error: ${authError.message}`)
+        console.error('Auth error details:', authError)
+        addNotification('error', `Ralat pendaftaran: ${authError.message}`)
         return
       }
 
-      // Insert into profiles table with correct column names
+      addDebugInfo('Auth registration successful')
+      addDebugInfo(`User ID: ${authData.user?.id}`)
+      addDebugInfo(`User email confirmed: ${authData.user?.email_confirmed_at ? 'Yes' : 'No'}`)
+
+      // Step 2: Wait a moment for auth user to be fully created
+      addDebugInfo('Step 2: Waiting for auth user to be ready...')
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Step 3: Check if user exists in auth.users
+      addDebugInfo('Step 3: Checking if user exists in auth.users...')
+      const { data: authUser, error: authCheckError } = await supabase.auth.getUser()
+      if (authCheckError) {
+        addDebugInfo(`Auth check error: ${authCheckError.message}`)
+      } else {
+        addDebugInfo(`Auth user found: ${authUser.user?.id}`)
+      }
+
+      // Step 4: Try to insert into profiles table
       if (authData.user) {
-        const { error: profileError } = await supabase
+        addDebugInfo('Step 4: Attempting to insert into profiles table...')
+        
+        const profileData = {
+          id: authData.user.id,
+          email: formData.email,
+          name: formData.name,
+          sekolah: formData.sekolah || null,
+          tingkatan: formData.tingkatan || null,
+          role: emailValidation.role,
+          xp: 0,
+          level: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        addDebugInfo(`Profile data to insert: ${JSON.stringify(profileData, null, 2)}`)
+
+        const { data: profileResult, error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: formData.email,
-            name: formData.name,  // Changed from 'nama' to 'name'
-            sekolah: formData.sekolah,
-            tingkatan: formData.tingkatan || null,
-            role: emailValidation.role,
-            xp: 0,
-            level: 1,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .insert(profileData)
+          .select()
 
         if (profileError) {
-          console.error('Profile error:', profileError)
-          addNotification('error', `Ralat menyimpan profil: ${profileError.message}`)
-          return
+          addDebugInfo(`Profile insertion error: ${profileError.message}`)
+          addDebugInfo(`Error details: ${JSON.stringify(profileError, null, 2)}`)
+          console.error('Profile error details:', profileError)
+          
+          // Try alternative approach - upsert instead of insert
+          addDebugInfo('Step 5: Trying upsert approach...')
+          const { data: upsertResult, error: upsertError } = await supabase
+            .from('profiles')
+            .upsert(profileData, { onConflict: 'id' })
+            .select()
+
+          if (upsertError) {
+            addDebugInfo(`Upsert error: ${upsertError.message}`)
+            addNotification('error', `Ralat menyimpan profil: ${upsertError.message}`)
+            
+            // Show debug info to user for troubleshooting
+            addNotification('info', 'Debug info tersedia di console browser')
+            console.log('Debug Info:', debugInfo)
+            return
+          } else {
+            addDebugInfo('Upsert successful!')
+            addDebugInfo(`Upsert result: ${JSON.stringify(upsertResult, null, 2)}`)
+          }
+        } else {
+          addDebugInfo('Profile insertion successful!')
+          addDebugInfo(`Profile result: ${JSON.stringify(profileResult, null, 2)}`)
         }
       }
 
+      addDebugInfo('Registration completed successfully!')
       addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Sila semak email untuk pengesahan.`)
+      
       setTimeout(() => {
         router.push('/login')
       }, 2000)
 
-    } catch (error) {
+    } catch (error: any) {
+      addDebugInfo(`Unexpected error: ${error.message}`)
       console.error('Registration error:', error)
-      addNotification('error', 'Ralat tidak dijangka berlaku')
+      addNotification('error', `Ralat tidak dijangka: ${error.message}`)
+      
+      // Show debug info to user
+      addNotification('info', 'Debug info tersedia di console browser')
+      console.log('Debug Info:', debugInfo)
     } finally {
       setLoading(false)
     }
@@ -296,7 +359,6 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Floating Code Symbols */}
         <div className="absolute top-20 left-10 text-electric-blue/20 text-6xl font-mono animate-pulse">
           {'</>'}
         </div>
@@ -310,7 +372,6 @@ export default function RegisterPage() {
           {'[]'}
         </div>
         
-        {/* Gradient Orbs */}
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-electric-blue/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-neon-green/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
@@ -336,6 +397,20 @@ export default function RegisterPage() {
           </div>
         ))}
       </div>
+
+      {/* Debug Panel (only show if there are debug messages) */}
+      {debugInfo.length > 0 && (
+        <div className="fixed bottom-4 left-4 z-50 max-w-md max-h-64 overflow-y-auto bg-gray-900/90 border border-gray-600 rounded-lg p-4 backdrop-blur-sm">
+          <div className="text-xs text-gray-300 mb-2 font-semibold">Debug Info:</div>
+          <div className="space-y-1">
+            {debugInfo.map((info, index) => (
+              <div key={index} className="text-xs text-gray-400 font-mono">
+                {info}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex">
