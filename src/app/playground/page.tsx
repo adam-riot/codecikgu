@@ -19,7 +19,10 @@ import {
   Copy,
   Trash2,
   Check,
-  AlertCircle
+  AlertCircle,
+  Folder,
+  File,
+  HardDrive
 } from 'lucide-react'
 
 // Language detection patterns
@@ -142,16 +145,14 @@ const languagePatterns = {
 
 // Auto-detect language function
 const detectLanguage = (code: string): string => {
-  if (!code.trim()) return 'javascript' // Default
+  if (!code.trim()) return 'javascript'
 
   const scores: { [key: string]: number } = {}
   
-  // Initialize scores
   Object.keys(languagePatterns).forEach(lang => {
     scores[lang] = 0
   })
 
-  // Check patterns for each language
   Object.entries(languagePatterns).forEach(([lang, config]) => {
     config.patterns.forEach(pattern => {
       const matches = code.match(pattern)
@@ -161,12 +162,10 @@ const detectLanguage = (code: string): string => {
     })
   })
 
-  // Find language with highest score
   const detectedLang = Object.entries(scores).reduce((a, b) => 
     scores[a[0]] > scores[b[0]] ? a : b
   )[0]
 
-  // Return detected language or default to javascript
   return scores[detectedLang] > 0 ? detectedLang : 'javascript'
 }
 
@@ -176,6 +175,19 @@ const getFileExtension = (language: string): string => {
   return config ? config.extensions[0] : '.txt'
 }
 
+// Detect language from file extension
+const detectLanguageFromExtension = (filename: string): string => {
+  const ext = '.' + filename.split('.').pop()?.toLowerCase()
+  
+  for (const [lang, config] of Object.entries(languagePatterns)) {
+    if (config.extensions.includes(ext)) {
+      return lang
+    }
+  }
+  
+  return 'javascript'
+}
+
 // Tab interface
 interface Tab {
   id: string
@@ -183,6 +195,16 @@ interface Tab {
   content: string
   language: string
   saved: boolean
+  fileHandle?: FileSystemFileHandle
+  isFromFileSystem: boolean
+}
+
+// File tree interface
+interface FileTreeItem {
+  name: string
+  type: 'file' | 'directory'
+  handle: FileSystemFileHandle | FileSystemDirectoryHandle
+  children?: FileTreeItem[]
 }
 
 // Notification interface
@@ -198,6 +220,14 @@ export default function PlaygroundPage() {
   const [userRole, setUserRole] = useState<string>('awam')
   const [loading, setLoading] = useState(true)
   
+  // File System API support check
+  const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false)
+  
+  // Directory and file management
+  const [currentDirectory, setCurrentDirectory] = useState<FileSystemDirectoryHandle | null>(null)
+  const [fileTree, setFileTree] = useState<FileTreeItem[]>([])
+  const [directoryName, setDirectoryName] = useState<string>('')
+  
   // Tab management
   const [tabs, setTabs] = useState<Tab[]>([
     {
@@ -205,7 +235,8 @@ export default function PlaygroundPage() {
       name: 'untitled.js',
       content: '',
       language: 'javascript',
-      saved: false
+      saved: false,
+      isFromFileSystem: false
     }
   ])
   const [activeTabId, setActiveTabId] = useState('1')
@@ -227,6 +258,11 @@ export default function PlaygroundPage() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Check File System API support
+  useEffect(() => {
+    setSupportsFileSystemAPI('showDirectoryPicker' in window)
+  }, [])
+
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
@@ -234,7 +270,6 @@ export default function PlaygroundPage() {
     
     setNotifications(prev => [...prev, notification])
     
-    // Auto-remove after 3 seconds
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 3000)
@@ -251,9 +286,6 @@ export default function PlaygroundPage() {
           
           const role = await getUserRole(userData)
           setUserRole(role)
-          
-          // Auto-load saved project when user is available
-          loadFromLocalStorage(userData)
         }
       } catch (error) {
         console.error('Error fetching user data:', error)
@@ -268,7 +300,7 @@ export default function PlaygroundPage() {
   // Auto-detect language when content changes
   useEffect(() => {
     const activeTab = tabs.find(tab => tab.id === activeTabId)
-    if (activeTab && activeTab.content) {
+    if (activeTab && activeTab.content && !activeTab.isFromFileSystem) {
       const detectedLang = detectLanguage(activeTab.content)
       if (detectedLang !== activeTab.language) {
         updateTab(activeTabId, { 
@@ -279,16 +311,19 @@ export default function PlaygroundPage() {
     }
   }, [tabs, activeTabId])
 
-  // Auto-save functionality
+  // Auto-save functionality for file system files
   useEffect(() => {
-    if (autoSave && user) {
-      const interval = setInterval(() => {
-        saveToLocalStorage(true) // true = silent save
-      }, 10000) // Auto-save every 10 seconds
+    if (autoSave) {
+      const interval = setInterval(async () => {
+        const activeTab = getActiveTab()
+        if (activeTab.isFromFileSystem && activeTab.fileHandle && !activeTab.saved) {
+          await saveFileToSystem(activeTab, true) // true = silent save
+        }
+      }, 3000) // Auto-save every 3 seconds for file system files
 
       return () => clearInterval(interval)
     }
-  }, [tabs, autoSave, user])
+  }, [tabs, activeTabId, autoSave])
 
   const getActiveTab = (): Tab => {
     return tabs.find(tab => tab.id === activeTabId) || tabs[0]
@@ -300,13 +335,156 @@ export default function PlaygroundPage() {
     ))
   }
 
+  // Open directory picker
+  const openDirectory = async () => {
+    if (!supportsFileSystemAPI) {
+      addNotification('error', 'Browser anda tidak support File System API. Sila guna Chrome 86+ atau Edge 86+')
+      return
+    }
+
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker()
+      setCurrentDirectory(dirHandle)
+      setDirectoryName(dirHandle.name)
+      
+      // Load file tree
+      const tree = await buildFileTree(dirHandle)
+      setFileTree(tree)
+      
+      addNotification('success', `Folder "${dirHandle.name}" telah dibuka`)
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Error opening directory:', error)
+        addNotification('error', 'Gagal membuka folder')
+      }
+    }
+  }
+
+  // Build file tree from directory
+  const buildFileTree = async (dirHandle: FileSystemDirectoryHandle): Promise<FileTreeItem[]> => {
+    const items: FileTreeItem[] = []
+    
+    for await (const [name, handle] of dirHandle.entries()) {
+      if (handle.kind === 'file') {
+        // Only include text files
+        const file = await handle.getFile()
+        if (isTextFile(file.name)) {
+          items.push({
+            name,
+            type: 'file',
+            handle
+          })
+        }
+      } else if (handle.kind === 'directory') {
+        const children = await buildFileTree(handle)
+        if (children.length > 0) { // Only include directories with text files
+          items.push({
+            name,
+            type: 'directory',
+            handle,
+            children
+          })
+        }
+      }
+    }
+    
+    return items.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'directory' ? -1 : 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+  }
+
+  // Check if file is a text file
+  const isTextFile = (filename: string): boolean => {
+    const textExtensions = ['.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less', '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt', '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf']
+    const ext = '.' + filename.split('.').pop()?.toLowerCase()
+    return textExtensions.includes(ext)
+  }
+
+  // Open file from file system
+  const openFileFromSystem = async (fileHandle: FileSystemFileHandle) => {
+    try {
+      const file = await fileHandle.getFile()
+      const content = await file.text()
+      const language = detectLanguageFromExtension(file.name)
+      
+      // Check if file is already open
+      const existingTab = tabs.find(tab => tab.fileHandle === fileHandle)
+      if (existingTab) {
+        setActiveTabId(existingTab.id)
+        addNotification('info', `File "${file.name}" sudah dibuka`)
+        return
+      }
+      
+      const newTab: Tab = {
+        id: nextTabId.toString(),
+        name: file.name,
+        content,
+        language,
+        saved: true,
+        fileHandle,
+        isFromFileSystem: true
+      }
+      
+      setTabs(prev => [...prev, newTab])
+      setActiveTabId(newTab.id)
+      setNextTabId(prev => prev + 1)
+      
+      addNotification('success', `File "${file.name}" telah dibuka`)
+    } catch (error) {
+      console.error('Error opening file:', error)
+      addNotification('error', `Gagal membuka file`)
+    }
+  }
+
+  // Save file to file system
+  const saveFileToSystem = async (tab: Tab, silent: boolean = false) => {
+    if (!tab.fileHandle) {
+      addNotification('error', 'Tiada file handle untuk disimpan')
+      return
+    }
+
+    try {
+      const writable = await tab.fileHandle.createWritable()
+      await writable.write(tab.content)
+      await writable.close()
+      
+      // Mark tab as saved
+      setTabs(prev => prev.map(t => 
+        t.id === tab.id ? { ...t, saved: true } : t
+      ))
+      
+      if (!silent) {
+        addNotification('success', `File "${tab.name}" telah disimpan`)
+      }
+    } catch (error) {
+      console.error('Error saving file:', error)
+      addNotification('error', `Gagal menyimpan file "${tab.name}"`)
+    }
+  }
+
+  // Save current tab
+  const saveCurrentTab = async () => {
+    const activeTab = getActiveTab()
+    
+    if (activeTab.isFromFileSystem && activeTab.fileHandle) {
+      await saveFileToSystem(activeTab)
+    } else {
+      // For non-file system tabs, use download
+      downloadFile()
+    }
+  }
+
   const addNewTab = () => {
     const newTab: Tab = {
       id: nextTabId.toString(),
       name: `untitled${nextTabId}.js`,
       content: '',
       language: 'javascript',
-      saved: false
+      saved: false,
+      isFromFileSystem: false
     }
     
     setTabs(prev => [...prev, newTab])
@@ -327,7 +505,6 @@ export default function PlaygroundPage() {
     
     setTabs(newTabs)
     
-    // Switch to adjacent tab
     if (activeTabId === tabId) {
       const newActiveIndex = Math.min(tabIndex, newTabs.length - 1)
       setActiveTabId(newTabs[newActiveIndex].id)
@@ -358,80 +535,7 @@ export default function PlaygroundPage() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    addNotification('success', `Fail ${activeTab.name} telah dimuat turun`)
-  }
-
-  const saveToLocalStorage = (silent: boolean = false) => {
-    if (!user) {
-      addNotification('error', 'Sila log masuk untuk menyimpan projek')
-      return
-    }
-
-    try {
-      const projectData = {
-        tabs,
-        activeTabId,
-        theme,
-        fontSize,
-        showLineNumbers,
-        autoSave,
-        savedAt: new Date().toISOString()
-      }
-      
-      const storageKey = `codecikgu_playground_${user.id}`
-      localStorage.setItem(storageKey, JSON.stringify(projectData))
-      
-      // Mark all tabs as saved
-      setTabs(prev => prev.map(tab => ({ ...tab, saved: true })))
-      
-      if (!silent) {
-        addNotification('success', 'Projek telah disimpan berjaya!')
-      }
-      
-      console.log('✅ Project saved to localStorage:', storageKey)
-    } catch (error) {
-      console.error('❌ Error saving to localStorage:', error)
-      addNotification('error', 'Gagal menyimpan projek. Sila cuba lagi.')
-    }
-  }
-
-  const loadFromLocalStorage = (userData?: CustomUser) => {
-    const currentUser = userData || user
-    
-    if (!currentUser) {
-      addNotification('error', 'Sila log masuk untuk membuka projek')
-      return
-    }
-
-    try {
-      const storageKey = `codecikgu_playground_${currentUser.id}`
-      const saved = localStorage.getItem(storageKey)
-      
-      if (saved) {
-        const data = JSON.parse(saved)
-        
-        if (data.tabs && data.tabs.length > 0) {
-          setTabs(data.tabs)
-          setActiveTabId(data.activeTabId || data.tabs[0].id)
-          setTheme(data.theme || 'dark')
-          setFontSize(data.fontSize || 14)
-          setShowLineNumbers(data.showLineNumbers ?? true)
-          setAutoSave(data.autoSave ?? true)
-          
-          const savedDate = data.savedAt ? new Date(data.savedAt).toLocaleString('ms-MY') : 'Tidak diketahui'
-          addNotification('success', `Projek telah dibuka (disimpan: ${savedDate})`)
-          
-          console.log('✅ Project loaded from localStorage:', storageKey)
-        } else {
-          addNotification('info', 'Tiada projek tersimpan dijumpai')
-        }
-      } else {
-        addNotification('info', 'Tiada projek tersimpan dijumpai')
-      }
-    } catch (error) {
-      console.error('❌ Error loading from localStorage:', error)
-      addNotification('error', 'Gagal membuka projek tersimpan')
-    }
+    addNotification('success', `File ${activeTab.name} telah dimuat turun`)
   }
 
   const handleSearch = () => {
@@ -483,6 +587,29 @@ export default function PlaygroundPage() {
     }
   }
 
+  // Render file tree
+  const renderFileTree = (items: FileTreeItem[], depth: number = 0) => {
+    return items.map((item) => (
+      <div key={item.name} style={{ marginLeft: `${depth * 16}px` }}>
+        {item.type === 'directory' ? (
+          <div className="flex items-center py-1 text-gray-400">
+            <Folder className="w-4 h-4 mr-2" />
+            <span className="text-sm">{item.name}</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => openFileFromSystem(item.handle as FileSystemFileHandle)}
+            className="flex items-center py-1 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left"
+          >
+            <File className="w-4 h-4 mr-2" />
+            <span className="text-sm">{item.name}</span>
+          </button>
+        )}
+        {item.children && renderFileTree(item.children, depth + 1)}
+      </div>
+    ))
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
@@ -528,8 +655,13 @@ export default function PlaygroundPage() {
                 CodeCikgu Playground
               </h1>
               <p className="text-gray-400 mt-2">
-                Editor kod online dengan auto-detect bahasa dan multi-tab support
+                Editor kod online dengan direct file system access (macam Notepad++)
               </p>
+              {!supportsFileSystemAPI && (
+                <p className="text-red-400 text-sm mt-1">
+                  ⚠️ Browser anda tidak support File System API. Sila guna Chrome 86+ atau Edge 86+
+                </p>
+              )}
             </div>
             
             <div className="flex items-center space-x-4">
@@ -541,21 +673,31 @@ export default function PlaygroundPage() {
                 <Search className="w-5 h-5 text-gray-400" />
               </button>
               
+              {supportsFileSystemAPI && (
+                <button
+                  onClick={openDirectory}
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-all duration-300"
+                >
+                  <HardDrive className="w-4 h-4" />
+                  <span>Open Folder</span>
+                </button>
+              )}
+              
               <button
-                onClick={downloadFile}
+                onClick={saveCurrentTab}
                 className="flex items-center space-x-2 px-4 py-2 bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 rounded-lg transition-all duration-300"
               >
-                <Download className="w-4 h-4" />
-                <span>Muat Turun</span>
+                <Save className="w-4 h-4" />
+                <span>Save</span>
               </button>
               
-              {user && (
+              {!activeTab.isFromFileSystem && (
                 <button
-                  onClick={() => saveToLocalStorage(false)}
+                  onClick={downloadFile}
                   className="flex items-center space-x-2 px-4 py-2 bg-electric-blue/20 border border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30 rounded-lg transition-all duration-300"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Simpan</span>
+                  <Download className="w-4 h-4" />
+                  <span>Download</span>
                 </button>
               )}
             </div>
@@ -598,10 +740,32 @@ export default function PlaygroundPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="lg:col-span-1">
+              {/* File Explorer */}
+              {currentDirectory && (
+                <div className="glass-dark rounded-xl p-6 mb-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                    <HardDrive className="w-5 h-5 mr-2" />
+                    File Explorer
+                  </h3>
+                  
+                  <div className="mb-4 p-3 bg-gray-800/30 rounded-lg">
+                    <div className="flex items-center text-electric-blue">
+                      <Folder className="w-4 h-4 mr-2" />
+                      <span className="text-sm font-medium">{directoryName}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-64 overflow-y-auto">
+                    {renderFileTree(fileTree)}
+                  </div>
+                </div>
+              )}
+
+              {/* Project Info */}
               <div className="glass-dark rounded-xl p-6 mb-6">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center">
                   <FileText className="w-5 h-5 mr-2" />
-                  Maklumat Projek
+                  Maklumat File
                 </h3>
                 
                 <div className="space-y-4">
@@ -612,6 +776,7 @@ export default function PlaygroundPage() {
                       value={activeTab.name}
                       onChange={(e) => updateTab(activeTabId, { name: e.target.value })}
                       className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
+                      disabled={activeTab.isFromFileSystem}
                     />
                   </div>
                   
@@ -619,6 +784,17 @@ export default function PlaygroundPage() {
                     <label className="block text-sm text-gray-400 mb-2">Bahasa (Auto-Detect)</label>
                     <div className="px-3 py-2 bg-gray-800/30 border border-gray-600 rounded text-electric-blue text-sm">
                       {languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Status</label>
+                    <div className={`px-3 py-2 rounded text-sm ${
+                      activeTab.isFromFileSystem 
+                        ? 'bg-green-500/20 text-green-400' 
+                        : 'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {activeTab.isFromFileSystem ? '🔗 File System' : '📝 Memory'}
                     </div>
                   </div>
                   
@@ -650,33 +826,25 @@ export default function PlaygroundPage() {
                     <span className="text-electric-blue text-sm">Tab Baru</span>
                   </button>
                   
+                  {supportsFileSystemAPI && (
+                    <button
+                      onClick={openDirectory}
+                      className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300"
+                    >
+                      <HardDrive className="w-4 h-4 text-purple-400 mr-2" />
+                      <span className="text-purple-400 text-sm">Open Folder</span>
+                    </button>
+                  )}
+                  
                   <button
-                    onClick={downloadFile}
+                    onClick={saveCurrentTab}
                     className="w-full flex items-center p-3 bg-neon-green/20 hover:bg-neon-green/30 border border-neon-green/30 rounded-lg transition-colors duration-300"
                   >
-                    <Download className="w-4 h-4 text-neon-green mr-2" />
-                    <span className="text-neon-green text-sm">Muat Turun</span>
+                    <Save className="w-4 h-4 text-neon-green mr-2" />
+                    <span className="text-neon-green text-sm">
+                      {activeTab.isFromFileSystem ? 'Save File' : 'Download'}
+                    </span>
                   </button>
-                  
-                  {user && (
-                    <>
-                      <button
-                        onClick={() => saveToLocalStorage(false)}
-                        className="w-full flex items-center p-3 bg-neon-cyan/20 hover:bg-neon-cyan/30 border border-neon-cyan/30 rounded-lg transition-colors duration-300"
-                      >
-                        <Save className="w-4 h-4 text-neon-cyan mr-2" />
-                        <span className="text-neon-cyan text-sm">Simpan Projek</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => loadFromLocalStorage()}
-                        className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300"
-                      >
-                        <FolderOpen className="w-4 h-4 text-purple-400 mr-2" />
-                        <span className="text-purple-400 text-sm">Buka Projek</span>
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
@@ -696,6 +864,7 @@ export default function PlaygroundPage() {
                       }`}
                       onClick={() => setActiveTabId(tab.id)}
                     >
+                      {tab.isFromFileSystem && <HardDrive className="w-3 h-3 text-green-400" />}
                       <span className="text-sm font-medium">{tab.name}</span>
                       {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Belum disimpan"></div>}
                       {tabs.length > 1 && (
@@ -749,12 +918,13 @@ export default function PlaygroundPage() {
                     <span>Bahasa: {languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language}</span>
                     <span>Baris: {activeTab.content.split('\n').length}</span>
                     <span>Aksara: {activeTab.content.length}</span>
+                    {activeTab.isFromFileSystem && <span className="text-green-400">📁 File System</span>}
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    {autoSave && user && <span className="text-green-400">Auto-save: ON</span>}
+                    {autoSave && activeTab.isFromFileSystem && <span className="text-green-400">Auto-save: ON</span>}
                     <span>Tema: {theme}</span>
-                    {user && <span className="text-blue-400">Logged in</span>}
+                    {supportsFileSystemAPI && <span className="text-blue-400">FS API: ✓</span>}
                   </div>
                 </div>
               </div>
