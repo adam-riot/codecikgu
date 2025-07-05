@@ -130,7 +130,10 @@ const languagePatterns = {
       /function\s+\w+\s*\(/,
       /class\s+\w+/,
       /include\s+/,
-      /require\s+/
+      /require\s+/,
+      /\$_GET/,
+      /\$_POST/,
+      /\$_SESSION/
     ]
   },
   python: {
@@ -274,14 +277,42 @@ const detectErrors = (content: string, language: string): CodeError[] => {
           })
         }
       }
-      
-      // Check for undefined variables (basic check)
-      const undefinedVarMatch = line.match(/(\w+)\s*=\s*undefined/)
-      if (undefinedVarMatch) {
+    })
+  }
+  
+  if (language === 'php') {
+    lines.forEach((line, index) => {
+      // Check for missing PHP opening tag
+      if (index === 0 && !line.includes('<?php') && line.trim() && !line.startsWith('//')) {
         errors.push({
           line: index + 1,
-          message: `Variable '${undefinedVarMatch[1]}' is explicitly set to undefined`,
+          message: 'Missing PHP opening tag <?php',
           type: 'warning'
+        })
+      }
+      
+      // Check for missing semicolons in PHP
+      if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}') && !line.trim().endsWith('?>')) {
+        if (line.includes('echo') || line.includes('$') || line.includes('=')) {
+          errors.push({
+            line: index + 1,
+            message: 'Missing semicolon',
+            type: 'warning'
+          })
+        }
+      }
+      
+      // Check for undefined variables (basic check)
+      const varMatches = line.match(/\$(\w+)/g)
+      if (varMatches) {
+        varMatches.forEach(varMatch => {
+          if (!content.includes(`${varMatch} =`) && !content.includes(`${varMatch}=`)) {
+            errors.push({
+              line: index + 1,
+              message: `Variable ${varMatch} may be undefined`,
+              type: 'warning'
+            })
+          }
         })
       }
     })
@@ -334,6 +365,86 @@ const executeJavaScript = (code: string) => {
     func(safeConsole)
   } catch (error) {
     errors.push(`Runtime Error: ${(error as Error).message}`)
+  }
+  
+  return {
+    output: output.join('\n'),
+    errors
+  }
+}
+
+const executePHP = (code: string) => {
+  const output: string[] = []
+  const errors: string[] = []
+  
+  try {
+    // Mock PHP execution - parse basic PHP syntax
+    const lines = code.split('\n')
+    let variables: { [key: string]: any } = {}
+    
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim()
+      
+      // Skip empty lines and comments
+      if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('<?php') || trimmedLine === '?>') {
+        return
+      }
+      
+      // Handle echo statements
+      const echoMatch = trimmedLine.match(/echo\s+(.+);?/)
+      if (echoMatch) {
+        let echoContent = echoMatch[1].replace(/;$/, '')
+        
+        // Handle string concatenation
+        echoContent = echoContent.replace(/\s*\.\s*/g, '')
+        
+        // Handle variables
+        echoContent = echoContent.replace(/\$(\w+)/g, (match, varName) => {
+          return variables[varName] !== undefined ? variables[varName] : `[undefined: ${match}]`
+        })
+        
+        // Handle quoted strings
+        echoContent = echoContent.replace(/["']/g, '')
+        
+        // Handle htmlspecialchars function
+        echoContent = echoContent.replace(/htmlspecialchars\(([^)]+)\)/g, '$1')
+        
+        output.push(echoContent)
+      }
+      
+      // Handle variable assignments
+      const varMatch = trimmedLine.match(/\$(\w+)\s*=\s*(.+);?/)
+      if (varMatch) {
+        const varName = varMatch[1]
+        let varValue = varMatch[2].replace(/;$/, '')
+        
+        // Handle $_GET, $_POST
+        if (varValue.includes('$_GET')) {
+          const getMatch = varValue.match(/\$_GET\[['"](\w+)['"]\]/)
+          if (getMatch) {
+            variables[varName] = `[GET: ${getMatch[1]}]`
+          }
+        } else if (varValue.includes('$_POST')) {
+          const postMatch = varValue.match(/\$_POST\[['"](\w+)['"]\]/)
+          if (postMatch) {
+            variables[varName] = `[POST: ${postMatch[1]}]`
+          }
+        } else {
+          // Handle string values
+          varValue = varValue.replace(/["']/g, '')
+          variables[varName] = varValue
+        }
+      }
+    })
+    
+    if (output.length === 0) {
+      output.push('PHP code parsed successfully. No output generated.')
+      output.push('Note: This is a mock PHP execution for syntax checking.')
+      output.push('To run actual PHP code, download the file and use XAMPP or similar.')
+    }
+    
+  } catch (error) {
+    errors.push(`PHP Parse Error: ${(error as Error).message}`)
   }
   
   return {
@@ -573,64 +684,6 @@ export default function PlaygroundPage() {
     }
   }
 
-  // Open directory picker
-  const openDirectory = async () => {
-    if (!supportsFileSystemAPI) {
-      addNotification('error', 'Browser anda tidak support File System API. Sila guna Chrome 86+ atau Edge 86+')
-      return
-    }
-
-    try {
-      setLoadingFiles(true)
-      const dirHandle = await (window as any).showDirectoryPicker()
-      setCurrentDirectory(dirHandle)
-      setDirectoryName(dirHandle.name)
-      
-      const tree = await buildFileTree(dirHandle)
-      setFileTree(tree)
-      
-      // Count files
-      const countFiles = (items: FileTreeItem[]): number => {
-        return items.reduce((count, item) => {
-          if (item.type === 'file') {
-            return count + 1
-          } else if (item.children) {
-            return count + countFiles(item.children)
-          }
-          return count
-        }, 0)
-      }
-      
-      const count = countFiles(tree)
-      setFileCount(count)
-      
-      addNotification('success', `Folder "${dirHandle.name}" telah dibuka (${count} files)`)
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        addNotification('error', 'Gagal membuka folder: ' + (error as Error).message)
-      }
-    } finally {
-      setLoadingFiles(false)
-    }
-  }
-
-  // Toggle directory expansion
-  const toggleDirectory = (targetItem: FileTreeItem) => {
-    const updateTree = (items: FileTreeItem[]): FileTreeItem[] => {
-      return items.map(item => {
-        if (item === targetItem) {
-          return { ...item, expanded: !item.expanded }
-        }
-        if (item.children) {
-          return { ...item, children: updateTree(item.children) }
-        }
-        return item
-      })
-    }
-    
-    setFileTree(updateTree(fileTree))
-  }
-
   // Open file from file system
   const openFileFromSystem = async (fileHandle: FileSystemFileHandle) => {
     try {
@@ -767,6 +820,7 @@ export default function PlaygroundPage() {
   // Execute code
   const executeCode = () => {
     const currentActiveTab = getActiveTab()
+    setIsExecuting(true)
     
     if (currentActiveTab.language === 'javascript') {
       const result = executeJavaScript(currentActiveTab.content)
@@ -776,13 +830,25 @@ export default function PlaygroundPage() {
       }
       setOutputTab('console')
       addNotification('success', 'Kod JavaScript telah dijalankan')
+    } else if (currentActiveTab.language === 'php') {
+      const result = executePHP(currentActiveTab.content)
+      setExecutionOutput(result.output)
+      if (result.errors.length > 0) {
+        setExecutionOutput(prev => prev + '\n\nErrors:\n' + result.errors.join('\n'))
+      }
+      setOutputTab('console')
+      addNotification('success', 'Kod PHP telah dianalisis dan dijalankan (mock execution)')
     } else if (currentActiveTab.language === 'html') {
       // For HTML, we'll show a preview
       setOutputTab('preview')
       addNotification('success', 'HTML preview telah dikemaskini')
     } else {
-      addNotification('info', `Execution tidak disokong untuk ${currentActiveTab.language}`)
+      addNotification('info', `Mock execution untuk ${currentActiveTab.language}. Download file untuk menjalankan kod sebenar.`)
+      setExecutionOutput(`Mock execution untuk ${languagePatterns[currentActiveTab.language as keyof typeof languagePatterns]?.name || currentActiveTab.language}.\n\nUntuk menjalankan kod sebenar:\n1. Download file menggunakan button Download\n2. Guna compiler/interpreter yang sesuai\n3. Contoh: XAMPP untuk PHP, Python interpreter untuk Python, dll.`)
+      setOutputTab('console')
     }
+    
+    setIsExecuting(false)
   }
 
   const handleSearch = () => {
@@ -830,48 +896,6 @@ export default function PlaygroundPage() {
       default:
         return 'bg-gray-800 text-gray-100 border-gray-600'
     }
-  }
-
-  // Render file tree
-  const renderFileTree = (items: FileTreeItem[], depth: number = 0) => {
-    if (!items || items.length === 0) {
-      return (
-        <div className="text-gray-500 text-sm text-center py-4">
-          Tiada fail text dijumpai dalam folder
-        </div>
-      )
-    }
-
-    return items.map((item) => (
-      <div key={`${item.name}-${depth}`} style={{ marginLeft: `${depth * 16}px` }}>
-        {item.type === 'directory' ? (
-          <button
-            onClick={() => toggleDirectory(item)}
-            className="flex items-center py-2 text-gray-400 hover:text-white transition-colors duration-300 w-full text-left"
-          >
-            {item.expanded ? (
-              <ChevronDown className="w-4 h-4 mr-1" />
-            ) : (
-              <ChevronRight className="w-4 h-4 mr-1" />
-            )}
-            <Folder className="w-4 h-4 mr-2" />
-            <span className="text-sm">{item.name}</span>
-            {item.children && (
-              <span className="text-xs text-gray-500 ml-2">({item.children.length})</span>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={() => openFileFromSystem(item.handle as FileSystemFileHandle)}
-            className="flex items-center py-2 text-gray-300 hover:text-electric-blue transition-colors duration-300 w-full text-left cursor-pointer group"
-          >
-            <File className="w-4 h-4 mr-2 ml-5" />
-            <span className="text-sm group-hover:underline">{item.name}</span>
-          </button>
-        )}
-        {item.type === 'directory' && item.expanded && item.children && renderFileTree(item.children, depth + 1)}
-      </div>
-    ))
   }
 
   if (loading) {
@@ -933,32 +957,22 @@ export default function PlaygroundPage() {
               
               <button
                 onClick={executeCode}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 rounded-lg transition-all duration-300"
+                disabled={isExecuting}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
               >
                 <Play className="w-4 h-4" />
-                <span>Run</span>
+                <span>{isExecuting ? 'Running...' : 'Run'}</span>
               </button>
               
               {supportsFileSystemAPI && (
-                <>
-                  <button
-                    onClick={openFiles}
-                    disabled={loadingFiles}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
-                  >
-                    <File className="w-4 h-4" />
-                    <span>Open File</span>
-                  </button>
-                  
-                  <button
-                    onClick={openDirectory}
-                    disabled={loadingFiles}
-                    className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
-                  >
-                    <HardDrive className="w-4 h-4" />
-                    <span>{loadingFiles ? 'Loading...' : 'Open Folder'}</span>
-                  </button>
-                </>
+                <button
+                  onClick={openFiles}
+                  disabled={loadingFiles}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 rounded-lg transition-all duration-300 disabled:opacity-50"
+                >
+                  <File className="w-4 h-4" />
+                  <span>Open File</span>
+                </button>
               )}
               
               <button
@@ -1019,55 +1033,6 @@ export default function PlaygroundPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="lg:col-span-1">
-              {/* File Explorer */}
-              {currentDirectory && (
-                <div className="glass-dark rounded-xl p-6 mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center">
-                      <HardDrive className="w-5 h-5 mr-2" />
-                      File Explorer
-                    </h3>
-                    <button
-                      onClick={() => {
-                        if (currentDirectory) {
-                          setLoadingFiles(true)
-                          buildFileTree(currentDirectory).then(tree => {
-                            setFileTree(tree)
-                            setLoadingFiles(false)
-                          })
-                        }
-                      }}
-                      disabled={loadingFiles}
-                      className="p-1 text-gray-400 hover:text-white transition-colors duration-300 disabled:opacity-50"
-                      title="Refresh"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${loadingFiles ? 'animate-spin' : ''}`} />
-                    </button>
-                  </div>
-                  
-                  <div className="mb-4 p-3 bg-gray-800/30 rounded-lg">
-                    <div className="flex items-center justify-between text-electric-blue">
-                      <div className="flex items-center">
-                        <Folder className="w-4 h-4 mr-2" />
-                        <span className="text-sm font-medium">{directoryName}</span>
-                      </div>
-                      <span className="text-xs text-gray-400">{fileCount} files</span>
-                    </div>
-                  </div>
-                  
-                  <div className="max-h-64 overflow-y-auto">
-                    {loadingFiles ? (
-                      <div className="text-center py-4">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-electric-blue" />
-                        <div className="text-sm text-gray-400 mt-2">Loading files...</div>
-                      </div>
-                    ) : (
-                      renderFileTree(fileTree)
-                    )}
-                  </div>
-                </div>
-              )}
-
               {/* Project Info Panel */}
               <div className="glass-dark rounded-xl p-6 mb-6">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center">
@@ -1134,27 +1099,14 @@ export default function PlaygroundPage() {
                   </button>
                   
                   {supportsFileSystemAPI && (
-                    <>
-                      <button
-                        onClick={openFiles}
-                        disabled={loadingFiles}
-                        className="w-full flex items-center p-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
-                      >
-                        <File className="w-4 h-4 text-blue-400 mr-2" />
-                        <span className="text-blue-400 text-sm">Open File</span>
-                      </button>
-                      
-                      <button
-                        onClick={openDirectory}
-                        disabled={loadingFiles}
-                        className="w-full flex items-center p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
-                      >
-                        <HardDrive className="w-4 h-4 text-purple-400 mr-2" />
-                        <span className="text-purple-400 text-sm">
-                          {loadingFiles ? 'Loading...' : 'Open Folder'}
-                        </span>
-                      </button>
-                    </>
+                    <button
+                      onClick={openFiles}
+                      disabled={loadingFiles}
+                      className="w-full flex items-center p-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors duration-300 disabled:opacity-50"
+                    >
+                      <File className="w-4 h-4 text-blue-400 mr-2" />
+                      <span className="text-blue-400 text-sm">Open File</span>
+                    </button>
                   )}
                   
                   <button
