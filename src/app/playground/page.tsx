@@ -30,8 +30,7 @@ import {
   RefreshCw,
   Cloud,
   FolderOpen,
-  Shield,
-  User
+  Shield
 } from 'lucide-react'
 
 // Types
@@ -628,7 +627,7 @@ export default function PlaygroundPage() {
   // Refs
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout>()
+  const editorContainerRef = useRef<HTMLDivElement>(null)
 
   // Check File System API support
   useEffect(() => {
@@ -676,6 +675,44 @@ export default function PlaygroundPage() {
     }
   }, [tabs, activeTabId, nextTabId, autoSave, user?.id])
 
+  // FIXED: Proper line number scrolling synchronization
+  useEffect(() => {
+    const textarea = textareaRef.current
+    const lineNumbers = lineNumbersRef.current
+    
+    if (textarea && lineNumbers) {
+      const syncScroll = () => {
+        // Force synchronization of scroll positions
+        lineNumbers.scrollTop = textarea.scrollTop
+        lineNumbers.scrollLeft = textarea.scrollLeft
+      }
+      
+      // Multiple event listeners for comprehensive sync
+      const events = ['scroll', 'input', 'keyup', 'mouseup', 'touchend']
+      
+      events.forEach(event => {
+        textarea.addEventListener(event, syncScroll)
+      })
+      
+      // Also sync on window resize
+      const handleResize = () => {
+        setTimeout(syncScroll, 0)
+      }
+      
+      window.addEventListener('resize', handleResize)
+      
+      // Initial sync
+      setTimeout(syncScroll, 0)
+      
+      return () => {
+        events.forEach(event => {
+          textarea.removeEventListener(event, syncScroll)
+        })
+        window.removeEventListener('resize', handleResize)
+      }
+    }
+  }, [activeTabId, activeTab.content]) // Re-run when tab or content changes
+
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
@@ -713,36 +750,6 @@ export default function PlaygroundPage() {
 
     fetchUserData()
   }, [])
-
-  // Fixed scroll synchronization between textarea and line numbers
-  useEffect(() => {
-    const textarea = textareaRef.current
-    const lineNumbers = lineNumbersRef.current
-    
-    if (textarea && lineNumbers) {
-      const handleScroll = () => {
-        // Sync scroll position
-        lineNumbers.scrollTop = textarea.scrollTop
-        lineNumbers.scrollLeft = textarea.scrollLeft
-      }
-      
-      // Add scroll event listener
-      textarea.addEventListener('scroll', handleScroll)
-      
-      // Also sync on content change to ensure alignment
-      const handleInput = () => {
-        // Small delay to ensure DOM is updated
-        setTimeout(handleScroll, 0)
-      }
-      
-      textarea.addEventListener('input', handleInput)
-      
-      return () => {
-        textarea.removeEventListener('scroll', handleScroll)
-        textarea.removeEventListener('input', handleInput)
-      }
-    }
-  }, [activeTabId]) // Re-run when active tab changes
 
   // Auto-detect language when content changes
   useEffect(() => {
@@ -814,15 +821,6 @@ export default function PlaygroundPage() {
     setSessionSaved(false)
     setLastSaveTime(null)
     addNotification('info', 'Session telah dibersihkan')
-  }
-
-  // Logout handler (clear all user sessions)
-  const handleLogout = async () => {
-    if (user?.id) {
-      clearAllUserSessions(user.id)
-    }
-    await supabase.auth.signOut()
-    router.push('/')
   }
 
   // Download file with directory picker
@@ -1185,17 +1183,6 @@ export default function PlaygroundPage() {
                 <FolderOpen className="w-4 h-4" />
                 <span>Download</span>
               </button>
-
-              {user && (
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 rounded-lg transition-all duration-300"
-                  title="Logout and clear session"
-                >
-                  <User className="w-4 h-4" />
-                  <span>Logout</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -1424,41 +1411,55 @@ export default function PlaygroundPage() {
                     </button>
                   </div>
 
-                  {/* Code Editor with Fixed Synchronized Line Numbers */}
-                  <div className="relative flex">
-                    {/* Line Numbers */}
-                    {showLineNumbers && (
-                      <div 
-                        ref={lineNumbersRef}
-                        className="flex-shrink-0 p-4 pr-2 text-gray-500 text-sm font-mono bg-gray-800/30 border-r border-gray-700 select-none pointer-events-none"
-                        style={{ 
-                          fontSize: `${fontSize}px`, 
-                          lineHeight: '1.5',
-                          width: '60px',
-                          height: '384px',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {activeTab.content.split('\n').map((_, index) => (
-                          <div key={index} className="text-right whitespace-nowrap">
-                            {index + 1}
+                  {/* Code Editor with PROPERLY FIXED Synchronized Line Numbers */}
+                  <div ref={editorContainerRef} className="relative">
+                    <div className="flex">
+                      {/* Line Numbers - FIXED SCROLLING */}
+                      {showLineNumbers && (
+                        <div 
+                          ref={lineNumbersRef}
+                          className="flex-shrink-0 p-4 pr-2 text-gray-500 text-sm font-mono bg-gray-800/30 border-r border-gray-700 select-none pointer-events-none user-select-none"
+                          style={{ 
+                            fontSize: `${fontSize}px`, 
+                            lineHeight: '1.5',
+                            width: '60px',
+                            height: '384px',
+                            overflow: 'hidden',
+                            position: 'relative'
+                          }}
+                        >
+                          <div style={{ position: 'relative' }}>
+                            {activeTab.content.split('\n').map((_, index) => (
+                              <div 
+                                key={index} 
+                                className="text-right whitespace-nowrap"
+                                style={{ 
+                                  height: `${fontSize * 1.5}px`,
+                                  lineHeight: '1.5'
+                                }}
+                              >
+                                {index + 1}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Code Textarea */}
-                    <textarea
-                      ref={textareaRef}
-                      value={activeTab.content}
-                      onChange={(e) => handleContentChange(e.target.value)}
-                      placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
-                      className={`flex-1 h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
-                      style={{ 
-                        fontSize: `${fontSize}px`,
-                        lineHeight: '1.5'
-                      }}
-                    />
+                        </div>
+                      )}
+                      
+                      {/* Code Textarea */}
+                      <textarea
+                        ref={textareaRef}
+                        value={activeTab.content}
+                        onChange={(e) => handleContentChange(e.target.value)}
+                        placeholder={`Mula tulis kod ${languagePatterns[activeTab.language as keyof typeof languagePatterns]?.name || activeTab.language} anda di sini...`}
+                        className={`flex-1 h-96 p-4 resize-none focus:outline-none font-mono ${getThemeClasses()}`}
+                        style={{ 
+                          fontSize: `${fontSize}px`,
+                          lineHeight: '1.5',
+                          minHeight: '384px'
+                        }}
+                        spellCheck={false}
+                      />
+                    </div>
                   </div>
 
                   {/* Status Bar */}
