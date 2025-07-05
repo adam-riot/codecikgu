@@ -1,157 +1,36 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase, getUserRole, type CustomUser } from '@/utils/supabase'
 import { 
+  Code, 
   Play, 
   Download, 
   Save, 
-  FolderOpen, 
+  Search, 
   Plus, 
   X, 
+  File, 
+  Folder, 
+  HardDrive, 
+  FileText, 
   Settings, 
-  FileText,
-  Code,
-  Palette,
-  Search,
-  RotateCcw,
-  Copy,
-  Trash2,
-  Check,
-  AlertCircle,
-  Folder,
-  File,
-  HardDrive,
-  ChevronRight,
-  ChevronDown,
-  RefreshCw,
-  Terminal,
-  Eye,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Info
+  Eye, 
+  Terminal, 
+  AlertTriangle, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  Info, 
+  Check, 
+  ChevronDown, 
+  ChevronRight, 
+  RefreshCw 
 } from 'lucide-react'
 
-// Language detection patterns
-const languagePatterns = {
-  javascript: {
-    patterns: [
-      /\b(function|var|let|const|=>|console\.log|document\.|window\.)\b/,
-      /\b(if|else|for|while|switch|case|break|continue|return)\b/,
-      /\b(true|false|null|undefined)\b/,
-      /\/\*[\s\S]*?\*\/|\/\/.*$/m,
-      /\$\{.*?\}/,
-      /\b(async|await|Promise|fetch)\b/
-    ],
-    extensions: ['.js', '.mjs', '.jsx'],
-    name: 'JavaScript'
-  },
-  python: {
-    patterns: [
-      /\b(def|class|import|from|if|elif|else|for|while|try|except|finally|with|as)\b/,
-      /\b(print|input|len|range|str|int|float|list|dict|tuple)\b/,
-      /\b(True|False|None)\b/,
-      /#.*$/m,
-      /'''[\s\S]*?'''|"""[\s\S]*?"""/,
-      /\bself\b/
-    ],
-    extensions: ['.py', '.pyw'],
-    name: 'Python'
-  },
-  // ... (more language patterns)
-}
-// Error detection functions
-const detectJavaScriptErrors = (code: string): Array<{line: number, message: string, type: 'error' | 'warning'}> => {
-  const errors: Array<{line: number, message: string, type: 'error' | 'warning'}> = []
-  const lines = code.split('\n')
-  
-  try {
-    // Try to parse as JavaScript
-    new Function(code)
-  } catch (error) {
-    const errorMessage = (error as Error).message
-    const lineMatch = errorMessage.match(/line (\d+)/)
-    const lineNumber = lineMatch ? parseInt(lineMatch[1]) : 1
-    
-    errors.push({
-      line: lineNumber,
-      message: `JavaScript Error: ${errorMessage}`,
-      type: 'error'
-    })
-  }
-  
-  // Check for common issues
-  lines.forEach((line, index) => {
-    const lineNum = index + 1
-    
-    // Missing semicolons (warning)
-    if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}') && !line.includes('//')) {
-      if (line.includes('=') || line.includes('console.log') || line.includes('return')) {
-        errors.push({
-          line: lineNum,
-          message: 'Warning: Missing semicolon',
-          type: 'warning'
-        })
-      }
-    }
-    
-    // Undefined variables (basic check)
-    const undefinedVarMatch = line.match(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?!\s*[=:])/g)
-    if (undefinedVarMatch) {
-      undefinedVarMatch.forEach(variable => {
-        if (!['console', 'document', 'window', 'alert', 'prompt', 'confirm', 'parseInt', 'parseFloat', 'isNaN', 'undefined', 'null', 'true', 'false'].includes(variable)) {
-          // Check if variable is declared in previous lines
-          const prevLines = lines.slice(0, index).join('\n')
-          if (!prevLines.includes(`var ${variable}`) && !prevLines.includes(`let ${variable}`) && !prevLines.includes(`const ${variable}`) && !prevLines.includes(`function ${variable}`)) {
-            errors.push({
-              line: lineNum,
-              message: `Warning: '${variable}' might be undefined`,
-              type: 'warning'
-            })
-          }
-        }
-      })
-    }
-  })
-  
-  return errors
-}
-
-const detectPHPErrors = (code: string): Array<{line: number, message: string, type: 'error' | 'warning'}> => {
-  const errors: Array<{line: number, message: string, type: 'error' | 'warning'}> = []
-  const lines = code.split('\n')
-  
-  lines.forEach((line, index) => {
-    const lineNum = index + 1
-    
-    // Missing PHP opening tag
-    if (index === 0 && !line.includes('<?php') && line.trim() && !line.startsWith('//') && !line.startsWith('/*')) {
-      errors.push({
-        line: lineNum,
-        message: 'Error: Missing PHP opening tag <?php',
-        type: 'error'
-      })
-    }
-    
-    // Missing semicolons
-    if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}') && !line.includes('//') && !line.includes('<?php')) {
-      if (line.includes('=') || line.includes('echo') || line.includes('print') || line.includes('return')) {
-        errors.push({
-          line: lineNum,
-          message: 'Error: Missing semicolon',
-          type: 'error'
-        })
-      }
-    }
-  })
-  
-  return errors
-}
-
-// Similar functions for HTML, CSS, Python errors...
-// Tab interface
+// Types
 interface Tab {
   id: string
   name: string
@@ -159,30 +38,361 @@ interface Tab {
   language: string
   saved: boolean
   fileHandle?: FileSystemFileHandle
-  isFromFileSystem: boolean
+  isFromFileSystem?: boolean
 }
 
-// File tree interface
-interface FileTreeItem {
-  name: string
-  type: 'file' | 'directory'
-  handle: FileSystemFileHandle | FileSystemDirectoryHandle
-  children?: FileTreeItem[]
-  expanded?: boolean
+interface CodeError {
+  line: number
+  message: string
+  type: 'error' | 'warning'
 }
 
-// Notification interface
 interface Notification {
   id: string
   type: 'success' | 'error' | 'info'
   message: string
 }
 
-// Error interface
-interface CodeError {
-  line: number
-  message: string
-  type: 'error' | 'warning'
+interface FileTreeItem {
+  name: string
+  type: 'file' | 'directory'
+  handle?: FileSystemFileHandle | FileSystemDirectoryHandle
+  children?: FileTreeItem[]
+  expanded?: boolean
+}
+
+// Language patterns for auto-detection
+const languagePatterns = {
+  javascript: {
+    name: 'JavaScript',
+    extensions: ['.js', '.jsx', '.mjs'],
+    patterns: [
+      /function\s+\w+\s*\(/,
+      /const\s+\w+\s*=/,
+      /let\s+\w+\s*=/,
+      /var\s+\w+\s*=/,
+      /=>\s*{/,
+      /console\.log\(/,
+      /document\./,
+      /window\./,
+      /require\(/,
+      /import\s+.*from/,
+      /export\s+(default\s+)?/
+    ]
+  },
+  typescript: {
+    name: 'TypeScript',
+    extensions: ['.ts', '.tsx'],
+    patterns: [
+      /interface\s+\w+/,
+      /type\s+\w+\s*=/,
+      /:\s*(string|number|boolean|any)\s*[;,=]/,
+      /function\s+\w+\s*\([^)]*:\s*\w+/,
+      /const\s+\w+:\s*\w+/
+    ]
+  },
+  html: {
+    name: 'HTML',
+    extensions: ['.html', '.htm'],
+    patterns: [
+      /<html/i,
+      /<head/i,
+      /<body/i,
+      /<div/i,
+      /<p>/i,
+      /<h[1-6]/i,
+      /<script/i,
+      /<style/i,
+      /<!DOCTYPE/i
+    ]
+  },
+  css: {
+    name: 'CSS',
+    extensions: ['.css', '.scss', '.sass'],
+    patterns: [
+      /\w+\s*{[^}]*}/,
+      /@media\s*\(/,
+      /@import/,
+      /:\s*#[0-9a-fA-F]{3,6}/,
+      /font-family:/,
+      /background-color:/,
+      /margin:/,
+      /padding:/
+    ]
+  },
+  php: {
+    name: 'PHP',
+    extensions: ['.php'],
+    patterns: [
+      /<\?php/,
+      /\$\w+/,
+      /echo\s+/,
+      /function\s+\w+\s*\(/,
+      /class\s+\w+/,
+      /include\s+/,
+      /require\s+/
+    ]
+  },
+  python: {
+    name: 'Python',
+    extensions: ['.py'],
+    patterns: [
+      /def\s+\w+\s*\(/,
+      /class\s+\w+/,
+      /import\s+\w+/,
+      /from\s+\w+\s+import/,
+      /print\s*\(/,
+      /if\s+__name__\s*==\s*['"']__main__['"']/,
+      /:\s*$/m
+    ]
+  },
+  java: {
+    name: 'Java',
+    extensions: ['.java'],
+    patterns: [
+      /public\s+class\s+\w+/,
+      /public\s+static\s+void\s+main/,
+      /System\.out\.print/,
+      /import\s+java\./,
+      /public\s+\w+\s+\w+\s*\(/
+    ]
+  },
+  cpp: {
+    name: 'C++',
+    extensions: ['.cpp', '.cc', '.cxx'],
+    patterns: [
+      /#include\s*<.*>/,
+      /using\s+namespace\s+std/,
+      /int\s+main\s*\(/,
+      /cout\s*<</, 
+      /cin\s*>>/,
+      /std::/
+    ]
+  },
+  sql: {
+    name: 'SQL',
+    extensions: ['.sql'],
+    patterns: [
+      /SELECT\s+.*FROM/i,
+      /INSERT\s+INTO/i,
+      /UPDATE\s+.*SET/i,
+      /DELETE\s+FROM/i,
+      /CREATE\s+TABLE/i,
+      /ALTER\s+TABLE/i
+    ]
+  },
+  xml: {
+    name: 'XML',
+    extensions: ['.xml'],
+    patterns: [
+      /<\?xml/,
+      /<\/\w+>/,
+      /<\w+[^>]*\/>/
+    ]
+  },
+  json: {
+    name: 'JSON',
+    extensions: ['.json'],
+    patterns: [
+      /^\s*{/,
+      /^\s*\[/,
+      /"\w+":\s*"/,
+      /"\w+":\s*\d+/,
+      /"\w+":\s*(true|false|null)/
+    ]
+  }
+}
+
+// Utility functions
+const detectLanguage = (content: string): string => {
+  if (!content.trim()) return 'javascript'
+  
+  for (const [lang, config] of Object.entries(languagePatterns)) {
+    const matchCount = config.patterns.filter(pattern => pattern.test(content)).length
+    if (matchCount >= 2) {
+      return lang
+    }
+  }
+  
+  // Single pattern matches
+  for (const [lang, config] of Object.entries(languagePatterns)) {
+    if (config.patterns.some(pattern => pattern.test(content))) {
+      return lang
+    }
+  }
+  
+  return 'javascript'
+}
+
+const detectLanguageFromExtension = (filename: string): string => {
+  const ext = '.' + filename.split('.').pop()?.toLowerCase()
+  
+  for (const [lang, config] of Object.entries(languagePatterns)) {
+    if (config.extensions.includes(ext)) {
+      return lang
+    }
+  }
+  
+  return 'javascript'
+}
+
+const ensureCorrectExtension = (filename: string, language: string): string => {
+  const config = languagePatterns[language as keyof typeof languagePatterns]
+  if (!config) return filename
+  
+  const currentExt = '.' + filename.split('.').pop()?.toLowerCase()
+  if (config.extensions.includes(currentExt)) {
+    return filename
+  }
+  
+  const nameWithoutExt = filename.split('.').slice(0, -1).join('.')
+  return nameWithoutExt + config.extensions[0]
+}
+
+const detectErrors = (content: string, language: string): CodeError[] => {
+  const errors: CodeError[] = []
+  const lines = content.split('\n')
+  
+  if (language === 'javascript' || language === 'typescript') {
+    lines.forEach((line, index) => {
+      // Check for common syntax errors
+      if (line.includes('console.log') && !line.includes('(') && !line.includes(')')) {
+        errors.push({
+          line: index + 1,
+          message: 'Missing parentheses in console.log',
+          type: 'error'
+        })
+      }
+      
+      // Check for missing semicolons (warning)
+      if (line.trim() && !line.trim().endsWith(';') && !line.trim().endsWith('{') && !line.trim().endsWith('}')) {
+        if (line.includes('=') || line.includes('console.log') || line.includes('return')) {
+          errors.push({
+            line: index + 1,
+            message: 'Missing semicolon',
+            type: 'warning'
+          })
+        }
+      }
+      
+      // Check for undefined variables (basic check)
+      const undefinedVarMatch = line.match(/(\w+)\s*=\s*undefined/)
+      if (undefinedVarMatch) {
+        errors.push({
+          line: index + 1,
+          message: `Variable '${undefinedVarMatch[1]}' is explicitly set to undefined`,
+          type: 'warning'
+        })
+      }
+    })
+  }
+  
+  if (language === 'html') {
+    lines.forEach((line, index) => {
+      // Check for unclosed tags (basic check)
+      const openTags = line.match(/<(\w+)[^>]*>/g) || []
+      const closeTags = line.match(/<\/(\w+)>/g) || []
+      
+      if (openTags.length > closeTags.length) {
+        const tagName = openTags[0]?.match(/<(\w+)/)?.[1]
+        if (tagName && !['img', 'br', 'hr', 'input', 'meta', 'link'].includes(tagName)) {
+          errors.push({
+            line: index + 1,
+            message: `Possible unclosed tag: ${tagName}`,
+            type: 'warning'
+          })
+        }
+      }
+    })
+  }
+  
+  return errors
+}
+
+const executeJavaScript = (code: string) => {
+  const output: string[] = []
+  const errors: string[] = []
+  
+  // Create a safe console object
+  const safeConsole = {
+    log: (...args: any[]) => {
+      output.push(args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' '))
+    },
+    error: (...args: any[]) => {
+      errors.push(args.map(arg => String(arg)).join(' '))
+    },
+    warn: (...args: any[]) => {
+      output.push('⚠️ ' + args.map(arg => String(arg)).join(' '))
+    }
+  }
+  
+  try {
+    // Create a function with the code and safe console
+    const func = new Function('console', code)
+    func(safeConsole)
+  } catch (error) {
+    errors.push(`Runtime Error: ${(error as Error).message}`)
+  }
+  
+  return {
+    output: output.join('\n'),
+    errors
+  }
+}
+
+// Build file tree from directory handle
+const buildFileTree = async (dirHandle: FileSystemDirectoryHandle): Promise<FileTreeItem[]> => {
+  const items: FileTreeItem[] = []
+  
+  try {
+    for await (const [name, handle] of dirHandle.entries()) {
+      if (handle.kind === 'file') {
+        // Only include text files
+        const file = await handle.getFile()
+        if (isTextFile(file.name)) {
+          items.push({
+            name,
+            type: 'file',
+            handle
+          })
+        }
+      } else if (handle.kind === 'directory') {
+        const children = await buildFileTree(handle)
+        if (children.length > 0) {
+          items.push({
+            name,
+            type: 'directory',
+            handle,
+            children,
+            expanded: false
+          })
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error building file tree:', error)
+  }
+  
+  return items.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'directory' ? -1 : 1
+    }
+    return a.name.localeCompare(b.name)
+  })
+}
+
+const isTextFile = (filename: string): boolean => {
+  const textExtensions = [
+    '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less',
+    '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
+    '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf',
+    '.vue', '.svelte', '.mjs', '.cjs'
+  ]
+  
+  const ext = '.' + filename.split('.').pop()?.toLowerCase()
+  return textExtensions.includes(ext)
 }
 
 export default function PlaygroundPage() {
@@ -190,23 +400,13 @@ export default function PlaygroundPage() {
   const [user, setUser] = useState<CustomUser | null>(null)
   const [userRole, setUserRole] = useState<string>('awam')
   const [loading, setLoading] = useState(true)
-  
-  // File System API support check
-  const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false)
-  
-  // Directory and file management
-  const [currentDirectory, setCurrentDirectory] = useState<FileSystemDirectoryHandle | null>(null)
-  const [fileTree, setFileTree] = useState<FileTreeItem[]>([])
-  const [directoryName, setDirectoryName] = useState<string>('')
-  const [loadingFiles, setLoadingFiles] = useState(false)
-  const [fileCount, setFileCount] = useState(0)
-  
-  // Tab management
+
+  // Editor state
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: '1',
-      name: 'untitled.js',
-      content: '// Welcome to CodeCikgu Playground!\n// Start typing your code here...\n\nconsole.log("Hello, World!");',
+      name: 'main.js',
+      content: '// Selamat datang ke CodeCikgu Playground!\n// Mula tulis kod anda di sini...\n\nconsole.log("Hello, CodeCikgu!");',
       language: 'javascript',
       saved: false,
       isFromFileSystem: false
@@ -215,21 +415,43 @@ export default function PlaygroundPage() {
   const [activeTabId, setActiveTabId] = useState('1')
   const [nextTabId, setNextTabId] = useState(2)
 
+  // Get active tab safely
+  const getActiveTab = (): Tab => {
+    return tabs.find(tab => tab.id === activeTabId) || tabs[0] || {
+      id: '1',
+      name: 'main.js',
+      content: '',
+      language: 'javascript',
+      saved: false,
+      isFromFileSystem: false
+    }
+  }
+
+  const activeTab = getActiveTab()
+
   // Editor settings
   const [theme, setTheme] = useState<'dark' | 'light' | 'monokai'>('dark')
   const [fontSize, setFontSize] = useState(14)
   const [showLineNumbers, setShowLineNumbers] = useState(true)
   const [autoSave, setAutoSave] = useState(true)
 
-  // Search & Replace
+  // Search and replace
   const [showSearch, setShowSearch] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [replaceTerm, setReplaceTerm] = useState('')
 
+  // File system
+  const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false)
+  const [currentDirectory, setCurrentDirectory] = useState<FileSystemDirectoryHandle | null>(null)
+  const [fileTree, setFileTree] = useState<FileTreeItem[]>([])
+  const [directoryName, setDirectoryName] = useState('')
+  const [fileCount, setFileCount] = useState(0)
+  const [loadingFiles, setLoadingFiles] = useState(false)
+
   // Output panel
   const [showOutput, setShowOutput] = useState(true)
-  const [outputContent, setOutputContent] = useState('')
-  const [outputErrors, setOutputErrors] = useState<string[]>([])
+  const [outputTab, setOutputTab] = useState<'errors' | 'console' | 'preview'>('errors')
+  const [executionOutput, setExecutionOutput] = useState('')
   const [codeErrors, setCodeErrors] = useState<CodeError[]>([])
   const [isExecuting, setIsExecuting] = useState(false)
 
@@ -240,6 +462,7 @@ export default function PlaygroundPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout>()
   const errorCheckTimeoutRef = useRef<NodeJS.Timeout>()
+
   // Check File System API support
   useEffect(() => {
     setSupportsFileSystemAPI('showDirectoryPicker' in window && 'showOpenFilePicker' in window)
@@ -281,13 +504,13 @@ export default function PlaygroundPage() {
 
   // Auto-detect language when content changes
   useEffect(() => {
-    const activeTab = tabs.find(tab => tab.id === activeTabId)
-    if (activeTab && activeTab.content && !activeTab.isFromFileSystem) {
-      const detectedLang = detectLanguage(activeTab.content)
-      if (detectedLang !== activeTab.language) {
+    const currentActiveTab = tabs.find(tab => tab.id === activeTabId)
+    if (currentActiveTab && currentActiveTab.content && !currentActiveTab.isFromFileSystem) {
+      const detectedLang = detectLanguage(currentActiveTab.content)
+      if (detectedLang !== currentActiveTab.language) {
         updateTab(activeTabId, { 
           language: detectedLang,
-          name: ensureCorrectExtension(activeTab.name, detectedLang)
+          name: ensureCorrectExtension(currentActiveTab.name, detectedLang)
         })
       }
     }
@@ -295,8 +518,8 @@ export default function PlaygroundPage() {
 
   // Error detection when content changes
   useEffect(() => {
-    const activeTab = getActiveTab()
-    const errors = detectErrors(activeTab.content, activeTab.language)
+    const currentActiveTab = getActiveTab()
+    const errors = detectErrors(currentActiveTab.content, currentActiveTab.language)
     setCodeErrors(errors)
   }, [tabs, activeTabId])
 
@@ -304,19 +527,15 @@ export default function PlaygroundPage() {
   useEffect(() => {
     if (autoSave) {
       const interval = setInterval(async () => {
-        const activeTab = getActiveTab()
-        if (activeTab.isFromFileSystem && activeTab.fileHandle && !activeTab.saved) {
-          await saveFileToSystem(activeTab, true)
+        const currentActiveTab = getActiveTab()
+        if (currentActiveTab.isFromFileSystem && currentActiveTab.fileHandle && !currentActiveTab.saved) {
+          await saveFileToSystem(currentActiveTab, true)
         }
       }, 3000)
 
       return () => clearInterval(interval)
     }
   }, [tabs, activeTabId, autoSave])
-
-  const getActiveTab = (): Tab => {
-    return tabs.find(tab => tab.id === activeTabId) || tabs[0]
-  }
 
   const updateTab = (tabId: string, updates: Partial<Tab>) => {
     setTabs(prev => prev.map(tab => 
@@ -370,7 +589,22 @@ export default function PlaygroundPage() {
       const tree = await buildFileTree(dirHandle)
       setFileTree(tree)
       
-      addNotification('success', `Folder "${dirHandle.name}" telah dibuka (${fileCount} files)`)
+      // Count files
+      const countFiles = (items: FileTreeItem[]): number => {
+        return items.reduce((count, item) => {
+          if (item.type === 'file') {
+            return count + 1
+          } else if (item.children) {
+            return count + countFiles(item.children)
+          }
+          return count
+        }, 0)
+      }
+      
+      const count = countFiles(tree)
+      setFileCount(count)
+      
+      addNotification('success', `Folder "${dirHandle.name}" telah dibuka (${count} files)`)
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
         addNotification('error', 'Gagal membuka folder: ' + (error as Error).message)
@@ -378,18 +612,6 @@ export default function PlaygroundPage() {
     } finally {
       setLoadingFiles(false)
     }
-  }
-  // Enhanced text file detection
-  const isTextFile = (filename: string): boolean => {
-    const textExtensions = [
-      '.js', '.jsx', '.ts', '.tsx', '.html', '.htm', '.css', '.scss', '.sass', '.less',
-      '.php', '.py', '.java', '.cpp', '.c', '.h', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
-      '.sql', '.xml', '.json', '.yaml', '.yml', '.md', '.txt', '.log', '.ini', '.cfg', '.conf',
-      '.vue', '.svelte', '.mjs', '.cjs'
-    ]
-    
-    const ext = '.' + filename.split('.').pop()?.toLowerCase()
-    return textExtensions.includes(ext)
   }
 
   // Toggle directory expansion
@@ -470,10 +692,10 @@ export default function PlaygroundPage() {
 
   // Save current tab
   const saveCurrentTab = async () => {
-    const activeTab = getActiveTab()
+    const currentActiveTab = getActiveTab()
     
-    if (activeTab.isFromFileSystem && activeTab.fileHandle) {
-      await saveFileToSystem(activeTab)
+    if (currentActiveTab.isFromFileSystem && currentActiveTab.fileHandle) {
+      await saveFileToSystem(currentActiveTab)
     } else {
       downloadFile()
     }
@@ -520,16 +742,16 @@ export default function PlaygroundPage() {
   }
 
   const downloadFile = () => {
-    const activeTab = getActiveTab()
+    const currentActiveTab = getActiveTab()
     
-    if (!activeTab.content.trim()) {
+    if (!currentActiveTab.content.trim()) {
       addNotification('error', 'Tiada kandungan untuk dimuat turun')
       return
     }
     
-    const correctFilename = ensureCorrectExtension(activeTab.name, activeTab.language)
+    const correctFilename = ensureCorrectExtension(currentActiveTab.name, currentActiveTab.language)
     
-    const blob = new Blob([activeTab.content], { type: 'text/plain' })
+    const blob = new Blob([currentActiveTab.content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -544,36 +766,54 @@ export default function PlaygroundPage() {
 
   // Execute code
   const executeCode = () => {
-    const activeTab = getActiveTab()
+    const currentActiveTab = getActiveTab()
     
-    if (activeTab.language === 'javascript') {
-      const result = executeJavaScript(activeTab.content)
+    if (currentActiveTab.language === 'javascript') {
+      const result = executeJavaScript(currentActiveTab.content)
       setExecutionOutput(result.output)
       if (result.errors.length > 0) {
         setExecutionOutput(prev => prev + '\n\nErrors:\n' + result.errors.join('\n'))
       }
       setOutputTab('console')
       addNotification('success', 'Kod JavaScript telah dijalankan')
-    } else if (activeTab.language === 'html') {
+    } else if (currentActiveTab.language === 'html') {
       // For HTML, we'll show a preview
       setOutputTab('preview')
       addNotification('success', 'HTML preview telah dikemaskini')
     } else {
-      addNotification('info', `Execution tidak disokong untuk ${activeTab.language}`)
+      addNotification('info', `Execution tidak disokong untuk ${currentActiveTab.language}`)
     }
   }
+
+  const handleSearch = () => {
+    if (!searchTerm) {
+      addNotification('error', 'Sila masukkan kata untuk dicari')
+      return
+    }
+    
+    const currentActiveTab = getActiveTab()
+    const regex = new RegExp(searchTerm, 'gi')
+    const matches = currentActiveTab.content.match(regex)
+    
+    if (matches) {
+      addNotification('success', `${matches.length} padanan dijumpai untuk "${searchTerm}"`)
+    } else {
+      addNotification('info', `Tiada padanan dijumpai untuk "${searchTerm}"`)
+    }
+  }
+
   const handleReplace = () => {
     if (!searchTerm) {
       addNotification('error', 'Sila masukkan kata untuk dicari')
       return
     }
     
-    const activeTab = getActiveTab()
+    const currentActiveTab = getActiveTab()
     const regex = new RegExp(searchTerm, 'gi')
-    const matches = activeTab.content.match(regex)
+    const matches = currentActiveTab.content.match(regex)
     
     if (matches) {
-      const newContent = activeTab.content.replace(regex, replaceTerm)
+      const newContent = currentActiveTab.content.replace(regex, replaceTerm)
       updateTab(activeTabId, { content: newContent })
       addNotification('success', `${matches.length} penggantian dibuat`)
     } else {
@@ -632,6 +872,16 @@ export default function PlaygroundPage() {
         {item.type === 'directory' && item.expanded && item.children && renderFileTree(item.children, depth + 1)}
       </div>
     ))
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
+        <div className="glass-dark rounded-2xl p-8 text-center">
+          <div className="text-2xl text-gradient loading-dots">Memuat playground</div>
+        </div>
+      </div>
+    )
   }
 
   // Main UI Render
@@ -764,6 +1014,7 @@ export default function PlaygroundPage() {
               </div>
             </div>
           )}
+
           {/* Main Editor Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar */}
@@ -1152,3 +1403,4 @@ export default function PlaygroundPage() {
     </div>
   )
 }
+
