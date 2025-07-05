@@ -51,10 +51,11 @@ interface EmailValidation {
 export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    nama: '',
+    name: '',
     email: '',
     telefon: '',
     sekolah: '',
+    tingkatan: '',
     password: '',
     confirmPassword: ''
   })
@@ -189,7 +190,7 @@ export default function RegisterPage() {
   }
 
   const validateStep1 = () => {
-    if (!formData.nama || !formData.email || !formData.telefon) {
+    if (!formData.name || !formData.email) {
       addNotification('error', 'Sila lengkapkan maklumat peribadi')
       return false
     }
@@ -240,37 +241,40 @@ export default function RegisterPage() {
         password: formData.password,
         options: {
           data: {
-            nama: formData.nama,
-            telefon: formData.telefon,
+            name: formData.name,
             sekolah: formData.sekolah,
+            tingkatan: formData.tingkatan,
             role: emailValidation.role
           }
         }
       })
 
       if (authError) {
+        console.error('Auth error:', authError)
         addNotification('error', authError.message)
         return
       }
 
-      // Insert into profiles table
+      // Insert into profiles table with correct column names
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
             id: authData.user.id,
-            nama: formData.nama,
             email: formData.email,
-            telefon: formData.telefon,
+            name: formData.name,  // Changed from 'nama' to 'name'
             sekolah: formData.sekolah,
+            tingkatan: formData.tingkatan || null,
             role: emailValidation.role,
             xp: 0,
             level: 1,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
 
         if (profileError) {
-          addNotification('error', 'Ralat menyimpan profil')
+          console.error('Profile error:', profileError)
+          addNotification('error', `Ralat menyimpan profil: ${profileError.message}`)
           return
         }
       }
@@ -281,6 +285,7 @@ export default function RegisterPage() {
       }, 2000)
 
     } catch (error) {
+      console.error('Registration error:', error)
       addNotification('error', 'Ralat tidak dijangka berlaku')
     } finally {
       setLoading(false)
@@ -469,7 +474,7 @@ export default function RegisterPage() {
                   <>
                     {/* Name Field */}
                     <div>
-                      <label htmlFor="nama" className="block text-sm font-medium text-gray-300 mb-2">
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
                         Nama Penuh *
                       </label>
                       <div className="relative">
@@ -477,10 +482,10 @@ export default function RegisterPage() {
                           <User className="h-5 w-5 text-gray-400" />
                         </div>
                         <input
-                          id="nama"
+                          id="name"
                           type="text"
-                          value={formData.nama}
-                          onChange={(e) => handleInputChange('nama', e.target.value)}
+                          value={formData.name}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
                           className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300"
                           placeholder="Ahmad bin Ali"
                           required
@@ -560,27 +565,6 @@ export default function RegisterPage() {
                       </div>
                     </div>
 
-                    {/* Phone Field */}
-                    <div>
-                      <label htmlFor="telefon" className="block text-sm font-medium text-gray-300 mb-2">
-                        Nombor Telefon *
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Phone className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <input
-                          id="telefon"
-                          type="tel"
-                          value={formData.telefon}
-                          onChange={(e) => handleInputChange('telefon', e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300"
-                          placeholder="012-3456789"
-                          required
-                        />
-                      </div>
-                    </div>
-
                     {/* School Field */}
                     <div>
                       <label htmlFor="sekolah" className="block text-sm font-medium text-gray-300 mb-2">
@@ -599,6 +583,29 @@ export default function RegisterPage() {
                           placeholder="SMK Bandar Utama"
                         />
                       </div>
+                    </div>
+
+                    {/* Tingkatan Field */}
+                    <div>
+                      <label htmlFor="tingkatan" className="block text-sm font-medium text-gray-300 mb-2">
+                        Tingkatan
+                      </label>
+                      <select
+                        id="tingkatan"
+                        value={formData.tingkatan}
+                        onChange={(e) => handleInputChange('tingkatan', e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300"
+                      >
+                        <option value="">Pilih Tingkatan</option>
+                        <option value="Tingkatan 1">Tingkatan 1</option>
+                        <option value="Tingkatan 2">Tingkatan 2</option>
+                        <option value="Tingkatan 3">Tingkatan 3</option>
+                        <option value="Tingkatan 4">Tingkatan 4</option>
+                        <option value="Tingkatan 5">Tingkatan 5</option>
+                        <option value="Tingkatan 6">Tingkatan 6</option>
+                        <option value="Universiti">Universiti</option>
+                        <option value="Lain-lain">Lain-lain</option>
+                      </select>
                     </div>
 
                     {/* Next Button */}
