@@ -18,30 +18,38 @@ export default function Navbar() {
     const fetchUserData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('Navbar - Auth user:', user) // Debug log
+        console.log('🔍 Navbar - Auth user:', user) // Enhanced debug log
         
         if (user) {
           const userData = user as CustomUser
           setUser(userData)
           
-          // Fetch role and name from database
+          // Enhanced role detection with multiple fallbacks
+          console.log('🔍 Navbar - User metadata:', userData.user_metadata) // Debug log
+          console.log('🔍 Navbar - User email:', userData.email) // Debug log
+          
+          // Fetch role and name from database with enhanced logging
           const [role, name] = await Promise.all([
             getUserRole(userData),
             getUserDisplayName(userData)
           ])
           
-          console.log('Navbar - Fetched role:', role) // Debug log
-          console.log('Navbar - Fetched name:', name) // Debug log
+          console.log('✅ Navbar - Final fetched role:', role) // Enhanced debug log
+          console.log('✅ Navbar - Final fetched name:', name) // Enhanced debug log
           
           setUserRole(role)
           setUserName(name)
+          
+          // Additional verification
+          console.log('🎯 Navbar - State updated with role:', role)
         } else {
+          console.log('❌ Navbar - No user found')
           setUser(null)
           setUserRole('awam')
           setUserName('Tetamu')
         }
       } catch (error) {
-        console.error('Error fetching user data:', error)
+        console.error('❌ Navbar - Error fetching user data:', error)
       } finally {
         setLoading(false)
       }
@@ -49,9 +57,10 @@ export default function Navbar() {
 
     fetchUserData()
 
-    // Listen for auth changes
+    // Listen for auth changes with enhanced logging
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Navbar - Auth state changed:', event, session?.user) // Debug log
+      console.log('🔄 Navbar - Auth state changed:', event, session?.user?.email) // Enhanced debug log
+      
       if (session?.user) {
         const userData = session.user as CustomUser
         setUser(userData)
@@ -61,9 +70,13 @@ export default function Navbar() {
           getUserDisplayName(userData)
         ])
         
+        console.log('🔄 Navbar - Auth change - New role:', role) // Enhanced debug log
+        console.log('🔄 Navbar - Auth change - New name:', name) // Enhanced debug log
+        
         setUserRole(role)
         setUserName(name)
       } else {
+        console.log('🔄 Navbar - Auth change - User logged out')
         setUser(null)
         setUserRole('awam')
         setUserName('Tetamu')
@@ -88,7 +101,7 @@ export default function Navbar() {
 
   // Navigation items - ALWAYS include "Laman Utama" pointing to "/"
   const navigationItems = [
-    { href: '/', label: 'Laman Utama' }, // ← FIXED: Always point to root
+    { href: '/', label: 'Laman Utama' },
     { href: '/playground', label: 'Playground' },
     { href: '/nota', label: 'Nota' },
     { href: '/leaderboard', label: 'Leaderboard' }
@@ -102,30 +115,39 @@ export default function Navbar() {
     )
   }
 
-  // Dashboard link based on role
+  // Enhanced dashboard link with better role detection
   const getDashboardLink = () => {
-    if (!user) return null
+    if (!user) {
+      console.log('🎯 getDashboardLink - No user, returning null')
+      return null
+    }
+    
+    console.log('🎯 getDashboardLink - Current userRole:', userRole) // Enhanced debug log
     
     switch (userRole) {
       case 'admin':
+        console.log('🎯 getDashboardLink - Returning admin dashboard')
         return {
           href: '/dashboard-admin',
           label: 'Dashboard Admin',
           color: 'neon-green'
         }
       case 'murid':
+        console.log('🎯 getDashboardLink - Returning murid dashboard')
         return {
           href: '/dashboard-murid',
           label: 'Dashboard Murid',
           color: 'electric-blue'
         }
       case 'awam':
+        console.log('🎯 getDashboardLink - Returning awam dashboard')
         return {
           href: '/dashboard-awam',
           label: 'Dashboard Awam',
           color: 'electric-blue'
         }
       default:
+        console.log('🎯 getDashboardLink - Unknown role, defaulting to awam:', userRole)
         return {
           href: '/dashboard-awam',
           label: 'Dashboard Awam',
@@ -135,6 +157,9 @@ export default function Navbar() {
   }
 
   const dashboardLink = getDashboardLink()
+  
+  // Enhanced debug logging for dashboard link
+  console.log('🎯 Navbar render - userRole:', userRole, 'dashboardLink:', dashboardLink)
 
   if (loading) {
     return (
@@ -206,6 +231,7 @@ export default function Navbar() {
                         ? 'bg-neon-green/20 border-neon-green/30 text-neon-green hover:bg-neon-green/30'
                         : 'bg-electric-blue/20 border-electric-blue/30 text-electric-blue hover:bg-electric-blue/30'
                     }`}
+                    title={`Role: ${userRole}`} // Debug tooltip
                   >
                     {dashboardLink.label}
                   </Link>
@@ -213,6 +239,7 @@ export default function Navbar() {
                 <Link
                   href="/profile"
                   className="text-gray-300 hover:text-white transition-colors duration-300"
+                  title={`User: ${userName} (${userRole})`} // Debug tooltip
                 >
                   👤 {userName}
                 </Link>
@@ -317,6 +344,13 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+      
+      {/* Debug Info (only in development) */}
+      {process.env.NODE_ENV === 'development' && user && (
+        <div className="bg-red-900/20 text-red-300 text-xs p-2 text-center border-b border-red-800">
+          DEBUG: User={userName} | Role={userRole} | Dashboard={dashboardLink?.label || 'None'}
+        </div>
+      )}
     </nav>
   )
 }
