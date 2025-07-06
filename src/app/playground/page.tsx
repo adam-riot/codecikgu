@@ -594,14 +594,117 @@ export default function PlaygroundPage() {
         </div>
       </header>
 
-      {/* ...File Manager Modal & Notifications kekal... */}
+      {/* File Manager Modal */}
+      {showFileManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 rounded-lg shadow-lg max-w-lg w-full p-6 relative">
+            <button
+              className="absolute top-2 right-2 text-gray-400 hover:text-white"
+              onClick={() => setShowFileManager(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center">
+              <Folder className="w-5 h-5 mr-2" /> Fail Tersimpan
+            </h2>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {savedFiles.length === 0 && (
+                <div className="text-gray-400 text-sm">Tiada fail disimpan.</div>
+              )}
+              {savedFiles.map(file => (
+                <div key={file.id} className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                  <div>
+                    <span className="font-mono text-electric-blue">{file.name}</span>
+                    <span className="ml-2 text-xs text-gray-400">{file.language}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => loadFile(file)}
+                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                    >
+                      Open
+                    </button>
+                    <button
+                      onClick={() => deleteFile(file.id)}
+                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {notifications.map(n => (
+          <div
+            key={n.id}
+            className={`px-4 py-2 rounded shadow-lg flex items-center space-x-2 ${
+              n.type === 'success'
+                ? 'bg-green-600 text-white'
+                : n.type === 'error'
+                ? 'bg-red-600 text-white'
+                : 'bg-blue-600 text-white'
+            }`}
+          >
+            {n.type === 'success' && <CheckCircle className="w-4 h-4" />}
+            {n.type === 'error' && <XCircle className="w-4 h-4" />}
+            {n.type === 'info' && <Info className="w-4 h-4" />}
+            <span>{n.message}</span>
+          </div>
+        ))}
+      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar kekal */}
+          {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            {/* ...sidebar code kekal... */}
+            <div className="bg-gray-900 rounded-xl p-4 shadow space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-lg font-bold text-white">Fail & Tab</span>
+                <button
+                  onClick={createNewTab}
+                  className="p-1 bg-green-600 hover:bg-green-700 text-white rounded"
+                  title="New File"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {tabs.map(tab => (
+                  <div
+                    key={tab.id}
+                    className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer ${
+                      tab.id === activeTabId
+                        ? 'bg-electric-blue/20 text-electric-blue'
+                        : 'bg-gray-800 text-white hover:bg-gray-700'
+                    }`}
+                    onClick={() => setActiveTabId(tab.id)}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <File className="w-4 h-4" />
+                      <span className="font-mono">{getFileExtension(tab.name, tab.language)}</span>
+                      {!tab.saved && <span className="w-2 h-2 bg-yellow-400 rounded-full" title="Unsaved"></span>}
+                    </div>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        closeTab(tab.id)
+                      }}
+                      className="ml-2 text-gray-400 hover:text-red-500"
+                      title="Close Tab"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Main Editor */}
@@ -657,11 +760,40 @@ export default function PlaygroundPage() {
                 </div>
 
                 {/* Status Bar */}
-                {/* ...status bar kekal... */}
+                <div className="flex items-center justify-between bg-gray-800/70 px-4 py-2 text-xs text-gray-400 font-mono">
+                  <div>
+                    <span>Language: {activeTab.language}</span>
+                    <span className="mx-2">|</span>
+                    <span>Lines: {activeTab.content.split('\n').length}</span>
+                    <span className="mx-2">|</span>
+                    <span>Characters: {activeTab.content.length}</span>
+                  </div>
+                  <div>
+                    {activeTab.saved ? (
+                      <span className="text-green-400">✓ Saved</span>
+                    ) : (
+                      <span className="text-yellow-400">● Unsaved</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Output Panel */}
-              {/* ...output panel kekal... */}
+              {showOutput && (
+                <div className="bg-gray-900 rounded-xl p-4 shadow">
+                  <div className="flex items-center mb-2">
+                    <Terminal className="w-4 h-4 text-electric-blue mr-2" />
+                    <span className="font-bold text-white">Output</span>
+                    <button
+                      className="ml-auto text-gray-400 hover:text-white"
+                      onClick={() => setShowOutput(false)}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <pre className="text-sm text-white whitespace-pre-wrap">{executionOutput}</pre>
+                </div>
+              )}
             </div>
           </div>
         </div>
