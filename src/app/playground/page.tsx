@@ -18,7 +18,6 @@ import {
   Info,
   Folder,
   Trash2,
-  Upload,
   FolderOpen,
   PlayCircle,
   FileText
@@ -189,7 +188,7 @@ const saveToLocalStorage = (tabs: Tab[], activeTabId: string) => {
   }
 }
 
-const loadFromLocalStorage = (): { tabs: Tab[], activeTabId: string } | null => {
+const loadFromLocalStorage = (): { tabs: Tab[]; activeTabId: string } | null => {
   try {
     const saved = localStorage.getItem('codecikgu_playground_state')
     if (saved) {
@@ -202,151 +201,41 @@ const loadFromLocalStorage = (): { tabs: Tab[], activeTabId: string } | null => 
   return null
 }
 
-// FIXED: Smart and consistent auto-indentation system
+// SIMPLE BUT RELIABLE AUTO-INDENTATION
 const getIndentLevel = (line: string): number => {
   const match = line.match(/^(\s*)/)
   return match ? match[1].length : 0
 }
 
-// Detect the current context (what language we're in within a mixed file)
-const detectCurrentContext = (content: string, cursorPosition: number): string => {
-  const beforeCursor = content.substring(0, cursorPosition)
-  
-  // Check if we're inside CSS block
-  const cssMatches = [...beforeCursor.matchAll(/<style[^>]*>|<\/style>/gi)]
-  let inCSS = false
-  for (let i = cssMatches.length - 1; i >= 0; i--) {
-    if (cssMatches[i][0].toLowerCase().includes('</style>')) {
-      break
-    } else if (cssMatches[i][0].toLowerCase().includes('<style')) {
-      inCSS = true
-      break
-    }
-  }
-  
-  // Check if we're inside JavaScript block
-  const jsMatches = [...beforeCursor.matchAll(/<script[^>]*>|<\/script>/gi)]
-  let inJS = false
-  for (let i = jsMatches.length - 1; i >= 0; i--) {
-    if (jsMatches[i][0].toLowerCase().includes('</script>')) {
-      break
-    } else if (jsMatches[i][0].toLowerCase().includes('<script')) {
-      inJS = true
-      break
-    }
-  }
-  
-  if (inCSS) return 'css'
-  if (inJS) return 'javascript'
-  
-  // Default to the file's main language
-  return detectLanguage(content)
-}
-
-// Smart indentation rules based on context
-const shouldIncreaseIndent = (line: string, context: string): boolean => {
+const shouldIndent = (line: string): boolean => {
   const trimmed = line.trim()
   
-  // Universal bracket rules
-  if (/[{(\[]$/.test(trimmed)) return true
-  
-  // Context-specific rules
-  switch (context.toLowerCase()) {
-    case 'css':
-      return /[{]$/.test(trimmed) || 
-             /^[.#][a-zA-Z][^{]*{$/.test(trimmed) ||
-             /@[a-zA-Z-]+[^{]*{$/.test(trimmed) // @media, @keyframes, etc.
-    
-    case 'javascript':
-    case 'typescript':
-      return /[{(\[]$/.test(trimmed) ||
-             /\b(if|else|for|while|function|class|try|catch|finally)\s*.*[{(]?\s*$/.test(trimmed) ||
-             /\b(if|else|for|while)\s*\([^)]*\)\s*$/.test(trimmed)
-    
-    case 'php':
-      return /[{:]$/.test(trimmed) ||
-             /\b(if|else|elseif|for|foreach|while|function|class|switch|case)\s*.*[{(]?\s*$/.test(trimmed) ||
-             /<\?php\s*$/.test(trimmed)
-    
-    case 'html':
-      return /<[^/][^>]*[^/]>$/.test(trimmed) && 
-             !/<(br|hr|img|input|meta|link|area|base|col|embed|source|track|wbr)\b[^>]*>$/i.test(trimmed)
-    
-    case 'python':
-      return /:$/.test(trimmed) || 
-             /\b(if|elif|else|for|while|def|class|try|except|finally|with)\b.*:$/.test(trimmed)
-    
-    case 'java':
-    case 'c':
-    case 'cpp':
-      return /[{]$/.test(trimmed) ||
-             /\b(if|else|for|while|do|switch|class|interface|enum)\s*.*[{(]?\s*$/.test(trimmed)
-    
-    default:
-      return /[{(\[]$/.test(trimmed)
-  }
+  // Simple rules that work reliably
+  return (
+    trimmed.endsWith('{') ||
+    trimmed.endsWith(':') ||
+    trimmed.endsWith('(') ||
+    trimmed.endsWith('[') ||
+    /\b(if|else|for|while|function|class|def|try|catch|finally)\b.*[{:]?\s*$/.test(trimmed) ||
+    /<[^/][^>]*[^/]>$/.test(trimmed)
+  )
 }
 
-// Smart auto-indentation calculation
-const getSmartAutoIndent = (content: string, cursorPosition: number, mainLanguage: string): string => {
-  const beforeCursor = content.substring(0, cursorPosition)
+const getAutoIndent = (content: string, cursorPos: number): string => {
+  const beforeCursor = content.substring(0, cursorPos)
   const lines = beforeCursor.split('\n')
   const currentLine = lines[lines.length - 1] || ''
   const previousLine = lines[lines.length - 2] || ''
   
-  // Detect current context (CSS inside PHP, JS inside HTML, etc.)
-  const context = detectCurrentContext(content, cursorPosition)
+  if (!previousLine) return ''
   
-  // Get base indentation from previous line
   let indent = getIndentLevel(previousLine)
   
-  // Check if we should increase indent based on previous line
-  if (shouldIncreaseIndent(previousLine, context)) {
-    indent += 2 // Use 2 spaces consistently
+  if (shouldIndent(previousLine)) {
+    indent += 2
   }
   
-  // Special handling for closing brackets
-  const trimmedCurrent = currentLine.trim()
-  if (/^[}\])]/.test(trimmedCurrent)) {
-    indent = Math.max(0, indent - 2)
-  }
-  
-  // Ensure minimum indentation is 0
-  indent = Math.max(0, indent)
-  
-  return ' '.repeat(indent)
-}
-
-// Smart bracket completion
-const getSmartBracketCompletion = (content: string, cursorPosition: number, insertedChar: string): string | null => {
-  const beforeCursor = content.substring(0, cursorPosition)
-  const afterCursor = content.substring(cursorPosition)
-  
-  // Only auto-complete if we're not already inside quotes or have a closing bracket
-  const pairs: { [key: string]: string } = {
-    '{': '}',
-    '(': ')',
-    '[': ']',
-    '"': '"',
-    "'": "'"
-  }
-  
-  if (pairs[insertedChar]) {
-    // Don't auto-complete quotes if we're already inside them
-    if ((insertedChar === '"' || insertedChar === "'") && 
-        (beforeCursor.split(insertedChar).length % 2 === 0)) {
-      return null
-    }
-    
-    // Don't auto-complete if the next character is already the closing bracket
-    if (afterCursor.charAt(0) === pairs[insertedChar]) {
-      return null
-    }
-    
-    return pairs[insertedChar]
-  }
-  
-  return null
+  return ' '.repeat(Math.max(0, indent))
 }
 
 export default function PlaygroundPage() {
@@ -513,7 +402,7 @@ console.log(greet('CodeCikgu'));
     }
   }
 
-  // FIXED: Smart and consistent auto-indentation
+  // SIMPLE AND RELIABLE AUTO-INDENTATION
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget
     const { selectionStart, selectionEnd, value } = textarea
@@ -521,20 +410,25 @@ console.log(greet('CodeCikgu'));
     if (e.key === 'Enter') {
       e.preventDefault()
       
-      const activeTab = getActiveTab()
-      const autoIndent = getSmartAutoIndent(value, selectionStart, activeTab.language)
+      // Get auto-indent for new line
+      const autoIndent = getAutoIndent(value, selectionStart)
       
-      // Insert new line with smart auto-indentation
-      const newContent = value.substring(0, selectionStart) + '\n' + autoIndent + value.substring(selectionEnd)
+      // Insert new line with indentation
+      const newContent = 
+        value.substring(0, selectionStart) + 
+        '\n' + 
+        autoIndent + 
+        value.substring(selectionEnd)
       
+      // Update content
       handleContentChange(newContent)
       
-      // Set cursor position after the auto-indent
+      // Set cursor position after indentation
       setTimeout(() => {
         if (textareaRef.current) {
-          const newPosition = selectionStart + 1 + autoIndent.length
-          textareaRef.current.selectionStart = newPosition
-          textareaRef.current.selectionEnd = newPosition
+          const newPos = selectionStart + 1 + autoIndent.length
+          textareaRef.current.selectionStart = newPos
+          textareaRef.current.selectionEnd = newPos
           textareaRef.current.focus()
         }
       }, 0)
@@ -547,22 +441,19 @@ console.log(greet('CodeCikgu'));
       const afterSelection = value.substring(selectionEnd)
       
       if (e.shiftKey) {
-        // Unindent (Shift+Tab)
+        // Unindent
         if (selectedText.includes('\n')) {
-          // Multi-line selection
+          // Multi-line
           const lines = selectedText.split('\n')
           const unindentedLines = lines.map(line => {
-            if (line.startsWith('  ')) {
-              return line.substring(2)
-            } else if (line.startsWith(' ')) {
-              return line.substring(1)
-            }
+            if (line.startsWith('  ')) return line.substring(2)
+            if (line.startsWith(' ')) return line.substring(1)
             return line
           })
           const newContent = beforeSelection + unindentedLines.join('\n') + afterSelection
           handleContentChange(newContent)
         } else {
-          // Single line - remove indentation from current line
+          // Single line
           const lines = value.split('\n')
           const currentLineIndex = beforeSelection.split('\n').length - 1
           const currentLine = lines[currentLineIndex]
@@ -573,19 +464,18 @@ console.log(greet('CodeCikgu'));
             lines[currentLineIndex] = currentLine.substring(1)
           }
           
-          const newContent = lines.join('\n')
-          handleContentChange(newContent)
+          handleContentChange(lines.join('\n'))
         }
       } else {
-        // Indent (Tab)
+        // Indent
         if (selectedText.includes('\n')) {
-          // Multi-line selection
+          // Multi-line
           const lines = selectedText.split('\n')
           const indentedLines = lines.map(line => '  ' + line)
           const newContent = beforeSelection + indentedLines.join('\n') + afterSelection
           handleContentChange(newContent)
         } else {
-          // Single line or no selection - insert tab
+          // Single line or no selection
           const newContent = beforeSelection + '  ' + selectedText + afterSelection
           handleContentChange(newContent)
           
@@ -598,32 +488,6 @@ console.log(greet('CodeCikgu'));
           }, 0)
         }
       }
-    }
-  }
-
-  // Handle character input for smart bracket completion
-  const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
-    const textarea = e.currentTarget
-    const { value, selectionStart } = textarea
-    
-    // Get the last typed character
-    const lastChar = value.charAt(selectionStart - 1)
-    
-    // Check if we should auto-complete brackets
-    const completion = getSmartBracketCompletion(value, selectionStart - 1, lastChar)
-    
-    if (completion) {
-      const newContent = value.substring(0, selectionStart) + completion + value.substring(selectionStart)
-      handleContentChange(newContent)
-      
-      // Keep cursor position between the brackets
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = selectionStart
-          textareaRef.current.selectionEnd = selectionStart
-          textareaRef.current.focus()
-        }
-      }, 0)
     }
   }
 
@@ -678,7 +542,7 @@ console.log(greet('CodeCikgu'));
       try {
         const output: string[] = []
         const safeConsole = {
-          log: (...args: any[]) => {
+          log: (...args: unknown[]) => {
             output.push(args.map(arg => {
               if (typeof arg === 'object') {
                 return JSON.stringify(arg, null, 2)
@@ -686,7 +550,7 @@ console.log(greet('CodeCikgu'));
               return String(arg)
             }).join(' '))
           },
-          error: (...args: any[]) => {
+          error: (...args: unknown[]) => {
             output.push('ERROR: ' + args.map(arg => String(arg)).join(' '))
           }
         }
@@ -899,7 +763,7 @@ console.log(greet('CodeCikgu'));
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor dengan smart & consistent indentation
+                Editor dengan reliable auto-indentation
               </span>
               
               {user && (
@@ -1158,13 +1022,12 @@ console.log(greet('CodeCikgu'));
                 )}
                 
                 <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <div className="text-xs text-green-400 font-medium mb-1">Smart Auto-Indentation:</div>
+                  <div className="text-xs text-green-400 font-medium mb-1">Simple Auto-Indentation:</div>
                   <div className="text-xs text-gray-300">
-                    • <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - Context-aware auto-indent<br/>
+                    • <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - Auto-indent after {`{`}, {`:`}, {`(`}<br/>
                     • <kbd className="bg-gray-700 px-1 rounded">Tab</kbd> - Manual indent<br/>
                     • <kbd className="bg-gray-700 px-1 rounded">Shift+Tab</kbd> - Unindent<br/>
-                    • Detects CSS/JS inside PHP/HTML<br/>
-                    • Smart bracket completion
+                    • Works reliably for all languages
                   </div>
                 </div>
               </div>
@@ -1186,7 +1049,7 @@ console.log(greet('CodeCikgu'));
                   </div>
                 </div>
 
-                {/* Code Editor with Smart Auto-Indentation */}
+                {/* Code Editor with Simple Auto-Indentation */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
                     {/* Line Numbers */}
@@ -1214,15 +1077,14 @@ console.log(greet('CodeCikgu'));
                       </pre>
                     </div>
                     
-                    {/* FIXED: Code Textarea with Smart Context-Aware Indentation */}
+                    {/* Code Textarea with Simple Reliable Auto-Indentation */}
                     <div className="flex-1 relative">
                       <textarea
                         ref={textareaRef}
                         value={activeTab.content}
                         onChange={(e) => handleContentChange(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        onInput={handleInput}
-                        placeholder="Write your code here... (Smart auto-indentation enabled)"
+                        placeholder="Write your code here... (Simple auto-indentation enabled)"
                         className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
                         style={{ 
                           fontSize: '14px',
@@ -1250,7 +1112,7 @@ console.log(greet('CodeCikgu'));
                     <span className="text-green-400">✓ Line Numbers Sync</span>
                     <span className="text-blue-400">💾 Auto-Save</span>
                     <span className="text-purple-400">📁 File Upload</span>
-                    <span className="text-orange-400">🧠 Smart Indent</span>
+                    <span className="text-orange-400">⚡ Simple Indent</span>
                     <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
                       {isCurrentLanguageExecutable ? '▶️ Executable' : '👁️ View Only'}
                     </span>
