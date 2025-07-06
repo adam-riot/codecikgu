@@ -156,15 +156,11 @@ const getFileExtension = (fileName: string, language: string): string => {
 // Get user role function
 const getUserRole = async (userId: string): Promise<string> => {
   try {
-    console.log('Fetching role for user ID:', userId)
-    
     const { data, error } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', userId)
       .single()
-    
-    console.log('Database response:', { data, error })
     
     if (error) {
       console.error('Error fetching user role:', error)
@@ -172,7 +168,6 @@ const getUserRole = async (userId: string): Promise<string> => {
     }
     
     const role = data?.role || 'awam'
-    console.log('Final role:', role)
     return role
   } catch (error) {
     console.error('Exception in getUserRole:', error)
@@ -207,40 +202,79 @@ const loadFromLocalStorage = (): { tabs: Tab[], activeTabId: string } | null => 
   return null
 }
 
-// FIXED: Truly automatic indentation functions
+// FIXED: Smart and consistent auto-indentation system
 const getIndentLevel = (line: string): number => {
   const match = line.match(/^(\s*)/)
   return match ? match[1].length : 0
 }
 
-const shouldIncreaseIndent = (line: string, language: string): boolean => {
+// Detect the current context (what language we're in within a mixed file)
+const detectCurrentContext = (content: string, cursorPosition: number): string => {
+  const beforeCursor = content.substring(0, cursorPosition)
+  
+  // Check if we're inside CSS block
+  const cssMatches = [...beforeCursor.matchAll(/<style[^>]*>|<\/style>/gi)]
+  let inCSS = false
+  for (let i = cssMatches.length - 1; i >= 0; i--) {
+    if (cssMatches[i][0].toLowerCase().includes('</style>')) {
+      break
+    } else if (cssMatches[i][0].toLowerCase().includes('<style')) {
+      inCSS = true
+      break
+    }
+  }
+  
+  // Check if we're inside JavaScript block
+  const jsMatches = [...beforeCursor.matchAll(/<script[^>]*>|<\/script>/gi)]
+  let inJS = false
+  for (let i = jsMatches.length - 1; i >= 0; i--) {
+    if (jsMatches[i][0].toLowerCase().includes('</script>')) {
+      break
+    } else if (jsMatches[i][0].toLowerCase().includes('<script')) {
+      inJS = true
+      break
+    }
+  }
+  
+  if (inCSS) return 'css'
+  if (inJS) return 'javascript'
+  
+  // Default to the file's main language
+  return detectLanguage(content)
+}
+
+// Smart indentation rules based on context
+const shouldIncreaseIndent = (line: string, context: string): boolean => {
   const trimmed = line.trim()
   
-  // Universal patterns that should increase indent
+  // Universal bracket rules
   if (/[{(\[]$/.test(trimmed)) return true
   
-  // Language-specific patterns
-  switch (language.toLowerCase()) {
+  // Context-specific rules
+  switch (context.toLowerCase()) {
+    case 'css':
+      return /[{]$/.test(trimmed) || 
+             /^[.#][a-zA-Z][^{]*{$/.test(trimmed) ||
+             /@[a-zA-Z-]+[^{]*{$/.test(trimmed) // @media, @keyframes, etc.
+    
     case 'javascript':
     case 'typescript':
-      return /\b(if|else|for|while|function|class|try|catch|finally)\s*.*[{(]?\s*$/.test(trimmed) ||
+      return /[{(\[]$/.test(trimmed) ||
+             /\b(if|else|for|while|function|class|try|catch|finally)\s*.*[{(]?\s*$/.test(trimmed) ||
              /\b(if|else|for|while)\s*\([^)]*\)\s*$/.test(trimmed)
-    
-    case 'python':
-      return /:$/.test(trimmed) || 
-             /\b(if|elif|else|for|while|def|class|try|except|finally|with)\b.*:$/.test(trimmed)
-    
-    case 'css':
-      return /{$/.test(trimmed) || /[.#][a-zA-Z][^{]*{$/.test(trimmed)
     
     case 'php':
       return /[{:]$/.test(trimmed) ||
-             /\b(if|else|elseif|for|foreach|while|function|class)\s*.*[{(]?\s*$/.test(trimmed) ||
+             /\b(if|else|elseif|for|foreach|while|function|class|switch|case)\s*.*[{(]?\s*$/.test(trimmed) ||
              /<\?php\s*$/.test(trimmed)
     
     case 'html':
       return /<[^/][^>]*[^/]>$/.test(trimmed) && 
              !/<(br|hr|img|input|meta|link|area|base|col|embed|source|track|wbr)\b[^>]*>$/i.test(trimmed)
+    
+    case 'python':
+      return /:$/.test(trimmed) || 
+             /\b(if|elif|else|for|while|def|class|try|except|finally|with)\b.*:$/.test(trimmed)
     
     case 'java':
     case 'c':
@@ -253,20 +287,66 @@ const shouldIncreaseIndent = (line: string, language: string): boolean => {
   }
 }
 
-const getAutoIndent = (content: string, cursorPosition: number, language: string): string => {
+// Smart auto-indentation calculation
+const getSmartAutoIndent = (content: string, cursorPosition: number, mainLanguage: string): string => {
   const beforeCursor = content.substring(0, cursorPosition)
   const lines = beforeCursor.split('\n')
   const currentLine = lines[lines.length - 1] || ''
   const previousLine = lines[lines.length - 2] || ''
   
+  // Detect current context (CSS inside PHP, JS inside HTML, etc.)
+  const context = detectCurrentContext(content, cursorPosition)
+  
+  // Get base indentation from previous line
   let indent = getIndentLevel(previousLine)
   
   // Check if we should increase indent based on previous line
-  if (shouldIncreaseIndent(previousLine, language)) {
-    indent += 2 // Use 2 spaces for indentation
+  if (shouldIncreaseIndent(previousLine, context)) {
+    indent += 2 // Use 2 spaces consistently
   }
   
-  return ' '.repeat(Math.max(0, indent))
+  // Special handling for closing brackets
+  const trimmedCurrent = currentLine.trim()
+  if (/^[}\])]/.test(trimmedCurrent)) {
+    indent = Math.max(0, indent - 2)
+  }
+  
+  // Ensure minimum indentation is 0
+  indent = Math.max(0, indent)
+  
+  return ' '.repeat(indent)
+}
+
+// Smart bracket completion
+const getSmartBracketCompletion = (content: string, cursorPosition: number, insertedChar: string): string | null => {
+  const beforeCursor = content.substring(0, cursorPosition)
+  const afterCursor = content.substring(cursorPosition)
+  
+  // Only auto-complete if we're not already inside quotes or have a closing bracket
+  const pairs: { [key: string]: string } = {
+    '{': '}',
+    '(': ')',
+    '[': ']',
+    '"': '"',
+    "'": "'"
+  }
+  
+  if (pairs[insertedChar]) {
+    // Don't auto-complete quotes if we're already inside them
+    if ((insertedChar === '"' || insertedChar === "'") && 
+        (beforeCursor.split(insertedChar).length % 2 === 0)) {
+      return null
+    }
+    
+    // Don't auto-complete if the next character is already the closing bracket
+    if (afterCursor.charAt(0) === pairs[insertedChar]) {
+      return null
+    }
+    
+    return pairs[insertedChar]
+  }
+  
+  return null
 }
 
 export default function PlaygroundPage() {
@@ -292,16 +372,24 @@ include ('db_conn.php');
   width: 100%;
   max-width: 1200px;
 }
+
+#tajuk {
+  font-size: 24px;
+  color: #333;
+  text-align: center;
+}
 </style>
 
 <script>
 function greet(name) {
-  return 'Hello, ' + name + '!';
+  if (name) {
+    return 'Hello, ' + name + '!';
+  } else {
+    return 'Hello, World!';
+  }
 }
 
-if (true) {
-  console.log('Auto-indent test');
-}
+console.log(greet('CodeCikgu'));
 </script>`,
       language: 'php',
       saved: false
@@ -425,7 +513,7 @@ if (true) {
     }
   }
 
-  // FIXED: Truly automatic indentation on key press
+  // FIXED: Smart and consistent auto-indentation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget
     const { selectionStart, selectionEnd, value } = textarea
@@ -434,12 +522,11 @@ if (true) {
       e.preventDefault()
       
       const activeTab = getActiveTab()
-      const autoIndent = getAutoIndent(value, selectionStart, activeTab.language)
+      const autoIndent = getSmartAutoIndent(value, selectionStart, activeTab.language)
       
-      // Insert new line with auto-indentation
+      // Insert new line with smart auto-indentation
       const newContent = value.substring(0, selectionStart) + '\n' + autoIndent + value.substring(selectionEnd)
       
-      // Update content
       handleContentChange(newContent)
       
       // Set cursor position after the auto-indent
@@ -511,6 +598,32 @@ if (true) {
           }, 0)
         }
       }
+    }
+  }
+
+  // Handle character input for smart bracket completion
+  const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget
+    const { value, selectionStart } = textarea
+    
+    // Get the last typed character
+    const lastChar = value.charAt(selectionStart - 1)
+    
+    // Check if we should auto-complete brackets
+    const completion = getSmartBracketCompletion(value, selectionStart - 1, lastChar)
+    
+    if (completion) {
+      const newContent = value.substring(0, selectionStart) + completion + value.substring(selectionStart)
+      handleContentChange(newContent)
+      
+      // Keep cursor position between the brackets
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = selectionStart
+          textareaRef.current.selectionEnd = selectionStart
+          textareaRef.current.focus()
+        }
+      }, 0)
     }
   }
 
@@ -786,7 +899,7 @@ if (true) {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor dengan truly automatic indentation
+                Editor dengan smart & consistent indentation
               </span>
               
               {user && (
@@ -1045,12 +1158,13 @@ if (true) {
                 )}
                 
                 <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <div className="text-xs text-green-400 font-medium mb-1">Truly Auto-Indentation:</div>
+                  <div className="text-xs text-green-400 font-medium mb-1">Smart Auto-Indentation:</div>
                   <div className="text-xs text-gray-300">
-                    • Press <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - automatic indent<br/>
-                    • Press <kbd className="bg-gray-700 px-1 rounded">Tab</kbd> - manual indent<br/>
-                    • Press <kbd className="bg-gray-700 px-1 rounded">Shift+Tab</kbd> - unindent<br/>
-                    • Works with {activeTab.language.toUpperCase()} syntax
+                    • <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - Context-aware auto-indent<br/>
+                    • <kbd className="bg-gray-700 px-1 rounded">Tab</kbd> - Manual indent<br/>
+                    • <kbd className="bg-gray-700 px-1 rounded">Shift+Tab</kbd> - Unindent<br/>
+                    • Detects CSS/JS inside PHP/HTML<br/>
+                    • Smart bracket completion
                   </div>
                 </div>
               </div>
@@ -1072,7 +1186,7 @@ if (true) {
                   </div>
                 </div>
 
-                {/* Code Editor with Truly Automatic Indentation */}
+                {/* Code Editor with Smart Auto-Indentation */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
                     {/* Line Numbers */}
@@ -1100,14 +1214,15 @@ if (true) {
                       </pre>
                     </div>
                     
-                    {/* FIXED: Code Textarea with Truly Automatic Indentation */}
+                    {/* FIXED: Code Textarea with Smart Context-Aware Indentation */}
                     <div className="flex-1 relative">
                       <textarea
                         ref={textareaRef}
                         value={activeTab.content}
                         onChange={(e) => handleContentChange(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Write your code here... (Press Enter for automatic indentation)"
+                        onInput={handleInput}
+                        placeholder="Write your code here... (Smart auto-indentation enabled)"
                         className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
                         style={{ 
                           fontSize: '14px',
@@ -1135,7 +1250,7 @@ if (true) {
                     <span className="text-green-400">✓ Line Numbers Sync</span>
                     <span className="text-blue-400">💾 Auto-Save</span>
                     <span className="text-purple-400">📁 File Upload</span>
-                    <span className="text-orange-400">⚡ Auto-Indent</span>
+                    <span className="text-orange-400">🧠 Smart Indent</span>
                     <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
                       {isCurrentLanguageExecutable ? '▶️ Executable' : '👁️ View Only'}
                     </span>
