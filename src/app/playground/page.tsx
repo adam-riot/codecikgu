@@ -3,12 +3,13 @@
 import dynamic from 'next/dynamic'
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 import { useEffect, useState, useRef } from 'react'
+import { Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
 import { 
   Code, Play, Download, Save, Plus, X, File, Terminal, CheckCircle, XCircle, Info,
-  Folder, Trash2, FolderOpen, PlayCircle, FileText, Eye
+  Folder, Trash2, FolderOpen, PlayCircle, FileText
 } from 'lucide-react'
 
 // Type Definitions
@@ -142,17 +143,11 @@ const loadFromLocalStorage = (): { tabs: Tab[]; activeTabId: string } | null => 
   return null
 }
 
-// Fungsi untuk hasilkan HTML preview
+// Preview helper
 function getPreviewHtml(tab: Tab) {
-  if (tab.language === 'html') {
-    return tab.content
-  }
-  if (tab.language === 'css') {
-    return `<style>${tab.content}</style><div class="preview-info">CSS dipratonton di sini.</div>`
-  }
-  if (tab.language === 'javascript') {
-    return `<script>${tab.content}<\/script><div class="preview-info">JS dipratonton di sini.</div>`
-  }
+  if (tab.language === 'html') return tab.content
+  if (tab.language === 'css') return `<style>${tab.content}</style><div class="preview-info">CSS dipratonton di sini.</div>`
+  if (tab.language === 'javascript') return `<script>${tab.content}<\/script><div class="preview-info">JS dipratonton di sini.</div>`
   return `<div class="preview-info">Preview hanya untuk HTML, CSS, atau JavaScript.</div>`
 }
 
@@ -164,21 +159,41 @@ export default function PlaygroundPage() {
     {
       id: '1',
       name: 'main',
-      content: `<!DOCTYPE html>
-<html>
-<head>
-  <title>Contoh HTML</title>
-  <style>
-    body { background: #f0f0f0; color: #222; }
-    h1 { color: #0af; }
-  </style>
-</head>
-<body>
-  <h1>Selamat Datang ke CodeCikgu!</h1>
-  <p>Edit kod HTML anda di sini dan lihat preview secara langsung.</p>
-</body>
-</html>`,
-      language: 'html',
+      content: `<?php
+// Sambungan ke pangkalan data
+include ('db_conn.php');
+?>
+<style>
+#mainbody {
+  background-color: #f0f0f0;
+  padding: 20px;
+  margin: 10px;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+#tajuk {
+  font-size: 24px;
+  color: #333;
+  text-align: center;
+}
+</style>
+
+<script>
+function greet(name) {
+  if (name) {
+    return 'Hello, ' + name + '!';
+  } else {
+    return 'Hello, World!';
+  }
+}
+
+console.log(greet('CodeCikgu'));
+</script>`,
+      language: 'php',
       saved: false
     }
   ])
@@ -473,6 +488,11 @@ export default function PlaygroundPage() {
     addNotification('info', 'Tab closed')
   }
 
+  const generateLineNumbers = (content: string): string => {
+    const lines = content.split('\n')
+    return lines.map((_, index) => (index + 1).toString()).join('\n')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
@@ -596,65 +616,74 @@ export default function PlaygroundPage() {
 
       {/* File Manager Modal */}
       {showFileManager && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-gray-900 rounded-lg shadow-lg max-w-lg w-full p-6 relative">
-            <button
-              className="absolute top-2 right-2 text-gray-400 hover:text-white"
-              onClick={() => setShowFileManager(false)}
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center">
-              <Folder className="w-5 h-5 mr-2" /> Fail Tersimpan
-            </h2>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {savedFiles.length === 0 && (
-                <div className="text-gray-400 text-sm">Tiada fail disimpan.</div>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 rounded-xl p-6 w-96 max-w-90vw max-h-80vh overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Saved Files</h3>
+              <button
+                onClick={() => setShowFileManager(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {savedFiles.length === 0 ? (
+                <p className="text-gray-400 text-center py-4">No saved files yet</p>
+              ) : (
+                savedFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="text-white font-medium">{getFileExtension(file.name, file.language)}</div>
+                      <div className="text-xs text-gray-400">
+                        {file.language} • {new Date(file.updated_at).toLocaleDateString()}
+                        {isExecutableLanguage(file.language) && <span className="text-green-400 ml-2">• Executable</span>}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => loadFile(file)}
+                        className="px-3 py-1 bg-electric-blue hover:bg-electric-blue/90 text-white text-sm rounded transition-colors"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => deleteFile(file.id)}
+                        className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
               )}
-              {savedFiles.map(file => (
-                <div key={file.id} className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
-                  <div>
-                    <span className="font-mono text-electric-blue">{file.name}</span>
-                    <span className="ml-2 text-xs text-gray-400">{file.language}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => loadFile(file)}
-                      className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
-                    >
-                      Open
-                    </button>
-                    <button
-                      onClick={() => deleteFile(file.id)}
-                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>
       )}
 
       {/* Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {notifications.map(n => (
+      <div className="fixed top-20 right-4 z-50 space-y-2">
+        {notifications.map((notification) => (
           <div
-            key={n.id}
-            className={`px-4 py-2 rounded shadow-lg flex items-center space-x-2 ${
-              n.type === 'success'
-                ? 'bg-green-600 text-white'
-                : n.type === 'error'
-                ? 'bg-red-600 text-white'
-                : 'bg-blue-600 text-white'
+            key={notification.id}
+            className={`flex items-center space-x-2 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 backdrop-blur-sm ${
+              notification.type === 'success' 
+                ? 'bg-green-500/20 border border-green-500/30 text-green-400'
+                : notification.type === 'error'
+                ? 'bg-red-500/20 border border-red-500/30 text-red-400'
+                : 'bg-blue-500/20 border border-blue-500/30 text-blue-400'
             }`}
           >
-            {n.type === 'success' && <CheckCircle className="w-4 h-4" />}
-            {n.type === 'error' && <XCircle className="w-4 h-4" />}
-            {n.type === 'info' && <Info className="w-4 h-4" />}
-            <span>{n.message}</span>
+            {notification.type === 'success' && <CheckCircle className="w-5 h-5" />}
+            {notification.type === 'error' && <XCircle className="w-5 h-5" />}
+            {notification.type === 'info' && <Info className="w-5 h-5" />}
+            <span className="text-sm font-medium">{notification.message}</span>
           </div>
         ))}
       </div>
@@ -664,45 +693,116 @@ export default function PlaygroundPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-gray-900 rounded-xl p-4 shadow space-y-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-lg font-bold text-white">Fail & Tab</span>
-                <button
-                  onClick={createNewTab}
-                  className="p-1 bg-green-600 hover:bg-green-700 text-white rounded"
-                  title="New File"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
+            <div className="glass-dark rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">File Explorer</h3>
+              
               <div className="space-y-2">
-                {tabs.map(tab => (
+                {tabs.map((tab) => (
                   <div
                     key={tab.id}
-                    className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer ${
-                      tab.id === activeTabId
-                        ? 'bg-electric-blue/20 text-electric-blue'
-                        : 'bg-gray-800 text-white hover:bg-gray-700'
+                    className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-300 ${
+                      tab.id === activeTabId 
+                        ? 'bg-electric-blue/20 text-electric-blue' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                     }`}
                     onClick={() => setActiveTabId(tab.id)}
                   >
                     <div className="flex items-center space-x-2">
                       <File className="w-4 h-4" />
-                      <span className="font-mono">{getFileExtension(tab.name, tab.language)}</span>
-                      {!tab.saved && <span className="w-2 h-2 bg-yellow-400 rounded-full" title="Unsaved"></span>}
+                      <span className="text-sm">{getFileExtension(tab.name, tab.language)}</span>
+                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Unsaved changes"></div>}
+                      {tab.saved && <div className="w-2 h-2 bg-green-400 rounded-full" title="Saved"></div>}
+                      {isExecutableLanguage(tab.language) && <PlayCircle className="w-3 h-3 text-green-400" />}
                     </div>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation()
-                        closeTab(tab.id)
-                      }}
-                      className="ml-2 text-gray-400 hover:text-red-500"
-                      title="Close Tab"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    
+                    {tabs.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          closeTab(tab.id)
+                        }}
+                        className="text-gray-500 hover:text-red-400"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
+                
+                <button
+                  onClick={createNewTab}
+                  className="flex items-center space-x-2 w-full p-2 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded transition-colors duration-300"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="text-sm">New File</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="glass-dark rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">File Info</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">File Name</label>
+                  <input
+                    type="text"
+                    value={activeTab.name}
+                    onChange={(e) => updateTab(activeTabId, { name: e.target.value, saved: false })}
+                    className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Language (Auto-detected)</label>
+                  <select
+                    value={activeTab.language}
+                    onChange={(e) => updateTab(activeTabId, { language: e.target.value, saved: false })}
+                    className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
+                  >
+                    <option value="javascript">JavaScript</option>
+                    <option value="php">PHP</option>
+                    <option value="python">Python</option>
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="c">C</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="json">JSON</option>
+                    <option value="xml">XML</option>
+                    <option value="sql">SQL</option>
+                  </select>
+                </div>
+                
+                <div className="text-sm text-gray-400 space-y-1">
+                  <div>Lines: {activeTab.content.split('\n').length}</div>
+                  <div>Characters: {activeTab.content.length}</div>
+                  <div>Download as: <span className="text-electric-blue">{getFileExtension(activeTab.name, activeTab.language)}</span></div>
+                  <div>Status: <span className={activeTab.saved ? 'text-green-400' : 'text-yellow-400'}>
+                    {activeTab.saved ? 'Saved' : 'Unsaved'}
+                  </span></div>
+                  <div>Execution: <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
+                    {isCurrentLanguageExecutable ? 'Supported' : 'View Only'}
+                  </span></div>
+                </div>
+                
+                {!isCurrentLanguageExecutable && (
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <div className="text-xs text-blue-400 font-medium mb-1">How to use {activeTab.language.toUpperCase()}:</div>
+                    <div className="text-xs text-gray-300">{getLanguageDescription(activeTab.language)}</div>
+                  </div>
+                )}
+                
+                <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <div className="text-xs text-green-400 font-medium mb-1">Auto-Indentation:</div>
+                  <div className="text-xs text-gray-300">
+                    • <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - Auto-indent after {`{`}, {`:`}, selectors<br/>
+                    • <kbd className="bg-gray-700 px-1 rounded">Tab</kbd> - Manual indent<br/>
+                    • <kbd className="bg-gray-700 px-1 rounded">Shift+Tab</kbd> - Unindent<br/>
+                    • Works for CSS, PHP, JS, HTML
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -760,38 +860,55 @@ export default function PlaygroundPage() {
                 </div>
 
                 {/* Status Bar */}
-                <div className="flex items-center justify-between bg-gray-800/70 px-4 py-2 text-xs text-gray-400 font-mono">
-                  <div>
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-800/30 border-t border-gray-700 text-sm text-gray-400">
+                  <div className="flex items-center space-x-4">
                     <span>Language: {activeTab.language}</span>
-                    <span className="mx-2">|</span>
                     <span>Lines: {activeTab.content.split('\n').length}</span>
-                    <span className="mx-2">|</span>
                     <span>Characters: {activeTab.content.length}</span>
                   </div>
-                  <div>
-                    {activeTab.saved ? (
-                      <span className="text-green-400">✓ Saved</span>
-                    ) : (
-                      <span className="text-yellow-400">● Unsaved</span>
-                    )}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-green-400">✓ Line Numbers Sync</span>
+                    <span className="text-blue-400">💾 Auto-Save</span>
+                    <span className="text-purple-400">📁 File Upload</span>
+                    <span className="text-orange-400">⚡ Auto Indent</span>
+                    <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
+                      {isCurrentLanguageExecutable ? '▶️ Executable' : '👁️ View Only'}
+                    </span>
+                    {user && <span className="text-yellow-400">🔒 User: {user.role}</span>}
                   </div>
                 </div>
               </div>
 
               {/* Output Panel */}
               {showOutput && (
-                <div className="bg-gray-900 rounded-xl p-4 shadow">
-                  <div className="flex items-center mb-2">
-                    <Terminal className="w-4 h-4 text-electric-blue mr-2" />
-                    <span className="font-bold text-white">Output</span>
+                <div className="glass-dark rounded-xl overflow-hidden">
+                  <div className="flex items-center bg-gray-800/50 border-b border-gray-700">
+                    <div className="flex items-center space-x-2 px-4 py-3 bg-gray-700/50 text-white">
+                      <Terminal className="w-4 h-4" />
+                      <span className="text-sm">Console Output</span>
+                    </div>
+                    <div className="flex-1"></div>
                     <button
-                      className="ml-auto text-gray-400 hover:text-white"
                       onClick={() => setShowOutput(false)}
+                      className="p-3 text-gray-400 hover:text-white transition-colors duration-300"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <pre className="text-sm text-white whitespace-pre-wrap">{executionOutput}</pre>
+                  <div className="p-4 h-64 overflow-y-auto bg-gray-900/50">
+                    <div className="font-mono text-sm">
+                      {executionOutput ? (
+                        <pre className="text-gray-300 whitespace-pre-wrap">{executionOutput}</pre>
+                      ) : (
+                        <div className="text-gray-500">
+                          {isCurrentLanguageExecutable 
+                            ? 'Click "Run" to execute your code and see the output here...'
+                            : `${activeTab.language.toUpperCase()} files cannot be executed in browser. Download the file to use with appropriate tools.`
+                          }
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
