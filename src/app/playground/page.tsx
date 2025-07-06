@@ -201,36 +201,54 @@ const loadFromLocalStorage = (): { tabs: Tab[]; activeTabId: string } | null => 
   return null
 }
 
-// SIMPLE BUT RELIABLE AUTO-INDENTATION
+// WORKING AUTO-INDENTATION SYSTEM
 const getIndentLevel = (line: string): number => {
   const match = line.match(/^(\s*)/)
   return match ? match[1].length : 0
 }
 
+// More aggressive indentation detection
 const shouldIndent = (line: string): boolean => {
   const trimmed = line.trim()
   
-  // Simple rules that work reliably
-  return (
-    trimmed.endsWith('{') ||
-    trimmed.endsWith(':') ||
-    trimmed.endsWith('(') ||
-    trimmed.endsWith('[') ||
-    /\b(if|else|for|while|function|class|def|try|catch|finally)\b.*[{:]?\s*$/.test(trimmed) ||
-    /<[^/][^>]*[^/]>$/.test(trimmed)
-  )
+  // Check for opening brackets/braces
+  if (trimmed.endsWith('{') || trimmed.endsWith('(') || trimmed.endsWith('[')) {
+    return true
+  }
+  
+  // Check for CSS selectors
+  if (/^[.#][a-zA-Z][^{]*{$/.test(trimmed)) {
+    return true
+  }
+  
+  // Check for CSS properties ending with colon
+  if (/^[a-zA-Z-]+\s*:\s*[^;]*;?\s*$/.test(trimmed) && !trimmed.endsWith(';')) {
+    return true
+  }
+  
+  // Check for control structures
+  if (/\b(if|else|for|while|function|class|def|try|catch|finally)\b/.test(trimmed)) {
+    return true
+  }
+  
+  // Check for HTML opening tags
+  if (/<[^/][^>]*[^/]>$/.test(trimmed) && !/<(br|hr|img|input|meta|link|area|base|col|embed|source|track|wbr)\b[^>]*>$/i.test(trimmed)) {
+    return true
+  }
+  
+  return false
 }
 
 const getAutoIndent = (content: string, cursorPos: number): string => {
   const beforeCursor = content.substring(0, cursorPos)
   const lines = beforeCursor.split('\n')
-  const currentLine = lines[lines.length - 1] || ''
   const previousLine = lines[lines.length - 2] || ''
   
-  if (!previousLine) return ''
+  if (!previousLine.trim()) return ''
   
   let indent = getIndentLevel(previousLine)
   
+  // Add indentation if previous line suggests it
   if (shouldIndent(previousLine)) {
     indent += 2
   }
@@ -402,7 +420,7 @@ console.log(greet('CodeCikgu'));
     }
   }
 
-  // SIMPLE AND RELIABLE AUTO-INDENTATION
+  // WORKING AUTO-INDENTATION
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget
     const { selectionStart, selectionEnd, value } = textarea
@@ -762,10 +780,6 @@ console.log(greet('CodeCikgu'));
             </Link>
 
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-400">
-                Editor dengan reliable auto-indentation
-              </span>
-              
               {user && (
                 <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${
                   user.role === 'murid' 
@@ -1022,12 +1036,12 @@ console.log(greet('CodeCikgu'));
                 )}
                 
                 <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <div className="text-xs text-green-400 font-medium mb-1">Simple Auto-Indentation:</div>
+                  <div className="text-xs text-green-400 font-medium mb-1">Auto-Indentation:</div>
                   <div className="text-xs text-gray-300">
-                    • <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - Auto-indent after {`{`}, {`:`}, {`(`}<br/>
+                    • <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> - Auto-indent after {`{`}, {`:`}, selectors<br/>
                     • <kbd className="bg-gray-700 px-1 rounded">Tab</kbd> - Manual indent<br/>
                     • <kbd className="bg-gray-700 px-1 rounded">Shift+Tab</kbd> - Unindent<br/>
-                    • Works reliably for all languages
+                    • Works for CSS, PHP, JS, HTML
                   </div>
                 </div>
               </div>
@@ -1049,7 +1063,7 @@ console.log(greet('CodeCikgu'));
                   </div>
                 </div>
 
-                {/* Code Editor with Simple Auto-Indentation */}
+                {/* Code Editor with Working Auto-Indentation */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
                     {/* Line Numbers */}
@@ -1077,14 +1091,14 @@ console.log(greet('CodeCikgu'));
                       </pre>
                     </div>
                     
-                    {/* Code Textarea with Simple Reliable Auto-Indentation */}
+                    {/* Code Textarea with Working Auto-Indentation */}
                     <div className="flex-1 relative">
                       <textarea
                         ref={textareaRef}
                         value={activeTab.content}
                         onChange={(e) => handleContentChange(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Write your code here... (Simple auto-indentation enabled)"
+                        placeholder="Write your code here... (Auto-indentation enabled)"
                         className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
                         style={{ 
                           fontSize: '14px',
@@ -1112,7 +1126,7 @@ console.log(greet('CodeCikgu'));
                     <span className="text-green-400">✓ Line Numbers Sync</span>
                     <span className="text-blue-400">💾 Auto-Save</span>
                     <span className="text-purple-400">📁 File Upload</span>
-                    <span className="text-orange-400">⚡ Simple Indent</span>
+                    <span className="text-orange-400">⚡ Auto Indent</span>
                     <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
                       {isCurrentLanguageExecutable ? '▶️ Executable' : '👁️ View Only'}
                     </span>
