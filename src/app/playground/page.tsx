@@ -322,20 +322,48 @@ console.log(greet('CodeCikgu'));
     }
   }
 
-  const downloadFile = () => {
-    const activeTab = getActiveTab()
-    const properFileName = getFileExtension(activeTab.name, activeTab.language)
-    const blob = new Blob([activeTab.content], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = properFileName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    addNotification('success', `File downloaded as ${properFileName}`)
+  const downloadFile = async () => {
+  const activeTab = getActiveTab()
+  const properFileName = getFileExtension(activeTab.name, activeTab.language)
+  const fileContent = activeTab.content
+
+  // Try File System Access API (Chromium browsers)
+  // @ts-ignore
+  if ('showSaveFilePicker' in window) {
+    try {
+      // @ts-ignore
+      const handle = await window.showSaveFilePicker({
+        suggestedName: properFileName,
+        types: [
+          {
+            description: 'Text Files',
+            accept: { 'text/plain': ['.js', '.php', '.py', '.html', '.css', '.java', '.cpp', '.c', '.ts', '.json', '.xml', '.sql', '.txt'] }
+          }
+        ]
+      })
+      const writable = await handle.createWritable()
+      await writable.write(fileContent)
+      await writable.close()
+      addNotification('success', `File saved as ${properFileName}`)
+      return
+    } catch (err) {
+      addNotification('error', 'Save cancelled or failed')
+      return
+    }
   }
+
+  // Fallback for other browsers
+  const blob = new Blob([fileContent], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = properFileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  addNotification('success', `File downloaded as ${properFileName}`)
+}
 
   const saveFile = async () => {
     if (!user) {
@@ -777,29 +805,7 @@ console.log(greet('CodeCikgu'));
                 {/* Code Editor */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
-                    {/* Line Numbers */}
-                    <div 
-                      className="flex-shrink-0 w-16 bg-gray-800/50 border-r border-gray-700 py-4 px-2 font-mono text-sm text-gray-500 overflow-hidden select-none user-select-none"
-                      style={{ 
-                        fontSize: '14px', 
-                        lineHeight: '1.5',
-                        height: '400px',
-                        overflowY: 'hidden',
-                        overflowX: 'hidden'
-                      }}
-                    >
-                      <pre 
-                        className="whitespace-pre text-right m-0 p-0"
-                        style={{ 
-                          fontSize: '14px', 
-                          lineHeight: '1.5',
-                          margin: 0,
-                          padding: 0
-                        }}
-                      >
-                        {generateLineNumbers(activeTab.content)}
-                      </pre>
-                    </div>
+                   
                     {/* Monaco Editor */}
                     <div className="flex-1">
                       <MonacoEditor
