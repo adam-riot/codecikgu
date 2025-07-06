@@ -19,7 +19,9 @@ import {
   Folder,
   Trash2,
   Upload,
-  FolderOpen
+  FolderOpen,
+  PlayCircle,
+  FileText
 } from 'lucide-react'
 
 // Type Definitions
@@ -52,6 +54,33 @@ interface Notification {
   id: string
   type: 'success' | 'error' | 'info'
   message: string
+}
+
+// FIXED: Define executable languages
+const EXECUTABLE_LANGUAGES = ['javascript', 'python']
+const NON_EXECUTABLE_LANGUAGES = ['css', 'html', 'json', 'xml', 'sql', 'php', 'java', 'cpp', 'c', 'typescript']
+
+// Check if language is executable
+const isExecutableLanguage = (language: string): boolean => {
+  return EXECUTABLE_LANGUAGES.includes(language.toLowerCase())
+}
+
+// Get language description for non-executable languages
+const getLanguageDescription = (language: string): string => {
+  const descriptions: { [key: string]: string } = {
+    css: 'CSS files are styling sheets - use with HTML files',
+    html: 'HTML files can be opened in browser - download to view',
+    json: 'JSON files are data format - use for configuration',
+    xml: 'XML files are markup format - use for data structure',
+    sql: 'SQL files are database queries - use with database tools',
+    php: 'PHP files need server environment - use XAMPP to run',
+    java: 'Java files need compilation - use IDE like Eclipse/IntelliJ',
+    cpp: 'C++ files need compilation - use compiler like g++',
+    c: 'C files need compilation - use compiler like gcc',
+    typescript: 'TypeScript files need compilation - use tsc compiler'
+  }
+  
+  return descriptions[language.toLowerCase()] || 'This language requires external tools to run'
 }
 
 // Language detection
@@ -154,7 +183,7 @@ const getUserRole = async (userId: string): Promise<string> => {
   }
 }
 
-// FIXED: Local storage functions for persistence
+// Local storage functions for persistence
 const saveToLocalStorage = (tabs: Tab[], activeTabId: string) => {
   try {
     const playgroundState = {
@@ -235,7 +264,6 @@ for (let i = 1; i <= 10; i++) {
 
   useEffect(() => {
     checkUser()
-    // FIXED: Load saved state on component mount
     loadSavedState()
   }, [])
 
@@ -245,14 +273,12 @@ for (let i = 1; i <= 10; i++) {
     }
   }, [user])
 
-  // FIXED: Auto-save to localStorage whenever tabs or activeTabId changes
   useEffect(() => {
     if (tabs.length > 0) {
       saveToLocalStorage(tabs, activeTabId)
     }
   }, [tabs, activeTabId])
 
-  // FIXED: Proper scroll synchronization with better event handling
   useEffect(() => {
     const textarea = textareaRef.current
     const lineNumbers = lineNumbersRef.current
@@ -263,13 +289,11 @@ for (let i = 1; i <= 10; i++) {
         lineNumbers.scrollLeft = textarea.scrollLeft
       }
       
-      // Multiple event listeners for better sync
       textarea.addEventListener('scroll', syncScroll, { passive: true })
       textarea.addEventListener('input', syncScroll, { passive: true })
       textarea.addEventListener('keyup', syncScroll, { passive: true })
       textarea.addEventListener('mouseup', syncScroll, { passive: true })
       
-      // Initial sync
       syncScroll()
       
       return () => {
@@ -343,7 +367,6 @@ for (let i = 1; i <= 10; i++) {
   const handleContentChange = (content: string) => {
     updateTab(activeTabId, { content })
     
-    // Auto-detect language
     const activeTab = getActiveTab()
     const detectedLang = detectLanguage(content, activeTab.name)
     if (detectedLang !== activeTab.language) {
@@ -351,7 +374,6 @@ for (let i = 1; i <= 10; i++) {
     }
   }
 
-  // FIXED: File upload functionality
   const handleFileUpload = () => {
     fileInputRef.current?.click()
   }
@@ -367,7 +389,7 @@ for (let i = 1; i <= 10; i++) {
       
       const newTab: Tab = {
         id: Date.now().toString(),
-        name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+        name: file.name.replace(/\.[^/.]+$/, ""),
         content,
         language,
         saved: false
@@ -380,14 +402,23 @@ for (let i = 1; i <= 10; i++) {
     
     reader.readAsText(file)
     
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
+  // FIXED: Smart execute code function
   const executeCode = async () => {
     const activeTab = getActiveTab()
+    
+    if (!isExecutableLanguage(activeTab.language)) {
+      // This should not happen as button is disabled, but just in case
+      const description = getLanguageDescription(activeTab.language)
+      setExecutionOutput(`${activeTab.language.toUpperCase()} files cannot be executed in browser.\n\n${description}`)
+      setShowOutput(true)
+      addNotification('info', `${activeTab.language.toUpperCase()} files need external tools to run`)
+      return
+    }
     
     if (activeTab.language === 'javascript') {
       setIsExecuting(true)
@@ -421,10 +452,11 @@ for (let i = 1; i <= 10; i++) {
       } finally {
         setIsExecuting(false)
       }
-    } else {
-      setExecutionOutput(`Execution not supported for ${activeTab.language}`)
+    } else if (activeTab.language === 'python') {
+      // Future: Add Python execution support
+      setExecutionOutput('Python execution coming soon!')
       setShowOutput(true)
-      addNotification('info', `Execution not available for ${activeTab.language}`)
+      addNotification('info', 'Python execution will be available in future updates')
     }
   }
 
@@ -577,7 +609,6 @@ for (let i = 1; i <= 10; i++) {
     addNotification('info', 'Tab closed')
   }
 
-  // FIXED: Generate line numbers with proper formatting
   const generateLineNumbers = (content: string): string => {
     const lines = content.split('\n')
     return lines.map((_, index) => (index + 1).toString()).join('\n')
@@ -595,10 +626,10 @@ for (let i = 1; i <= 10; i++) {
   }
 
   const activeTab = getActiveTab()
+  const isCurrentLanguageExecutable = isExecutableLanguage(activeTab.language)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -620,7 +651,7 @@ for (let i = 1; i <= 10; i++) {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor kod online dengan persistent storage dan file upload
+                Editor kod online dengan smart execution
               </span>
               
               {user && (
@@ -660,14 +691,32 @@ for (let i = 1; i <= 10; i++) {
                   <span>Save</span>
                 </button>
                 
-                <button
-                  onClick={executeCode}
-                  disabled={isExecuting}
-                  className="flex items-center space-x-2 px-4 py-2 bg-neon-green hover:bg-neon-green/90 text-dark-black font-medium rounded-lg transition-colors duration-300 disabled:opacity-50"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>{isExecuting ? 'Running...' : 'Run'}</span>
-                </button>
+                {/* FIXED: Smart Run Button */}
+                {isCurrentLanguageExecutable ? (
+                  <button
+                    onClick={executeCode}
+                    disabled={isExecuting}
+                    className="flex items-center space-x-2 px-4 py-2 bg-neon-green hover:bg-neon-green/90 text-dark-black font-medium rounded-lg transition-colors duration-300 disabled:opacity-50"
+                  >
+                    <Play className="w-4 h-4" />
+                    <span>{isExecuting ? 'Running...' : 'Run'}</span>
+                  </button>
+                ) : (
+                  <div className="relative group">
+                    <button
+                      disabled
+                      className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-gray-400 font-medium rounded-lg cursor-not-allowed opacity-50"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>View Only</span>
+                    </button>
+                    
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap z-50">
+                      {getLanguageDescription(activeTab.language)}
+                    </div>
+                  </div>
+                )}
                 
                 <button
                   onClick={downloadFile}
@@ -707,7 +756,10 @@ for (let i = 1; i <= 10; i++) {
                   >
                     <div className="flex-1">
                       <div className="text-white font-medium">{getFileExtension(file.name, file.language)}</div>
-                      <div className="text-xs text-gray-400">{file.language} • {new Date(file.updated_at).toLocaleDateString()}</div>
+                      <div className="text-xs text-gray-400">
+                        {file.language} • {new Date(file.updated_at).toLocaleDateString()}
+                        {isExecutableLanguage(file.language) && <span className="text-green-400 ml-2">• Executable</span>}
+                      </div>
                     </div>
                     
                     <div className="flex items-center space-x-2">
@@ -776,6 +828,7 @@ for (let i = 1; i <= 10; i++) {
                       <File className="w-4 h-4" />
                       <span className="text-sm">{getFileExtension(tab.name, tab.language)}</span>
                       {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                      {isExecutableLanguage(tab.language) && <PlayCircle className="w-3 h-3 text-green-400" />}
                     </div>
                     
                     {tabs.length > 1 && (
@@ -843,7 +896,18 @@ for (let i = 1; i <= 10; i++) {
                   <div>Characters: {activeTab.content.length}</div>
                   <div>Download as: <span className="text-electric-blue">{getFileExtension(activeTab.name, activeTab.language)}</span></div>
                   <div>Status: <span className={activeTab.saved ? 'text-green-400' : 'text-yellow-400'}>{activeTab.saved ? 'Saved' : 'Unsaved'}</span></div>
+                  <div>Execution: <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
+                    {isCurrentLanguageExecutable ? 'Supported' : 'View Only'}
+                  </span></div>
                 </div>
+                
+                {/* FIXED: Language-specific help */}
+                {!isCurrentLanguageExecutable && (
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <div className="text-xs text-blue-400 font-medium mb-1">How to use {activeTab.language.toUpperCase()}:</div>
+                    <div className="text-xs text-gray-300">{getLanguageDescription(activeTab.language)}</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -858,13 +922,14 @@ for (let i = 1; i <= 10; i++) {
                   <div className="flex items-center space-x-2 px-4 py-3 bg-gray-700/50 text-white">
                     <span className="text-sm font-medium">{getFileExtension(activeTab.name, activeTab.language)}</span>
                     {!activeTab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                    {isCurrentLanguageExecutable && <PlayCircle className="w-4 h-4 text-green-400" />}
                   </div>
                 </div>
 
-                {/* FIXED: Code Editor with Synchronized Line Numbers */}
+                {/* Code Editor */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
-                    {/* FIXED: Line Numbers with Perfect Scrolling */}
+                    {/* Line Numbers */}
                     <div 
                       ref={lineNumbersRef}
                       className="flex-shrink-0 w-16 bg-gray-800/50 border-r border-gray-700 py-4 px-2 font-mono text-sm text-gray-500 overflow-hidden select-none user-select-none"
@@ -889,7 +954,7 @@ for (let i = 1; i <= 10; i++) {
                       </pre>
                     </div>
                     
-                    {/* FIXED: Code Textarea with Perfect Alignment */}
+                    {/* Code Textarea */}
                     <div className="flex-1 relative">
                       <textarea
                         ref={textareaRef}
@@ -919,9 +984,12 @@ for (let i = 1; i <= 10; i++) {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <span className="text-green-400">✓ Line Numbers Sync FIXED</span>
-                    <span className="text-blue-400">💾 Auto-Save Enabled</span>
-                    <span className="text-purple-400">📁 File Upload Ready</span>
+                    <span className="text-green-400">✓ Line Numbers Sync</span>
+                    <span className="text-blue-400">💾 Auto-Save</span>
+                    <span className="text-purple-400">📁 File Upload</span>
+                    <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
+                      {isCurrentLanguageExecutable ? '▶️ Executable' : '👁️ View Only'}
+                    </span>
                     {user && <span className="text-yellow-400">🔒 User: {user.role}</span>}
                   </div>
                 </div>
@@ -952,7 +1020,10 @@ for (let i = 1; i <= 10; i++) {
                         <pre className="text-gray-300 whitespace-pre-wrap">{executionOutput}</pre>
                       ) : (
                         <div className="text-gray-500">
-                          Click "Run" to execute your code and see the output here...
+                          {isCurrentLanguageExecutable 
+                            ? 'Click "Run" to execute your code and see the output here...'
+                            : `${activeTab.language.toUpperCase()} files cannot be executed in browser. Download the file to use with appropriate tools.`
+                          }
                         </div>
                       )}
                     </div>
