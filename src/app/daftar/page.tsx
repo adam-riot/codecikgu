@@ -25,7 +25,8 @@ import {
   X,
   Info,
   GraduationCap,
-  UserCheck
+  UserCheck,
+  Bug
 } from 'lucide-react'
 
 interface Notification {
@@ -45,6 +46,14 @@ interface EmailValidation {
   isMOE: boolean
   role: 'murid' | 'awam'
   message: string
+}
+
+interface DebugLog {
+  timestamp: string
+  step: string
+  status: 'success' | 'error' | 'info'
+  message: string
+  data?: any
 }
 
 export default function RegisterPage() {
@@ -73,6 +82,21 @@ export default function RegisterPage() {
     message: ''
   })
   const [step, setStep] = useState(1)
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([])
+  const [showDebug, setShowDebug] = useState(false)
+
+  // Debug logging function
+  const addDebugLog = (step: string, status: 'success' | 'error' | 'info', message: string, data?: any) => {
+    const log: DebugLog = {
+      timestamp: new Date().toISOString(),
+      step,
+      status,
+      message,
+      data
+    }
+    setDebugLogs(prev => [...prev, log])
+    console.log(`[DEBUG ${status.toUpperCase()}] ${step}: ${message}`, data || '')
+  }
 
   // Add notification function
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -236,77 +260,188 @@ export default function RegisterPage() {
     if (!validateStep2()) return
 
     setLoading(true)
+    setDebugLogs([]) // Clear previous logs
 
     try {
-      console.log('Starting AUTH-ONLY registration...')
-      console.log(`Email: ${formData.email}`)
-      console.log(`Role: ${emailValidation.role}`)
+      addDebugLog('INIT', 'info', 'Starting registration process', {
+        email: formData.email,
+        role: emailValidation.role,
+        timestamp: new Date().toISOString()
+      })
 
-      // AUTH-ONLY APPROACH: No manual profile creation
+      // Test Supabase connection first
+      addDebugLog('CONNECTION', 'info', 'Testing Supabase connection...')
+      
+      try {
+        const { data: testData, error: testError } = await supabase
+          .from('profiles')
+          .select('count')
+          .limit(1)
+        
+        if (testError) {
+          addDebugLog('CONNECTION', 'error', 'Supabase connection failed', testError)
+        } else {
+          addDebugLog('CONNECTION', 'success', 'Supabase connection OK')
+        }
+      } catch (connError: any) {
+        addDebugLog('CONNECTION', 'error', 'Connection test failed', connError)
+      }
+
+      // Check if email already exists
+      addDebugLog('EMAIL_CHECK', 'info', 'Checking if email already exists...')
+      
+      try {
+        const { data: existingUser, error: checkError } = await supabase.auth.getUser()
+        addDebugLog('EMAIL_CHECK', 'info', 'Current auth state', { user: existingUser?.user?.email || 'none' })
+      } catch (checkErr: any) {
+        addDebugLog('EMAIL_CHECK', 'error', 'Auth check failed', checkErr)
+      }
+
+      // Prepare metadata
+      const metadata = {
+        full_name: formData.name,
+        name: formData.name,
+        sekolah: formData.sekolah || '',
+        tingkatan: formData.tingkatan || '',
+        role: emailValidation.role,
+        xp: 0,
+        level: 1,
+        avatar_url: '',
+        bio: '',
+        email: formData.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      addDebugLog('METADATA', 'info', 'Prepared user metadata', metadata)
+
+      // Attempt registration
+      addDebugLog('AUTH_SIGNUP', 'info', 'Calling supabase.auth.signUp...')
+      
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          data: {
-            // Store ALL data in auth metadata
-            full_name: formData.name,
-            name: formData.name,
-            sekolah: formData.sekolah || '',
-            tingkatan: formData.tingkatan || '',
-            role: emailValidation.role,
-            xp: 0,
-            level: 1,
-            avatar_url: '',
-            bio: '',
-            // Additional metadata for profile creation
-            email: formData.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
+          data: metadata
         }
       })
 
+      addDebugLog('AUTH_SIGNUP', 'info', 'Auth signup response received', {
+        hasData: !!data,
+        hasUser: !!data?.user,
+        hasSession: !!data?.session,
+        userId: data?.user?.id,
+        hasError: !!error
+      })
+
       if (error) {
-        console.error('Auth registration error:', error)
+        addDebugLog('AUTH_SIGNUP', 'error', 'Auth signup failed', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          cause: error.cause
+        })
         
         // Handle specific error types
-        if (error.message.includes('already registered')) {
+        if (error.message.includes('already registered') || error.message.includes('already been registered')) {
           addNotification('error', 'Email ini sudah didaftarkan. Sila cuba log masuk.')
         } else if (error.message.includes('invalid email')) {
           addNotification('error', 'Format email tidak sah.')
-        } else if (error.message.includes('weak password')) {
+        } else if (error.message.includes('weak password') || error.message.includes('password')) {
           addNotification('error', 'Password terlalu lemah. Sila gunakan password yang lebih kuat.')
+        } else if (error.message.includes('rate limit')) {
+          addNotification('error', 'Terlalu banyak percubaan. Sila tunggu sebentar.')
         } else {
           addNotification('error', `Ralat pendaftaran: ${error.message}`)
         }
         return
       }
 
-      if (data.user) {
-        console.log('AUTH-ONLY registration successful!')
-        console.log('User ID:', data.user.id)
-        console.log('User metadata:', data.user.user_metadata)
-        
-        addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Sila semak email untuk pengesahan.`)
+      if (data?.user) {
+        addDebugLog('AUTH_SUCCESS', 'success', 'Auth user created successfully', {
+          userId: data.user.id,
+          email: data.user.email,
+          emailConfirmed: data.user.email_confirmed_at,
+          metadata: data.user.user_metadata
+        })
+
+        // Check if user needs email confirmation
+        if (!data.session && !data.user.email_confirmed_at) {
+          addDebugLog('EMAIL_CONFIRMATION', 'info', 'Email confirmation required')
+          addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Sila semak email untuk pengesahan.`)
+        } else {
+          addDebugLog('IMMEDIATE_ACCESS', 'success', 'User can access immediately')
+          addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Anda boleh log masuk sekarang.`)
+        }
         
         // Redirect to login after success
         setTimeout(() => {
           router.push('/login?message=registration_success')
         }, 2000)
       } else {
-        addNotification('error', 'Ralat: Pendaftaran tidak berjaya')
+        addDebugLog('NO_USER', 'error', 'No user returned from signup')
+        addNotification('error', 'Ralat: Pendaftaran tidak berjaya - tiada user dicipta')
       }
 
     } catch (error: any) {
-      console.error('Unexpected registration error:', error)
+      addDebugLog('UNEXPECTED_ERROR', 'error', 'Unexpected registration error', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
       addNotification('error', `Ralat tidak dijangka: ${error.message}`)
     } finally {
       setLoading(false)
+      addDebugLog('COMPLETE', 'info', 'Registration process completed')
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black relative overflow-hidden">
+      {/* Debug Panel */}
+      {showDebug && (
+        <div className="fixed top-4 left-4 w-96 max-h-96 bg-gray-900/95 border border-gray-700 rounded-lg p-4 z-50 overflow-y-auto">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold flex items-center">
+              <Bug className="w-4 h-4 mr-2" />
+              Debug Logs
+            </h3>
+            <button
+              onClick={() => setShowDebug(false)}
+              className="text-gray-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-2 text-xs">
+            {debugLogs.map((log, index) => (
+              <div key={index} className={`p-2 rounded ${
+                log.status === 'success' ? 'bg-green-500/20 text-green-400' :
+                log.status === 'error' ? 'bg-red-500/20 text-red-400' :
+                'bg-blue-500/20 text-blue-400'
+              }`}>
+                <div className="font-semibold">{log.step}</div>
+                <div>{log.message}</div>
+                {log.data && (
+                  <pre className="mt-1 text-xs opacity-75 overflow-x-auto">
+                    {JSON.stringify(log.data, null, 2)}
+                  </pre>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Debug Toggle Button */}
+      <button
+        onClick={() => setShowDebug(!showDebug)}
+        className="fixed bottom-4 left-4 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-lg z-40 flex items-center"
+      >
+        <Bug className="w-4 h-4 mr-2" />
+        Debug ({debugLogs.length})
+      </button>
+
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 left-10 text-electric-blue/20 text-6xl font-mono animate-pulse">
