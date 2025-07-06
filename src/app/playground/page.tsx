@@ -1,26 +1,14 @@
 'use client'
 
+import dynamic from 'next/dynamic'
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
 import { 
-  Code, 
-  Play, 
-  Download, 
-  Save, 
-  Plus, 
-  X, 
-  File, 
-  Terminal, 
-  CheckCircle, 
-  XCircle, 
-  Info,
-  Folder,
-  Trash2,
-  FolderOpen,
-  PlayCircle,
-  FileText
+  Code, Play, Download, Save, Plus, X, File, Terminal, CheckCircle, XCircle, Info,
+  Folder, Trash2, FolderOpen, PlayCircle, FileText
 } from 'lucide-react'
 
 // Type Definitions
@@ -58,12 +46,10 @@ interface Notification {
 // Define executable languages
 const EXECUTABLE_LANGUAGES = ['javascript', 'python']
 
-// Check if language is executable
 const isExecutableLanguage = (language: string): boolean => {
   return EXECUTABLE_LANGUAGES.includes(language.toLowerCase())
 }
 
-// Get language description for non-executable languages
 const getLanguageDescription = (language: string): string => {
   const descriptions: { [key: string]: string } = {
     css: 'CSS files are styling sheets - use with HTML files',
@@ -77,11 +63,9 @@ const getLanguageDescription = (language: string): string => {
     c: 'C files need compilation - use compiler like gcc',
     typescript: 'TypeScript files need compilation - use tsc compiler'
   }
-  
   return descriptions[language.toLowerCase()] || 'This language requires external tools to run'
 }
 
-// Language detection
 const detectLanguage = (code: string, fileName?: string): string => {
   if (fileName) {
     const ext = fileName.split('.').pop()?.toLowerCase()
@@ -100,40 +84,18 @@ const detectLanguage = (code: string, fileName?: string): string => {
       case 'sql': return 'sql'
     }
   }
-  
   if (!code.trim()) return 'javascript'
-  
-  if (code.includes('<?php') || code.includes('$') || /\b(echo|print|var_dump)\b/.test(code)) {
-    return 'php'
-  }
-  
-  if (/\b(def|import|print|if __name__|True|False|None)\b/.test(code) || code.includes('print(')) {
-    return 'python'
-  }
-  
-  if (/<html|<head|<body|<div|<span|<!DOCTYPE/.test(code)) {
-    return 'html'
-  }
-  
-  if (/\{[^}]*\}/.test(code) && /[.#][a-zA-Z]/.test(code)) {
-    return 'css'
-  }
-  
-  if (/\b(public class|System\.out\.println|public static void main)\b/.test(code)) {
-    return 'java'
-  }
-  
-  if (/#include|using namespace std|cout|cin/.test(code)) {
-    return 'cpp'
-  }
-  
+  if (code.includes('<?php') || code.includes('$') || /\b(echo|print|var_dump)\b/.test(code)) return 'php'
+  if (/\b(def|import|print|if __name__|True|False|None)\b/.test(code) || code.includes('print(')) return 'python'
+  if (/<html|<head|<body|<div|<span|<!DOCTYPE/.test(code)) return 'html'
+  if (/\{[^}]*\}/.test(code) && /[.#][a-zA-Z]/.test(code)) return 'css'
+  if (/\b(public class|System\.out\.println|public static void main)\b/.test(code)) return 'java'
+  if (/#include|using namespace std|cout|cin/.test(code)) return 'cpp'
   return 'javascript'
 }
 
-// File extension mapping
 const getFileExtension = (fileName: string, language: string): string => {
   if (fileName.includes('.')) return fileName
-  
   const extensions: { [key: string]: string } = {
     javascript: 'js',
     php: 'php',
@@ -148,11 +110,9 @@ const getFileExtension = (fileName: string, language: string): string => {
     xml: 'xml',
     sql: 'sql'
   }
-  
   return `${fileName}.${extensions[language] || 'txt'}`
 }
 
-// Get user role function
 const getUserRole = async (userId: string): Promise<string> => {
   try {
     const { data, error } = await supabase
@@ -160,100 +120,26 @@ const getUserRole = async (userId: string): Promise<string> => {
       .select('role')
       .eq('id', userId)
       .single()
-    
-    if (error) {
-      console.error('Error fetching user role:', error)
-      return 'awam'
-    }
-    
-    const role = data?.role || 'awam'
-    return role
-  } catch (error) {
-    console.error('Exception in getUserRole:', error)
+    if (error) return 'awam'
+    return data?.role || 'awam'
+  } catch {
     return 'awam'
   }
 }
 
-// Local storage functions for persistence
 const saveToLocalStorage = (tabs: Tab[], activeTabId: string) => {
   try {
-    const playgroundState = {
-      tabs,
-      activeTabId,
-      timestamp: Date.now()
-    }
+    const playgroundState = { tabs, activeTabId, timestamp: Date.now() }
     localStorage.setItem('codecikgu_playground_state', JSON.stringify(playgroundState))
-  } catch (error) {
-    console.error('Error saving to localStorage:', error)
-  }
+  } catch {}
 }
 
 const loadFromLocalStorage = (): { tabs: Tab[]; activeTabId: string } | null => {
   try {
     const saved = localStorage.getItem('codecikgu_playground_state')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      return parsed
-    }
-  } catch (error) {
-    console.error('Error loading from localStorage:', error)
-  }
+    if (saved) return JSON.parse(saved)
+  } catch {}
   return null
-}
-
-// WORKING AUTO-INDENTATION SYSTEM
-const getIndentLevel = (line: string): number => {
-  const match = line.match(/^(\s*)/)
-  return match ? match[1].length : 0
-}
-
-// More aggressive indentation detection
-const shouldIndent = (line: string): boolean => {
-  const trimmed = line.trim()
-  
-  // Check for opening brackets/braces
-  if (trimmed.endsWith('{') || trimmed.endsWith('(') || trimmed.endsWith('[')) {
-    return true
-  }
-  
-  // Check for CSS selectors
-  if (/^[.#][a-zA-Z][^{]*{$/.test(trimmed)) {
-    return true
-  }
-  
-  // Check for CSS properties ending with colon
-  if (/^[a-zA-Z-]+\s*:\s*[^;]*;?\s*$/.test(trimmed) && !trimmed.endsWith(';')) {
-    return true
-  }
-  
-  // Check for control structures
-  if (/\b(if|else|for|while|function|class|def|try|catch|finally)\b/.test(trimmed)) {
-    return true
-  }
-  
-  // Check for HTML opening tags
-  if (/<[^/][^>]*[^/]>$/.test(trimmed) && !/<(br|hr|img|input|meta|link|area|base|col|embed|source|track|wbr)\b[^>]*>$/i.test(trimmed)) {
-    return true
-  }
-  
-  return false
-}
-
-const getAutoIndent = (content: string, cursorPos: number): string => {
-  const beforeCursor = content.substring(0, cursorPos)
-  const lines = beforeCursor.split('\n')
-  const previousLine = lines[lines.length - 2] || ''
-  
-  if (!previousLine.trim()) return ''
-  
-  let indent = getIndentLevel(previousLine)
-  
-  // Add indentation if previous line suggests it
-  if (shouldIndent(previousLine)) {
-    indent += 2
-  }
-  
-  return ' '.repeat(Math.max(0, indent))
 }
 
 export default function PlaygroundPage() {
@@ -309,8 +195,6 @@ console.log(greet('CodeCikgu'));
   const [isExecuting, setIsExecuting] = useState(false)
   const [savedFiles, setSavedFiles] = useState<SavedFile[]>([])
   const [showFileManager, setShowFileManager] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const lineNumbersRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -319,42 +203,12 @@ console.log(greet('CodeCikgu'));
   }, [])
 
   useEffect(() => {
-    if (user) {
-      loadSavedFiles()
-    }
+    if (user) loadSavedFiles()
   }, [user])
 
   useEffect(() => {
-    if (tabs.length > 0) {
-      saveToLocalStorage(tabs, activeTabId)
-    }
+    if (tabs.length > 0) saveToLocalStorage(tabs, activeTabId)
   }, [tabs, activeTabId])
-
-  useEffect(() => {
-    const textarea = textareaRef.current
-    const lineNumbers = lineNumbersRef.current
-    
-    if (textarea && lineNumbers) {
-      const syncScroll = () => {
-        lineNumbers.scrollTop = textarea.scrollTop
-        lineNumbers.scrollLeft = textarea.scrollLeft
-      }
-      
-      textarea.addEventListener('scroll', syncScroll, { passive: true })
-      textarea.addEventListener('input', syncScroll, { passive: true })
-      textarea.addEventListener('keyup', syncScroll, { passive: true })
-      textarea.addEventListener('mouseup', syncScroll, { passive: true })
-      
-      syncScroll()
-      
-      return () => {
-        textarea.removeEventListener('scroll', syncScroll)
-        textarea.removeEventListener('input', syncScroll)
-        textarea.removeEventListener('keyup', syncScroll)
-        textarea.removeEventListener('mouseup', syncScroll)
-      }
-    }
-  }, [activeTabId, tabs])
 
   const loadSavedState = () => {
     const saved = loadFromLocalStorage()
@@ -368,20 +222,10 @@ console.log(greet('CodeCikgu'));
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
       if (session && session.user) {
         const userRole = await getUserRole(session.user.id)
-        
-        const userData = {
-          id: session.user.id,
-          email: session.user.email || '',
-          role: userRole
-        }
-        
-        setUser(userData)
+        setUser({ id: session.user.id, email: session.user.email || '', role: userRole })
       }
-    } catch (error) {
-      console.error('Error checking user:', error)
     } finally {
       setLoading(false)
     }
@@ -389,18 +233,13 @@ console.log(greet('CodeCikgu'));
 
   const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
-    const notification: Notification = { id, type, message }
-    
-    setNotifications(prev => [...prev, notification])
-    
+    setNotifications(prev => [...prev, { id, type, message }])
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
   }
 
-  const getActiveTab = (): Tab => {
-    return tabs.find(tab => tab.id === activeTabId) || tabs[0]
-  }
+  const getActiveTab = (): Tab => tabs.find(tab => tab.id === activeTabId) || tabs[0]
 
   const updateTab = (tabId: string, updates: Partial<Tab>) => {
     setTabs(prev => prev.map(tab => 
@@ -412,100 +251,10 @@ console.log(greet('CodeCikgu'));
 
   const handleContentChange = (content: string) => {
     updateTab(activeTabId, { content, saved: false })
-    
     const activeTab = getActiveTab()
     const detectedLang = detectLanguage(content, activeTab.name)
     if (detectedLang !== activeTab.language) {
       updateTab(activeTabId, { language: detectedLang })
-    }
-  }
-
-  // WORKING AUTO-INDENTATION
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const textarea = e.currentTarget
-    const { selectionStart, selectionEnd, value } = textarea
-    
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      
-      // Get auto-indent for new line
-      const autoIndent = getAutoIndent(value, selectionStart)
-      
-      // Insert new line with indentation
-      const newContent = 
-        value.substring(0, selectionStart) + 
-        '\n' + 
-        autoIndent + 
-        value.substring(selectionEnd)
-      
-      // Update content
-      handleContentChange(newContent)
-      
-      // Set cursor position after indentation
-      setTimeout(() => {
-        if (textareaRef.current) {
-          const newPos = selectionStart + 1 + autoIndent.length
-          textareaRef.current.selectionStart = newPos
-          textareaRef.current.selectionEnd = newPos
-          textareaRef.current.focus()
-        }
-      }, 0)
-      
-    } else if (e.key === 'Tab') {
-      e.preventDefault()
-      
-      const beforeSelection = value.substring(0, selectionStart)
-      const selectedText = value.substring(selectionStart, selectionEnd)
-      const afterSelection = value.substring(selectionEnd)
-      
-      if (e.shiftKey) {
-        // Unindent
-        if (selectedText.includes('\n')) {
-          // Multi-line
-          const lines = selectedText.split('\n')
-          const unindentedLines = lines.map(line => {
-            if (line.startsWith('  ')) return line.substring(2)
-            if (line.startsWith(' ')) return line.substring(1)
-            return line
-          })
-          const newContent = beforeSelection + unindentedLines.join('\n') + afterSelection
-          handleContentChange(newContent)
-        } else {
-          // Single line
-          const lines = value.split('\n')
-          const currentLineIndex = beforeSelection.split('\n').length - 1
-          const currentLine = lines[currentLineIndex]
-          
-          if (currentLine.startsWith('  ')) {
-            lines[currentLineIndex] = currentLine.substring(2)
-          } else if (currentLine.startsWith(' ')) {
-            lines[currentLineIndex] = currentLine.substring(1)
-          }
-          
-          handleContentChange(lines.join('\n'))
-        }
-      } else {
-        // Indent
-        if (selectedText.includes('\n')) {
-          // Multi-line
-          const lines = selectedText.split('\n')
-          const indentedLines = lines.map(line => '  ' + line)
-          const newContent = beforeSelection + indentedLines.join('\n') + afterSelection
-          handleContentChange(newContent)
-        } else {
-          // Single line or no selection
-          const newContent = beforeSelection + '  ' + selectedText + afterSelection
-          handleContentChange(newContent)
-          
-          setTimeout(() => {
-            if (textareaRef.current) {
-              textareaRef.current.selectionStart = selectionStart + 2
-              textareaRef.current.selectionEnd = selectionEnd + 2
-              textareaRef.current.focus()
-            }
-          }, 0)
-        }
-      }
     }
   }
 
@@ -516,12 +265,10 @@ console.log(greet('CodeCikgu'));
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-
     const reader = new FileReader()
     reader.onload = (e) => {
       const content = e.target?.result as string
       const language = detectLanguage(content, file.name)
-      
       const newTab: Tab = {
         id: Date.now().toString(),
         name: file.name.replace(/\.[^/.]+$/, ""),
@@ -529,22 +276,16 @@ console.log(greet('CodeCikgu'));
         language,
         saved: false
       }
-      
       setTabs(prev => [...prev, newTab])
       setActiveTabId(newTab.id)
       addNotification('success', `File ${file.name} uploaded successfully`)
     }
-    
     reader.readAsText(file)
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const executeCode = async () => {
     const activeTab = getActiveTab()
-    
     if (!isExecutableLanguage(activeTab.language)) {
       const description = getLanguageDescription(activeTab.language)
       setExecutionOutput(`${activeTab.language.toUpperCase()} files cannot be executed in browser.\n\n${description}`)
@@ -552,19 +293,15 @@ console.log(greet('CodeCikgu'));
       addNotification('info', `${activeTab.language.toUpperCase()} files need external tools to run`)
       return
     }
-    
     if (activeTab.language === 'javascript') {
       setIsExecuting(true)
       setShowOutput(true)
-      
       try {
         const output: string[] = []
         const safeConsole = {
           log: (...args: unknown[]) => {
             output.push(args.map(arg => {
-              if (typeof arg === 'object') {
-                return JSON.stringify(arg, null, 2)
-              }
+              if (typeof arg === 'object') return JSON.stringify(arg, null, 2)
               return String(arg)
             }).join(' '))
           },
@@ -572,15 +309,12 @@ console.log(greet('CodeCikgu'));
             output.push('ERROR: ' + args.map(arg => String(arg)).join(' '))
           }
         }
-        
         const func = new Function('console', activeTab.content)
         func(safeConsole)
-        
         setExecutionOutput(output.length > 0 ? output.join('\n') : 'Code executed successfully (no output)')
         addNotification('success', 'Code executed successfully')
       } catch (error) {
-        const errorMessage = (error as Error).message
-        setExecutionOutput(`Error: ${errorMessage}`)
+        setExecutionOutput(`Error: ${(error as Error).message}`)
         addNotification('error', 'Execution failed')
       } finally {
         setIsExecuting(false)
@@ -591,7 +325,6 @@ console.log(greet('CodeCikgu'));
   const downloadFile = () => {
     const activeTab = getActiveTab()
     const properFileName = getFileExtension(activeTab.name, activeTab.language)
-    
     const blob = new Blob([activeTab.content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -601,7 +334,6 @@ console.log(greet('CodeCikgu'));
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    
     addNotification('success', `File downloaded as ${properFileName}`)
   }
 
@@ -610,9 +342,7 @@ console.log(greet('CodeCikgu'));
       addNotification('error', 'Please login to save files')
       return
     }
-
     const activeTab = getActiveTab()
-    
     try {
       if (activeTab.file_id) {
         const { error } = await supabase
@@ -625,9 +355,7 @@ console.log(greet('CodeCikgu'));
           })
           .eq('id', activeTab.file_id)
           .eq('user_id', user.id)
-        
         if (error) throw error
-        
         updateTab(activeTabId, { saved: true })
         addNotification('success', 'File updated successfully')
       } else {
@@ -641,35 +369,27 @@ console.log(greet('CodeCikgu'));
           })
           .select()
           .single()
-        
         if (error) throw error
-        
         updateTab(activeTabId, { file_id: data.id, saved: true })
         addNotification('success', 'File saved successfully')
       }
-      
       loadSavedFiles()
-    } catch (error) {
-      console.error('Save error:', error)
+    } catch {
       addNotification('error', 'Failed to save file')
     }
   }
 
   const loadSavedFiles = async () => {
     if (!user) return
-    
     try {
       const { data, error } = await supabase
         .from('playground_files')
         .select('*')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
-      
       if (error) throw error
       setSavedFiles(data || [])
-    } catch (error) {
-      console.error('Load files error:', error)
-    }
+    } catch {}
   }
 
   const loadFile = (file: SavedFile) => {
@@ -681,7 +401,6 @@ console.log(greet('CodeCikgu'));
       saved: true,
       file_id: file.id
     }
-    
     setTabs(prev => [...prev, newTab])
     setActiveTabId(newTab.id)
     setShowFileManager(false)
@@ -690,20 +409,16 @@ console.log(greet('CodeCikgu'));
 
   const deleteFile = async (fileId: string) => {
     if (!user) return
-    
     try {
       const { error } = await supabase
         .from('playground_files')
         .delete()
         .eq('id', fileId)
         .eq('user_id', user.id)
-      
       if (error) throw error
-      
       loadSavedFiles()
       addNotification('success', 'File deleted')
-    } catch (error) {
-      console.error('Delete error:', error)
+    } catch {
       addNotification('error', 'Failed to delete file')
     }
   }
@@ -717,7 +432,6 @@ console.log(greet('CodeCikgu'));
       language: 'javascript',
       saved: false
     }
-    
     setTabs(prev => [...prev, newTab])
     setActiveTabId(newId)
     addNotification('info', 'New tab created')
@@ -728,14 +442,11 @@ console.log(greet('CodeCikgu'));
       addNotification('error', 'Cannot close the last tab')
       return
     }
-    
     setTabs(prev => prev.filter(tab => tab.id !== tabId))
-    
     if (activeTabId === tabId) {
       const remainingTabs = tabs.filter(tab => tab.id !== tabId)
       setActiveTabId(remainingTabs[0].id)
     }
-    
     addNotification('info', 'Tab closed')
   }
 
@@ -1063,12 +774,11 @@ console.log(greet('CodeCikgu'));
                   </div>
                 </div>
 
-                {/* Code Editor with Working Auto-Indentation */}
+                {/* Code Editor */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
                     {/* Line Numbers */}
                     <div 
-                      ref={lineNumbersRef}
                       className="flex-shrink-0 w-16 bg-gray-800/50 border-r border-gray-700 py-4 px-2 font-mono text-sm text-gray-500 overflow-hidden select-none user-select-none"
                       style={{ 
                         fontSize: '14px', 
@@ -1090,25 +800,22 @@ console.log(greet('CodeCikgu'));
                         {generateLineNumbers(activeTab.content)}
                       </pre>
                     </div>
-                    
-                    {/* Code Textarea with Working Auto-Indentation */}
-                    <div className="flex-1 relative">
-                      <textarea
-                        ref={textareaRef}
+                    {/* Monaco Editor */}
+                    <div className="flex-1">
+                      <MonacoEditor
+                        height="400px"
+                        language={activeTab.language}
                         value={activeTab.content}
-                        onChange={(e) => handleContentChange(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Write your code here... (Auto-indentation enabled)"
-                        className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
-                        style={{ 
-                          fontSize: '14px',
-                          lineHeight: '1.5',
-                          height: '400px',
-                          margin: 0,
-                          padding: '16px',
-                          tabSize: 2
+                        theme="vs-dark"
+                        options={{
+                          fontSize: 14,
+                          minimap: { enabled: false },
+                          wordWrap: 'on',
+                          scrollBeyondLastLine: false,
+                          automaticLayout: true,
+                          tabSize: 2,
                         }}
-                        spellCheck={false}
+                        onChange={(value) => handleContentChange(value || '')}
                       />
                     </div>
                   </div>
@@ -1121,7 +828,6 @@ console.log(greet('CodeCikgu'));
                     <span>Lines: {activeTab.content.split('\n').length}</span>
                     <span>Characters: {activeTab.content.length}</span>
                   </div>
-                  
                   <div className="flex items-center space-x-2">
                     <span className="text-green-400">✓ Line Numbers Sync</span>
                     <span className="text-blue-400">💾 Auto-Save</span>
@@ -1143,9 +849,7 @@ console.log(greet('CodeCikgu'));
                       <Terminal className="w-4 h-4" />
                       <span className="text-sm">Console Output</span>
                     </div>
-                    
                     <div className="flex-1"></div>
-                    
                     <button
                       onClick={() => setShowOutput(false)}
                       className="p-3 text-gray-400 hover:text-white transition-colors duration-300"
@@ -1153,7 +857,6 @@ console.log(greet('CodeCikgu'));
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-
                   <div className="p-4 h-64 overflow-y-auto bg-gray-900/50">
                     <div className="font-mono text-sm">
                       {executionOutput ? (
@@ -1177,4 +880,3 @@ console.log(greet('CodeCikgu'));
     </div>
   )
 }
-
