@@ -56,7 +56,7 @@ interface Notification {
   message: string
 }
 
-// FIXED: Define executable languages
+// Define executable languages
 const EXECUTABLE_LANGUAGES = ['javascript', 'python']
 const NON_EXECUTABLE_LANGUAGES = ['css', 'html', 'json', 'xml', 'sql', 'php', 'java', 'cpp', 'c', 'typescript']
 
@@ -85,7 +85,6 @@ const getLanguageDescription = (language: string): string => {
 
 // Language detection
 const detectLanguage = (code: string, fileName?: string): string => {
-  // First try to detect from file extension
   if (fileName) {
     const ext = fileName.split('.').pop()?.toLowerCase()
     switch (ext) {
@@ -104,7 +103,6 @@ const detectLanguage = (code: string, fileName?: string): string => {
     }
   }
   
-  // Fallback to content detection
   if (!code.trim()) return 'javascript'
   
   if (code.includes('<?php') || code.includes('$') || /\b(echo|print|var_dump)\b/.test(code)) {
@@ -210,6 +208,52 @@ const loadFromLocalStorage = (): { tabs: Tab[], activeTabId: string } | null => 
     console.error('Error loading from localStorage:', error)
   }
   return null
+}
+
+// FIXED: Auto-indentation functions
+const getIndentLevel = (line: string): number => {
+  const match = line.match(/^(\s*)/)
+  return match ? match[1].length : 0
+}
+
+const shouldIncreaseIndent = (line: string, language: string): boolean => {
+  const trimmed = line.trim()
+  
+  if (language === 'javascript' || language === 'typescript') {
+    return /[{(\[]$/.test(trimmed) || 
+           /\b(if|else|for|while|function|class|try|catch|finally)\s*\([^)]*\)\s*$/.test(trimmed) ||
+           /\b(if|else|for|while)\s*\([^)]*\)\s*$/.test(trimmed)
+  }
+  
+  if (language === 'python') {
+    return /:$/.test(trimmed) || 
+           /\b(if|elif|else|for|while|def|class|try|except|finally|with)\b.*:$/.test(trimmed)
+  }
+  
+  if (language === 'css') {
+    return /{$/.test(trimmed)
+  }
+  
+  if (language === 'html') {
+    return /<[^/][^>]*[^/]>$/.test(trimmed) && !/<(br|hr|img|input|meta|link)\b[^>]*>$/i.test(trimmed)
+  }
+  
+  return /[{(\[]$/.test(trimmed)
+}
+
+const getAutoIndent = (content: string, cursorPosition: number, language: string): string => {
+  const beforeCursor = content.substring(0, cursorPosition)
+  const lines = beforeCursor.split('\n')
+  const currentLine = lines[lines.length - 1] || ''
+  const previousLine = lines[lines.length - 2] || ''
+  
+  let indent = getIndentLevel(previousLine)
+  
+  if (shouldIncreaseIndent(previousLine, language)) {
+    indent += 2 // 2 spaces for indentation
+  }
+  
+  return ' '.repeat(indent)
 }
 
 export default function PlaygroundPage() {
@@ -356,21 +400,84 @@ for (let i = 1; i <= 10; i++) {
     return tabs.find(tab => tab.id === activeTabId) || tabs[0]
   }
 
+  // FIXED: Update tab function with proper save status
   const updateTab = (tabId: string, updates: Partial<Tab>) => {
     setTabs(prev => prev.map(tab => 
       tab.id === tabId 
-        ? { ...tab, ...updates, saved: false }
+        ? { ...tab, ...updates, saved: updates.saved !== undefined ? updates.saved : false }
         : tab
     ))
   }
 
+  // FIXED: Handle content change with auto-indentation
   const handleContentChange = (content: string) => {
-    updateTab(activeTabId, { content })
+    updateTab(activeTabId, { content, saved: false })
     
     const activeTab = getActiveTab()
     const detectedLang = detectLanguage(content, activeTab.name)
     if (detectedLang !== activeTab.language) {
       updateTab(activeTabId, { language: detectedLang })
+    }
+  }
+
+  // FIXED: Handle key press for auto-indentation
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget
+    const { selectionStart, selectionEnd, value } = textarea
+    
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      
+      const activeTab = getActiveTab()
+      const autoIndent = getAutoIndent(value, selectionStart, activeTab.language)
+      const newContent = value.substring(0, selectionStart) + '\n' + autoIndent + value.substring(selectionEnd)
+      
+      handleContentChange(newContent)
+      
+      // Set cursor position after the auto-indent
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = selectionStart + 1 + autoIndent.length
+      }, 0)
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      
+      if (e.shiftKey) {
+        // Unindent
+        const lines = value.split('\n')
+        const startLine = value.substring(0, selectionStart).split('\n').length - 1
+        const endLine = value.substring(0, selectionEnd).split('\n').length - 1
+        
+        for (let i = startLine; i <= endLine; i++) {
+          if (lines[i].startsWith('  ')) {
+            lines[i] = lines[i].substring(2)
+          }
+        }
+        
+        const newContent = lines.join('\n')
+        handleContentChange(newContent)
+      } else {
+        // Indent
+        const beforeSelection = value.substring(0, selectionStart)
+        const selectedText = value.substring(selectionStart, selectionEnd)
+        const afterSelection = value.substring(selectionEnd)
+        
+        if (selectedText.includes('\n')) {
+          // Multi-line selection - indent each line
+          const lines = selectedText.split('\n')
+          const indentedLines = lines.map(line => '  ' + line)
+          const newContent = beforeSelection + indentedLines.join('\n') + afterSelection
+          handleContentChange(newContent)
+        } else {
+          // Single line or no selection - insert tab
+          const newContent = beforeSelection + '  ' + selectedText + afterSelection
+          handleContentChange(newContent)
+          
+          setTimeout(() => {
+            textarea.selectionStart = selectionStart + 2
+            textarea.selectionEnd = selectionEnd + 2
+          }, 0)
+        }
+      }
     }
   }
 
@@ -407,12 +514,10 @@ for (let i = 1; i <= 10; i++) {
     }
   }
 
-  // FIXED: Smart execute code function
   const executeCode = async () => {
     const activeTab = getActiveTab()
     
     if (!isExecutableLanguage(activeTab.language)) {
-      // This should not happen as button is disabled, but just in case
       const description = getLanguageDescription(activeTab.language)
       setExecutionOutput(`${activeTab.language.toUpperCase()} files cannot be executed in browser.\n\n${description}`)
       setShowOutput(true)
@@ -453,7 +558,6 @@ for (let i = 1; i <= 10; i++) {
         setIsExecuting(false)
       }
     } else if (activeTab.language === 'python') {
-      // Future: Add Python execution support
       setExecutionOutput('Python execution coming soon!')
       setShowOutput(true)
       addNotification('info', 'Python execution will be available in future updates')
@@ -477,6 +581,7 @@ for (let i = 1; i <= 10; i++) {
     addNotification('success', `File downloaded as ${properFileName}`)
   }
 
+  // FIXED: Save file function with proper status update
   const saveFile = async () => {
     if (!user) {
       addNotification('error', 'Please login to save files')
@@ -499,6 +604,9 @@ for (let i = 1; i <= 10; i++) {
           .eq('user_id', user.id)
         
         if (error) throw error
+        
+        // FIXED: Update save status properly
+        updateTab(activeTabId, { saved: true })
         addNotification('success', 'File updated successfully')
       } else {
         const { data, error } = await supabase
@@ -514,6 +622,7 @@ for (let i = 1; i <= 10; i++) {
         
         if (error) throw error
         
+        // FIXED: Update save status and file_id properly
         updateTab(activeTabId, { file_id: data.id, saved: true })
         addNotification('success', 'File saved successfully')
       }
@@ -548,7 +657,7 @@ for (let i = 1; i <= 10; i++) {
       name: file.name,
       content: file.content,
       language: file.language,
-      saved: true,
+      saved: true, // FIXED: Set saved to true when loading from database
       file_id: file.id
     }
     
@@ -651,7 +760,7 @@ for (let i = 1; i <= 10; i++) {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor kod online dengan smart execution
+                Editor kod dengan auto-indentation dan smart save
               </span>
               
               {user && (
@@ -691,7 +800,6 @@ for (let i = 1; i <= 10; i++) {
                   <span>Save</span>
                 </button>
                 
-                {/* FIXED: Smart Run Button */}
                 {isCurrentLanguageExecutable ? (
                   <button
                     onClick={executeCode}
@@ -711,7 +819,6 @@ for (let i = 1; i <= 10; i++) {
                       <span>View Only</span>
                     </button>
                     
-                    {/* Tooltip */}
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap z-50">
                       {getLanguageDescription(activeTab.language)}
                     </div>
@@ -827,7 +934,9 @@ for (let i = 1; i <= 10; i++) {
                     <div className="flex items-center space-x-2">
                       <File className="w-4 h-4" />
                       <span className="text-sm">{getFileExtension(tab.name, tab.language)}</span>
-                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                      {/* FIXED: Show proper save status indicator */}
+                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Unsaved changes"></div>}
+                      {tab.saved && <div className="w-2 h-2 bg-green-400 rounded-full" title="Saved"></div>}
                       {isExecutableLanguage(tab.language) && <PlayCircle className="w-3 h-3 text-green-400" />}
                     </div>
                     
@@ -864,7 +973,7 @@ for (let i = 1; i <= 10; i++) {
                   <input
                     type="text"
                     value={activeTab.name}
-                    onChange={(e) => updateTab(activeTabId, { name: e.target.value })}
+                    onChange={(e) => updateTab(activeTabId, { name: e.target.value, saved: false })}
                     className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
                   />
                 </div>
@@ -873,7 +982,7 @@ for (let i = 1; i <= 10; i++) {
                   <label className="block text-sm text-gray-400 mb-2">Language (Auto-detected)</label>
                   <select
                     value={activeTab.language}
-                    onChange={(e) => updateTab(activeTabId, { language: e.target.value })}
+                    onChange={(e) => updateTab(activeTabId, { language: e.target.value, saved: false })}
                     className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
                   >
                     <option value="javascript">JavaScript</option>
@@ -895,19 +1004,31 @@ for (let i = 1; i <= 10; i++) {
                   <div>Lines: {activeTab.content.split('\n').length}</div>
                   <div>Characters: {activeTab.content.length}</div>
                   <div>Download as: <span className="text-electric-blue">{getFileExtension(activeTab.name, activeTab.language)}</span></div>
-                  <div>Status: <span className={activeTab.saved ? 'text-green-400' : 'text-yellow-400'}>{activeTab.saved ? 'Saved' : 'Unsaved'}</span></div>
+                  {/* FIXED: Show correct save status */}
+                  <div>Status: <span className={activeTab.saved ? 'text-green-400' : 'text-yellow-400'}>
+                    {activeTab.saved ? 'Saved' : 'Unsaved'}
+                  </span></div>
                   <div>Execution: <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
                     {isCurrentLanguageExecutable ? 'Supported' : 'View Only'}
                   </span></div>
                 </div>
                 
-                {/* FIXED: Language-specific help */}
                 {!isCurrentLanguageExecutable && (
                   <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                     <div className="text-xs text-blue-400 font-medium mb-1">How to use {activeTab.language.toUpperCase()}:</div>
                     <div className="text-xs text-gray-300">{getLanguageDescription(activeTab.language)}</div>
                   </div>
                 )}
+                
+                {/* FIXED: Auto-indentation help */}
+                <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <div className="text-xs text-green-400 font-medium mb-1">Auto-Indentation:</div>
+                  <div className="text-xs text-gray-300">
+                    • Press <kbd className="bg-gray-700 px-1 rounded">Enter</kbd> for auto-indent<br/>
+                    • Press <kbd className="bg-gray-700 px-1 rounded">Tab</kbd> to indent<br/>
+                    • Press <kbd className="bg-gray-700 px-1 rounded">Shift+Tab</kbd> to unindent
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -921,12 +1042,14 @@ for (let i = 1; i <= 10; i++) {
                 <div className="flex items-center bg-gray-800/50 border-b border-gray-700">
                   <div className="flex items-center space-x-2 px-4 py-3 bg-gray-700/50 text-white">
                     <span className="text-sm font-medium">{getFileExtension(activeTab.name, activeTab.language)}</span>
-                    {!activeTab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                    {/* FIXED: Show proper save status in tab */}
+                    {!activeTab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="Unsaved changes"></div>}
+                    {activeTab.saved && <div className="w-2 h-2 bg-green-400 rounded-full" title="Saved"></div>}
                     {isCurrentLanguageExecutable && <PlayCircle className="w-4 h-4 text-green-400" />}
                   </div>
                 </div>
 
-                {/* Code Editor */}
+                {/* Code Editor with Auto-Indentation */}
                 <div className="relative">
                   <div className="flex bg-gray-900">
                     {/* Line Numbers */}
@@ -954,20 +1077,22 @@ for (let i = 1; i <= 10; i++) {
                       </pre>
                     </div>
                     
-                    {/* Code Textarea */}
+                    {/* FIXED: Code Textarea with Auto-Indentation */}
                     <div className="flex-1 relative">
                       <textarea
                         ref={textareaRef}
                         value={activeTab.content}
                         onChange={(e) => handleContentChange(e.target.value)}
-                        placeholder="Write your code here..."
+                        onKeyDown={handleKeyPress}
+                        placeholder="Write your code here... (Press Enter for auto-indent, Tab to indent)"
                         className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
                         style={{ 
                           fontSize: '14px',
                           lineHeight: '1.5',
                           height: '400px',
                           margin: 0,
-                          padding: '16px'
+                          padding: '16px',
+                          tabSize: 2
                         }}
                         spellCheck={false}
                       />
@@ -987,6 +1112,7 @@ for (let i = 1; i <= 10; i++) {
                     <span className="text-green-400">✓ Line Numbers Sync</span>
                     <span className="text-blue-400">💾 Auto-Save</span>
                     <span className="text-purple-400">📁 File Upload</span>
+                    <span className="text-orange-400">⚡ Auto-Indent</span>
                     <span className={isCurrentLanguageExecutable ? 'text-green-400' : 'text-gray-400'}>
                       {isCurrentLanguageExecutable ? '▶️ Executable' : '👁️ View Only'}
                     </span>
