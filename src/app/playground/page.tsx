@@ -13,11 +13,9 @@ import {
   X, 
   File, 
   Terminal, 
-  AlertTriangle, 
   CheckCircle, 
   XCircle, 
   Info,
-  Settings,
   Folder,
   Trash2
 } from 'lucide-react'
@@ -54,41 +52,34 @@ interface Notification {
   message: string
 }
 
-// Language detection patterns
+// Language detection
 const detectLanguage = (code: string): string => {
   if (!code.trim()) return 'javascript'
   
-  // PHP detection
   if (code.includes('<?php') || code.includes('$') || /\b(echo|print|var_dump)\b/.test(code)) {
     return 'php'
   }
   
-  // Python detection
   if (/\b(def|import|print|if __name__|True|False|None)\b/.test(code) || code.includes('print(')) {
     return 'python'
   }
   
-  // HTML detection
   if (/<html|<head|<body|<div|<span|<!DOCTYPE/.test(code)) {
     return 'html'
   }
   
-  // CSS detection
   if (/\{[^}]*\}/.test(code) && /[.#][a-zA-Z]/.test(code)) {
     return 'css'
   }
   
-  // Java detection
   if (/\b(public class|System\.out\.println|public static void main)\b/.test(code)) {
     return 'java'
   }
   
-  // C++ detection
   if (/#include|using namespace std|cout|cin/.test(code)) {
     return 'cpp'
   }
   
-  // Default to JavaScript
   return 'javascript'
 }
 
@@ -109,138 +100,7 @@ const getFileExtension = (fileName: string, language: string): string => {
   return `${fileName}.${extensions[language] || 'txt'}`
 }
 
-// FIXED: Proper syntax highlighting function
-const applySyntaxHighlighting = (code: string, language: string): string => {
-  if (!code) return ''
-  
-  let highlighted = code
-  
-  // Escape HTML first
-  highlighted = highlighted
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  
-  if (language === 'javascript') {
-    // Keywords
-    highlighted = highlighted.replace(
-      /\b(const|let|var|function|if|else|for|while|return|class|import|export|async|await|try|catch|finally|throw|new|this)\b/g,
-      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
-    )
-    
-    // Strings
-    highlighted = highlighted.replace(
-      /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g,
-      '<span style="color: #ce9178;">$&</span>'
-    )
-    
-    // Comments
-    highlighted = highlighted.replace(
-      /(\/\/.*$)/gm,
-      '<span style="color: #6a9955; font-style: italic;">$&</span>'
-    )
-    
-    // Numbers
-    highlighted = highlighted.replace(
-      /\b(\d+\.?\d*)\b/g,
-      '<span style="color: #b5cea8;">$&</span>'
-    )
-  } else if (language === 'php') {
-    // PHP tags
-    highlighted = highlighted.replace(
-      /(&lt;\?php|\?&gt;)/g,
-      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
-    )
-    
-    // Variables
-    highlighted = highlighted.replace(
-      /\$[a-zA-Z_][a-zA-Z0-9_]*/g,
-      '<span style="color: #9cdcfe;">$&</span>'
-    )
-    
-    // Keywords
-    highlighted = highlighted.replace(
-      /\b(echo|print|var_dump|function|class|public|private|protected|if|else|for|while|return)\b/g,
-      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
-    )
-    
-    // Strings
-    highlighted = highlighted.replace(
-      /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
-      '<span style="color: #ce9178;">$&</span>'
-    )
-    
-    // Comments
-    highlighted = highlighted.replace(
-      /(\/\/.*$|#.*$)/gm,
-      '<span style="color: #6a9955; font-style: italic;">$&</span>'
-    )
-  } else if (language === 'python') {
-    // Keywords
-    highlighted = highlighted.replace(
-      /\b(def|class|import|from|if|elif|else|for|while|try|except|finally|return|True|False|None|and|or|not|in|is)\b/g,
-      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
-    )
-    
-    // Strings
-    highlighted = highlighted.replace(
-      /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
-      '<span style="color: #ce9178;">$&</span>'
-    )
-    
-    // Comments
-    highlighted = highlighted.replace(
-      /(#.*$)/gm,
-      '<span style="color: #6a9955; font-style: italic;">$&</span>'
-    )
-    
-    // Numbers
-    highlighted = highlighted.replace(
-      /\b(\d+\.?\d*)\b/g,
-      '<span style="color: #b5cea8;">$&</span>'
-    )
-  } else if (language === 'html') {
-    // Tags
-    highlighted = highlighted.replace(
-      /(&lt;\/?[a-zA-Z][^&gt;]*&gt;)/g,
-      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
-    )
-    
-    // Attributes
-    highlighted = highlighted.replace(
-      /\s([a-zA-Z-]+)=/g,
-      ' <span style="color: #92c5f7;">$1</span>='
-    )
-    
-    // Strings
-    highlighted = highlighted.replace(
-      /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
-      '<span style="color: #ce9178;">$&</span>'
-    )
-  } else if (language === 'css') {
-    // Selectors
-    highlighted = highlighted.replace(
-      /([.#]?[a-zA-Z][a-zA-Z0-9-]*)\s*\{/g,
-      '<span style="color: #d7ba7d;">$1</span> {'
-    )
-    
-    // Properties
-    highlighted = highlighted.replace(
-      /([a-zA-Z-]+)\s*:/g,
-      '<span style="color: #9cdcfe;">$1</span>:'
-    )
-    
-    // Values
-    highlighted = highlighted.replace(
-      /:\s*([^;]+);/g,
-      ': <span style="color: #ce9178;">$1</span>;'
-    )
-  }
-  
-  return highlighted
-}
-
-// FIXED: Get user role function with better error handling
+// Get user role function
 const getUserRole = async (userId: string): Promise<string> => {
   try {
     console.log('Fetching role for user ID:', userId)
@@ -287,7 +147,21 @@ console.log(greet('CodeCikgu'));
 // Try some operations
 const numbers = [1, 2, 3, 4, 5];
 const doubled = numbers.map(n => n * 2);
-console.log('Doubled:', doubled);`,
+console.log('Doubled:', doubled);
+
+// Object example
+const student = {
+  name: 'Ahmad',
+  age: 16,
+  grade: 'A'
+};
+
+console.log('Student info:', student);
+
+// More lines to test scrolling
+for (let i = 1; i <= 10; i++) {
+  console.log('Line', i);
+}`,
       language: 'javascript',
       saved: false
     }
@@ -300,7 +174,7 @@ console.log('Doubled:', doubled);`,
   const [savedFiles, setSavedFiles] = useState<SavedFile[]>([])
   const [showFileManager, setShowFileManager] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const highlightRef = useRef<HTMLDivElement>(null)
+  const lineNumbersRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     checkUser()
@@ -312,21 +186,25 @@ console.log('Doubled:', doubled);`,
     }
   }, [user])
 
-  // Sync scroll between textarea and highlight overlay
+  // FIXED: Proper scroll synchronization
   useEffect(() => {
     const textarea = textareaRef.current
-    const highlight = highlightRef.current
+    const lineNumbers = lineNumbersRef.current
     
-    if (textarea && highlight) {
+    if (textarea && lineNumbers) {
       const syncScroll = () => {
-        highlight.scrollTop = textarea.scrollTop
-        highlight.scrollLeft = textarea.scrollLeft
+        lineNumbers.scrollTop = textarea.scrollTop
       }
       
       textarea.addEventListener('scroll', syncScroll)
-      return () => textarea.removeEventListener('scroll', syncScroll)
+      textarea.addEventListener('input', syncScroll)
+      
+      return () => {
+        textarea.removeEventListener('scroll', syncScroll)
+        textarea.removeEventListener('input', syncScroll)
+      }
     }
-  }, [])
+  }, [activeTabId])
 
   const checkUser = async () => {
     try {
@@ -448,7 +326,6 @@ console.log('Doubled:', doubled);`,
     addNotification('success', `File downloaded as ${properFileName}`)
   }
 
-  // FIXED: Persistent save functionality
   const saveFile = async () => {
     if (!user) {
       addNotification('error', 'Please login to save files')
@@ -459,7 +336,6 @@ console.log('Doubled:', doubled);`,
     
     try {
       if (activeTab.file_id) {
-        // Update existing file
         const { error } = await supabase
           .from('playground_files')
           .update({
@@ -469,12 +345,11 @@ console.log('Doubled:', doubled);`,
             updated_at: new Date().toISOString()
           })
           .eq('id', activeTab.file_id)
-          .eq('user_id', user.id) // Security: only update own files
+          .eq('user_id', user.id)
         
         if (error) throw error
         addNotification('success', 'File updated successfully')
       } else {
-        // Create new file
         const { data, error } = await supabase
           .from('playground_files')
           .insert({
@@ -488,12 +363,10 @@ console.log('Doubled:', doubled);`,
         
         if (error) throw error
         
-        // Update tab with file_id
         updateTab(activeTabId, { file_id: data.id, saved: true })
         addNotification('success', 'File saved successfully')
       }
       
-      // Reload saved files list
       loadSavedFiles()
     } catch (error) {
       console.error('Save error:', error)
@@ -508,7 +381,7 @@ console.log('Doubled:', doubled);`,
       const { data, error } = await supabase
         .from('playground_files')
         .select('*')
-        .eq('user_id', user.id) // Security: only load own files
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
       
       if (error) throw error
@@ -542,7 +415,7 @@ console.log('Doubled:', doubled);`,
         .from('playground_files')
         .delete()
         .eq('id', fileId)
-        .eq('user_id', user.id) // Security: only delete own files
+        .eq('user_id', user.id)
       
       if (error) throw error
       
@@ -585,7 +458,8 @@ console.log('Doubled:', doubled);`,
     addNotification('info', 'Tab closed')
   }
 
-  const getLineNumbers = (content: string): string => {
+  // FIXED: Generate line numbers properly
+  const generateLineNumbers = (content: string): string => {
     const lines = content.split('\n')
     return lines.map((_, index) => index + 1).join('\n')
   }
@@ -618,7 +492,7 @@ console.log('Doubled:', doubled);`,
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor kod online dengan auto-detect dan persistent save
+                Editor kod online dengan line numbers dan responsive scrolling
               </span>
               
               {user && (
@@ -845,45 +719,37 @@ console.log('Doubled:', doubled);`,
                   </div>
                 </div>
 
-                {/* Code Editor with FIXED Syntax Highlighting */}
-                <div className="relative">
-                  {/* Line Numbers */}
+                {/* FIXED: Code Editor with Proper Line Numbers and Scrolling */}
+                <div className="relative flex bg-gray-900">
+                  {/* FIXED: Line Numbers with Proper Styling */}
                   <div 
-                    className="absolute left-0 top-0 w-12 h-full bg-gray-800/30 border-r border-gray-700 p-4 font-mono text-sm text-gray-500 pointer-events-none overflow-hidden"
-                    style={{ fontSize: '14px', lineHeight: '1.5' }}
+                    ref={lineNumbersRef}
+                    className="flex-shrink-0 w-16 bg-gray-800/50 border-r border-gray-700 py-4 px-2 font-mono text-sm text-gray-500 overflow-hidden select-none"
+                    style={{ 
+                      fontSize: '14px', 
+                      lineHeight: '1.5',
+                      maxHeight: '400px'
+                    }}
                   >
-                    <pre className="whitespace-pre">{getLineNumbers(activeTab.content)}</pre>
+                    <pre className="whitespace-pre text-right">{generateLineNumbers(activeTab.content)}</pre>
                   </div>
                   
-                  {/* FIXED: Syntax Highlighted Background */}
-                  <div 
-                    ref={highlightRef}
-                    className="absolute inset-0 pl-12 p-4 font-mono pointer-events-none overflow-auto whitespace-pre-wrap break-words text-white"
-                    style={{ 
-                      fontSize: '14px',
-                      lineHeight: '1.5',
-                      backgroundColor: '#1a1a1a',
-                      zIndex: 1
-                    }}
-                    dangerouslySetInnerHTML={{
-                      __html: applySyntaxHighlighting(activeTab.content, activeTab.language)
-                    }}
-                  />
-                  
-                  {/* Transparent Textarea */}
-                  <textarea
-                    ref={textareaRef}
-                    value={activeTab.content}
-                    onChange={(e) => handleContentChange(e.target.value)}
-                    placeholder="Write your code here..."
-                    className="relative w-full h-96 pl-12 p-4 resize-none focus:outline-none font-mono bg-transparent text-transparent caret-white"
-                    style={{ 
-                      fontSize: '14px',
-                      lineHeight: '1.5',
-                      zIndex: 2
-                    }}
-                    spellCheck={false}
-                  />
+                  {/* FIXED: Code Textarea with Proper Scrolling */}
+                  <div className="flex-1 relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={activeTab.content}
+                      onChange={(e) => handleContentChange(e.target.value)}
+                      placeholder="Write your code here..."
+                      className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
+                      style={{ 
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        minHeight: '400px'
+                      }}
+                      spellCheck={false}
+                    />
+                  </div>
                 </div>
 
                 {/* Status Bar */}
@@ -895,8 +761,8 @@ console.log('Doubled:', doubled);`,
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <span className="text-green-400">✓ Syntax Highlighting FIXED</span>
-                    <span className="text-blue-400">💾 Persistent Save</span>
+                    <span className="text-green-400">✓ Line Numbers FIXED</span>
+                    <span className="text-blue-400">✓ Responsive Scrolling</span>
                     {user && <span className="text-purple-400">🔒 User: {user.role}</span>}
                   </div>
                 </div>
