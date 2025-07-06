@@ -169,70 +169,6 @@ export default function RegisterPage() {
     return { score, feedback, color }
   }
 
-  // Helper function to wait for auth user to be available
-  const waitForAuthUser = async (userId: string, maxAttempts = 10): Promise<boolean> => {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const { data, error } = await supabase
-          .from('auth.users')
-          .select('id')
-          .eq('id', userId)
-          .single()
-
-        if (data && !error) {
-          console.log(`Auth user found on attempt ${attempt}`)
-          return true
-        }
-
-        console.log(`Attempt ${attempt}: Auth user not found yet, waiting...`)
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-      } catch (error) {
-        console.log(`Attempt ${attempt}: Error checking auth user:`, error)
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-    }
-
-    console.log('Max attempts reached, auth user not found')
-    return false
-  }
-
-  // Helper function to create profile with retry mechanism
-  const createProfileWithRetry = async (profileData: any, maxAttempts = 5): Promise<boolean> => {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        console.log(`Profile creation attempt ${attempt}`)
-        
-        const { data, error } = await supabase
-          .from('profiles')
-          .insert(profileData)
-          .select()
-
-        if (!error && data) {
-          console.log(`Profile created successfully on attempt ${attempt}:`, data)
-          return true
-        }
-
-        if (error) {
-          console.log(`Attempt ${attempt} failed:`, error.message)
-          
-          // If it's a foreign key constraint error, wait longer
-          if (error.message.includes('foreign key') || error.message.includes('violates')) {
-            console.log('Foreign key constraint error, waiting longer...')
-            await new Promise(resolve => setTimeout(resolve, 2000))
-          } else {
-            await new Promise(resolve => setTimeout(resolve, 1000))
-          }
-        }
-      } catch (error: any) {
-        console.log(`Attempt ${attempt} exception:`, error.message)
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-    }
-
-    console.log('Max profile creation attempts reached')
-    return false
-  }
-
   useEffect(() => {
     if (formData.password) {
       setPasswordStrength(checkPasswordStrength(formData.password))
@@ -302,79 +238,63 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      console.log('Starting registration process...')
+      console.log('Starting AUTH-ONLY registration...')
       console.log(`Email: ${formData.email}`)
-      console.log(`Role will be: ${emailValidation.role}`)
+      console.log(`Role: ${emailValidation.role}`)
 
-      // Step 1: Register with Supabase Auth
-      console.log('Step 1: Creating auth user...')
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // AUTH-ONLY APPROACH: No manual profile creation
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
+            // Store ALL data in auth metadata
+            full_name: formData.name,
             name: formData.name,
-            sekolah: formData.sekolah || null,
-            tingkatan: formData.tingkatan || null,
-            role: emailValidation.role
+            sekolah: formData.sekolah || '',
+            tingkatan: formData.tingkatan || '',
+            role: emailValidation.role,
+            xp: 0,
+            level: 1,
+            avatar_url: '',
+            bio: '',
+            // Additional metadata for profile creation
+            email: formData.email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }
         }
       })
 
-      if (authError) {
-        console.error('Auth registration error:', authError)
-        addNotification('error', `Ralat pendaftaran: ${authError.message}`)
+      if (error) {
+        console.error('Auth registration error:', error)
+        
+        // Handle specific error types
+        if (error.message.includes('already registered')) {
+          addNotification('error', 'Email ini sudah didaftarkan. Sila cuba log masuk.')
+        } else if (error.message.includes('invalid email')) {
+          addNotification('error', 'Format email tidak sah.')
+        } else if (error.message.includes('weak password')) {
+          addNotification('error', 'Password terlalu lemah. Sila gunakan password yang lebih kuat.')
+        } else {
+          addNotification('error', `Ralat pendaftaran: ${error.message}`)
+        }
         return
       }
 
-      if (!authData.user) {
-        addNotification('error', 'Ralat: User tidak dicipta')
-        return
-      }
-
-      console.log('Auth user created successfully:', authData.user.id)
-
-      // Step 2: Wait for auth user to be available in database
-      console.log('Step 2: Waiting for auth user to be available...')
-      const authUserReady = await waitForAuthUser(authData.user.id)
-      
-      if (!authUserReady) {
-        console.log('Auth user not ready, but continuing with profile creation...')
-      }
-
-      // Step 3: Create profile with retry mechanism
-      console.log('Step 3: Creating user profile...')
-      const profileData = {
-        id: authData.user.id,
-        email: formData.email,
-        name: formData.name,
-        sekolah: formData.sekolah || null,
-        tingkatan: formData.tingkatan || null,
-        role: emailValidation.role,
-        xp: 0,
-        level: 1,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      console.log('Profile data to create:', profileData)
-
-      const profileCreated = await createProfileWithRetry(profileData)
-
-      if (profileCreated) {
-        console.log('Registration completed successfully!')
+      if (data.user) {
+        console.log('AUTH-ONLY registration successful!')
+        console.log('User ID:', data.user.id)
+        console.log('User metadata:', data.user.user_metadata)
+        
         addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Sila semak email untuk pengesahan.`)
         
+        // Redirect to login after success
         setTimeout(() => {
-          router.push('/login')
+          router.push('/login?message=registration_success')
         }, 2000)
       } else {
-        console.log('Profile creation failed, but auth user exists')
-        addNotification('info', 'Akaun dicipta tetapi profil tidak lengkap. Sila cuba log masuk.')
-        
-        setTimeout(() => {
-          router.push('/login')
-        }, 3000)
+        addNotification('error', 'Ralat: Pendaftaran tidak berjaya')
       }
 
     } catch (error: any) {
