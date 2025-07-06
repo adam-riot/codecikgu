@@ -17,7 +17,9 @@ import {
   XCircle, 
   Info,
   Folder,
-  Trash2
+  Trash2,
+  Upload,
+  FolderOpen
 } from 'lucide-react'
 
 // Type Definitions
@@ -53,7 +55,27 @@ interface Notification {
 }
 
 // Language detection
-const detectLanguage = (code: string): string => {
+const detectLanguage = (code: string, fileName?: string): string => {
+  // First try to detect from file extension
+  if (fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    switch (ext) {
+      case 'js': return 'javascript'
+      case 'php': return 'php'
+      case 'py': return 'python'
+      case 'html': case 'htm': return 'html'
+      case 'css': return 'css'
+      case 'java': return 'java'
+      case 'cpp': case 'cc': case 'cxx': return 'cpp'
+      case 'c': return 'c'
+      case 'ts': return 'typescript'
+      case 'json': return 'json'
+      case 'xml': return 'xml'
+      case 'sql': return 'sql'
+    }
+  }
+  
+  // Fallback to content detection
   if (!code.trim()) return 'javascript'
   
   if (code.includes('<?php') || code.includes('$') || /\b(echo|print|var_dump)\b/.test(code)) {
@@ -94,7 +116,12 @@ const getFileExtension = (fileName: string, language: string): string => {
     html: 'html',
     css: 'css',
     java: 'java',
-    cpp: 'cpp'
+    cpp: 'cpp',
+    c: 'c',
+    typescript: 'ts',
+    json: 'json',
+    xml: 'xml',
+    sql: 'sql'
   }
   
   return `${fileName}.${extensions[language] || 'txt'}`
@@ -125,6 +152,35 @@ const getUserRole = async (userId: string): Promise<string> => {
     console.error('Exception in getUserRole:', error)
     return 'awam'
   }
+}
+
+// FIXED: Local storage functions for persistence
+const saveToLocalStorage = (tabs: Tab[], activeTabId: string) => {
+  try {
+    const playgroundState = {
+      tabs,
+      activeTabId,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('codecikgu_playground_state', JSON.stringify(playgroundState))
+    console.log('Saved to localStorage:', playgroundState)
+  } catch (error) {
+    console.error('Error saving to localStorage:', error)
+  }
+}
+
+const loadFromLocalStorage = (): { tabs: Tab[], activeTabId: string } | null => {
+  try {
+    const saved = localStorage.getItem('codecikgu_playground_state')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      console.log('Loaded from localStorage:', parsed)
+      return parsed
+    }
+  } catch (error) {
+    console.error('Error loading from localStorage:', error)
+  }
+  return null
 }
 
 export default function PlaygroundPage() {
@@ -175,9 +231,12 @@ for (let i = 1; i <= 10; i++) {
   const [showFileManager, setShowFileManager] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     checkUser()
+    // FIXED: Load saved state on component mount
+    loadSavedState()
   }, [])
 
   useEffect(() => {
@@ -186,7 +245,14 @@ for (let i = 1; i <= 10; i++) {
     }
   }, [user])
 
-  // FIXED: Proper scroll synchronization
+  // FIXED: Auto-save to localStorage whenever tabs or activeTabId changes
+  useEffect(() => {
+    if (tabs.length > 0) {
+      saveToLocalStorage(tabs, activeTabId)
+    }
+  }, [tabs, activeTabId])
+
+  // FIXED: Proper scroll synchronization with better event handling
   useEffect(() => {
     const textarea = textareaRef.current
     const lineNumbers = lineNumbersRef.current
@@ -194,17 +260,35 @@ for (let i = 1; i <= 10; i++) {
     if (textarea && lineNumbers) {
       const syncScroll = () => {
         lineNumbers.scrollTop = textarea.scrollTop
+        lineNumbers.scrollLeft = textarea.scrollLeft
       }
       
-      textarea.addEventListener('scroll', syncScroll)
-      textarea.addEventListener('input', syncScroll)
+      // Multiple event listeners for better sync
+      textarea.addEventListener('scroll', syncScroll, { passive: true })
+      textarea.addEventListener('input', syncScroll, { passive: true })
+      textarea.addEventListener('keyup', syncScroll, { passive: true })
+      textarea.addEventListener('mouseup', syncScroll, { passive: true })
+      
+      // Initial sync
+      syncScroll()
       
       return () => {
         textarea.removeEventListener('scroll', syncScroll)
         textarea.removeEventListener('input', syncScroll)
+        textarea.removeEventListener('keyup', syncScroll)
+        textarea.removeEventListener('mouseup', syncScroll)
       }
     }
-  }, [activeTabId])
+  }, [activeTabId, tabs])
+
+  const loadSavedState = () => {
+    const saved = loadFromLocalStorage()
+    if (saved && saved.tabs && saved.tabs.length > 0) {
+      setTabs(saved.tabs)
+      setActiveTabId(saved.activeTabId)
+      addNotification('info', 'Previous session restored')
+    }
+  }
 
   const checkUser = async () => {
     try {
@@ -260,10 +344,45 @@ for (let i = 1; i <= 10; i++) {
     updateTab(activeTabId, { content })
     
     // Auto-detect language
-    const detectedLang = detectLanguage(content)
     const activeTab = getActiveTab()
+    const detectedLang = detectLanguage(content, activeTab.name)
     if (detectedLang !== activeTab.language) {
       updateTab(activeTabId, { language: detectedLang })
+    }
+  }
+
+  // FIXED: File upload functionality
+  const handleFileUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target?.result as string
+      const language = detectLanguage(content, file.name)
+      
+      const newTab: Tab = {
+        id: Date.now().toString(),
+        name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+        content,
+        language,
+        saved: false
+      }
+      
+      setTabs(prev => [...prev, newTab])
+      setActiveTabId(newTab.id)
+      addNotification('success', `File ${file.name} uploaded successfully`)
+    }
+    
+    reader.readAsText(file)
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -458,10 +577,10 @@ for (let i = 1; i <= 10; i++) {
     addNotification('info', 'Tab closed')
   }
 
-  // FIXED: Generate line numbers properly
+  // FIXED: Generate line numbers with proper formatting
   const generateLineNumbers = (content: string): string => {
     const lines = content.split('\n')
-    return lines.map((_, index) => index + 1).join('\n')
+    return lines.map((_, index) => (index + 1).toString()).join('\n')
   }
 
   if (loading) {
@@ -479,6 +598,15 @@ for (let i = 1; i <= 10; i++) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".js,.php,.py,.html,.css,.java,.cpp,.c,.ts,.json,.xml,.sql,.txt"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       {/* Header */}
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -492,7 +620,7 @@ for (let i = 1; i <= 10; i++) {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor kod online dengan line numbers dan responsive scrolling
+                Editor kod online dengan persistent storage dan file upload
               </span>
               
               {user && (
@@ -507,6 +635,15 @@ for (let i = 1; i <= 10; i++) {
               )}
 
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleFileUpload}
+                  className="flex items-center space-x-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors duration-300"
+                  title="Open File from Computer"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  <span>Open</span>
+                </button>
+
                 <button
                   onClick={() => setShowFileManager(!showFileManager)}
                   className="p-2 text-gray-400 hover:text-white transition-colors duration-300"
@@ -693,6 +830,11 @@ for (let i = 1; i <= 10; i++) {
                     <option value="css">CSS</option>
                     <option value="java">Java</option>
                     <option value="cpp">C++</option>
+                    <option value="c">C</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="json">JSON</option>
+                    <option value="xml">XML</option>
+                    <option value="sql">SQL</option>
                   </select>
                 </div>
                 
@@ -719,36 +861,52 @@ for (let i = 1; i <= 10; i++) {
                   </div>
                 </div>
 
-                {/* FIXED: Code Editor with Proper Line Numbers and Scrolling */}
-                <div className="relative flex bg-gray-900">
-                  {/* FIXED: Line Numbers with Proper Styling */}
-                  <div 
-                    ref={lineNumbersRef}
-                    className="flex-shrink-0 w-16 bg-gray-800/50 border-r border-gray-700 py-4 px-2 font-mono text-sm text-gray-500 overflow-hidden select-none"
-                    style={{ 
-                      fontSize: '14px', 
-                      lineHeight: '1.5',
-                      maxHeight: '400px'
-                    }}
-                  >
-                    <pre className="whitespace-pre text-right">{generateLineNumbers(activeTab.content)}</pre>
-                  </div>
-                  
-                  {/* FIXED: Code Textarea with Proper Scrolling */}
-                  <div className="flex-1 relative">
-                    <textarea
-                      ref={textareaRef}
-                      value={activeTab.content}
-                      onChange={(e) => handleContentChange(e.target.value)}
-                      placeholder="Write your code here..."
-                      className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
+                {/* FIXED: Code Editor with Synchronized Line Numbers */}
+                <div className="relative">
+                  <div className="flex bg-gray-900">
+                    {/* FIXED: Line Numbers with Perfect Scrolling */}
+                    <div 
+                      ref={lineNumbersRef}
+                      className="flex-shrink-0 w-16 bg-gray-800/50 border-r border-gray-700 py-4 px-2 font-mono text-sm text-gray-500 overflow-hidden select-none user-select-none"
                       style={{ 
-                        fontSize: '14px',
+                        fontSize: '14px', 
                         lineHeight: '1.5',
-                        minHeight: '400px'
+                        height: '400px',
+                        overflowY: 'hidden',
+                        overflowX: 'hidden'
                       }}
-                      spellCheck={false}
-                    />
+                    >
+                      <pre 
+                        className="whitespace-pre text-right m-0 p-0"
+                        style={{ 
+                          fontSize: '14px', 
+                          lineHeight: '1.5',
+                          margin: 0,
+                          padding: 0
+                        }}
+                      >
+                        {generateLineNumbers(activeTab.content)}
+                      </pre>
+                    </div>
+                    
+                    {/* FIXED: Code Textarea with Perfect Alignment */}
+                    <div className="flex-1 relative">
+                      <textarea
+                        ref={textareaRef}
+                        value={activeTab.content}
+                        onChange={(e) => handleContentChange(e.target.value)}
+                        placeholder="Write your code here..."
+                        className="w-full h-96 p-4 resize-none focus:outline-none font-mono bg-gray-900 text-white border-none"
+                        style={{ 
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          height: '400px',
+                          margin: 0,
+                          padding: '16px'
+                        }}
+                        spellCheck={false}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -761,9 +919,10 @@ for (let i = 1; i <= 10; i++) {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <span className="text-green-400">✓ Line Numbers FIXED</span>
-                    <span className="text-blue-400">✓ Responsive Scrolling</span>
-                    {user && <span className="text-purple-400">🔒 User: {user.role}</span>}
+                    <span className="text-green-400">✓ Line Numbers Sync FIXED</span>
+                    <span className="text-blue-400">💾 Auto-Save Enabled</span>
+                    <span className="text-purple-400">📁 File Upload Ready</span>
+                    {user && <span className="text-yellow-400">🔒 User: {user.role}</span>}
                   </div>
                 </div>
               </div>
