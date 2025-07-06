@@ -9,29 +9,20 @@ import {
   Play, 
   Download, 
   Save, 
-  Search, 
   Plus, 
   X, 
   File, 
-  Folder,
   Terminal, 
   AlertTriangle, 
   CheckCircle, 
   XCircle, 
   Info,
   Settings,
-  Eye,
-  RefreshCw,
-  Cloud,
-  FolderOpen,
-  Shield,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  HardDrive
+  Folder,
+  Trash2
 } from 'lucide-react'
 
-// Types
+// Type Definitions
 interface User {
   id: string
   email: string
@@ -44,12 +35,17 @@ interface Tab {
   content: string
   language: string
   saved: boolean
+  file_id?: string
 }
 
-interface CodeError {
-  line: number
-  message: string
-  type: 'error' | 'warning'
+interface SavedFile {
+  id: string
+  name: string
+  content: string
+  language: string
+  user_id: string
+  created_at: string
+  updated_at: string
 }
 
 interface Notification {
@@ -58,102 +54,216 @@ interface Notification {
   message: string
 }
 
-interface FileSystemItem {
-  id: string
-  name: string
-  type: 'file' | 'folder'
-  content?: string
-  children?: FileSystemItem[]
-  expanded?: boolean
+// Language detection patterns
+const detectLanguage = (code: string): string => {
+  if (!code.trim()) return 'javascript'
+  
+  // PHP detection
+  if (code.includes('<?php') || code.includes('$') || /\b(echo|print|var_dump)\b/.test(code)) {
+    return 'php'
+  }
+  
+  // Python detection
+  if (/\b(def|import|print|if __name__|True|False|None)\b/.test(code) || code.includes('print(')) {
+    return 'python'
+  }
+  
+  // HTML detection
+  if (/<html|<head|<body|<div|<span|<!DOCTYPE/.test(code)) {
+    return 'html'
+  }
+  
+  // CSS detection
+  if (/\{[^}]*\}/.test(code) && /[.#][a-zA-Z]/.test(code)) {
+    return 'css'
+  }
+  
+  // Java detection
+  if (/\b(public class|System\.out\.println|public static void main)\b/.test(code)) {
+    return 'java'
+  }
+  
+  // C++ detection
+  if (/#include|using namespace std|cout|cin/.test(code)) {
+    return 'cpp'
+  }
+  
+  // Default to JavaScript
+  return 'javascript'
 }
 
-// Language configurations
-const LANGUAGE_CONFIG = {
-  javascript: {
-    extension: '.js',
-    defaultContent: `// Welcome to CodeCikgu Playground!
-console.log('Hello, World!');
-
-function greet(name) {
-  return 'Hello, ' + name + '!';
+// File extension mapping
+const getFileExtension = (fileName: string, language: string): string => {
+  if (fileName.includes('.')) return fileName
+  
+  const extensions: { [key: string]: string } = {
+    javascript: 'js',
+    php: 'php',
+    python: 'py',
+    html: 'html',
+    css: 'css',
+    java: 'java',
+    cpp: 'cpp'
+  }
+  
+  return `${fileName}.${extensions[language] || 'txt'}`
 }
 
-console.log(greet('CodeCikgu'));`,
-    executable: true
-  },
-  html: {
-    extension: '.html',
-    defaultContent: `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CodeCikgu HTML</title>
-</head>
-<body>
-    <h1>Hello, CodeCikgu!</h1>
-    <p>Write your HTML code here.</p>
-</body>
-</html>`,
-    executable: false
-  },
-  css: {
-    extension: '.css',
-    defaultContent: `/* CodeCikgu CSS Playground */
-body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    margin: 0;
-    padding: 20px;
+// FIXED: Proper syntax highlighting function
+const applySyntaxHighlighting = (code: string, language: string): string => {
+  if (!code) return ''
+  
+  let highlighted = code
+  
+  // Escape HTML first
+  highlighted = highlighted
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  
+  if (language === 'javascript') {
+    // Keywords
+    highlighted = highlighted.replace(
+      /\b(const|let|var|function|if|else|for|while|return|class|import|export|async|await|try|catch|finally|throw|new|this)\b/g,
+      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
+    )
+    
+    // Strings
+    highlighted = highlighted.replace(
+      /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g,
+      '<span style="color: #ce9178;">$&</span>'
+    )
+    
+    // Comments
+    highlighted = highlighted.replace(
+      /(\/\/.*$)/gm,
+      '<span style="color: #6a9955; font-style: italic;">$&</span>'
+    )
+    
+    // Numbers
+    highlighted = highlighted.replace(
+      /\b(\d+\.?\d*)\b/g,
+      '<span style="color: #b5cea8;">$&</span>'
+    )
+  } else if (language === 'php') {
+    // PHP tags
+    highlighted = highlighted.replace(
+      /(&lt;\?php|\?&gt;)/g,
+      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
+    )
+    
+    // Variables
+    highlighted = highlighted.replace(
+      /\$[a-zA-Z_][a-zA-Z0-9_]*/g,
+      '<span style="color: #9cdcfe;">$&</span>'
+    )
+    
+    // Keywords
+    highlighted = highlighted.replace(
+      /\b(echo|print|var_dump|function|class|public|private|protected|if|else|for|while|return)\b/g,
+      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
+    )
+    
+    // Strings
+    highlighted = highlighted.replace(
+      /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+      '<span style="color: #ce9178;">$&</span>'
+    )
+    
+    // Comments
+    highlighted = highlighted.replace(
+      /(\/\/.*$|#.*$)/gm,
+      '<span style="color: #6a9955; font-style: italic;">$&</span>'
+    )
+  } else if (language === 'python') {
+    // Keywords
+    highlighted = highlighted.replace(
+      /\b(def|class|import|from|if|elif|else|for|while|try|except|finally|return|True|False|None|and|or|not|in|is)\b/g,
+      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
+    )
+    
+    // Strings
+    highlighted = highlighted.replace(
+      /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+      '<span style="color: #ce9178;">$&</span>'
+    )
+    
+    // Comments
+    highlighted = highlighted.replace(
+      /(#.*$)/gm,
+      '<span style="color: #6a9955; font-style: italic;">$&</span>'
+    )
+    
+    // Numbers
+    highlighted = highlighted.replace(
+      /\b(\d+\.?\d*)\b/g,
+      '<span style="color: #b5cea8;">$&</span>'
+    )
+  } else if (language === 'html') {
+    // Tags
+    highlighted = highlighted.replace(
+      /(&lt;\/?[a-zA-Z][^&gt;]*&gt;)/g,
+      '<span style="color: #569cd6; font-weight: bold;">$&</span>'
+    )
+    
+    // Attributes
+    highlighted = highlighted.replace(
+      /\s([a-zA-Z-]+)=/g,
+      ' <span style="color: #92c5f7;">$1</span>='
+    )
+    
+    // Strings
+    highlighted = highlighted.replace(
+      /(["'])((?:\\.|(?!\1)[^\\])*?)\1/g,
+      '<span style="color: #ce9178;">$&</span>'
+    )
+  } else if (language === 'css') {
+    // Selectors
+    highlighted = highlighted.replace(
+      /([.#]?[a-zA-Z][a-zA-Z0-9-]*)\s*\{/g,
+      '<span style="color: #d7ba7d;">$1</span> {'
+    )
+    
+    // Properties
+    highlighted = highlighted.replace(
+      /([a-zA-Z-]+)\s*:/g,
+      '<span style="color: #9cdcfe;">$1</span>:'
+    )
+    
+    // Values
+    highlighted = highlighted.replace(
+      /:\s*([^;]+);/g,
+      ': <span style="color: #ce9178;">$1</span>;'
+    )
+  }
+  
+  return highlighted
 }
 
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}`,
-    executable: false
-  },
-  python: {
-    extension: '.py',
-    defaultContent: `# Welcome to CodeCikgu Python Playground!
-print("Hello, World!")
-
-def greet(name):
-    return f"Hello, {name}!"
-
-print(greet("CodeCikgu"))
-
-# Example: Simple calculator
-def add(a, b):
-    return a + b
-
-result = add(5, 3)
-print(f"5 + 3 = {result}")`,
-    executable: false
-  },
-  php: {
-    extension: '.php',
-    defaultContent: `<?php
-// Welcome to CodeCikgu PHP Playground!
-echo "Hello, World!\\n";
-
-function greet($name) {
-    return "Hello, " . $name . "!";
-}
-
-echo greet("CodeCikgu") . "\\n";
-
-// Example: Simple array
-$fruits = ["apple", "banana", "orange"];
-foreach ($fruits as $fruit) {
-    echo "I like " . $fruit . "\\n";
-}
-?>`,
-    executable: false
+// FIXED: Get user role function with better error handling
+const getUserRole = async (userId: string): Promise<string> => {
+  try {
+    console.log('Fetching role for user ID:', userId)
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+    
+    console.log('Database response:', { data, error })
+    
+    if (error) {
+      console.error('Error fetching user role:', error)
+      return 'awam'
+    }
+    
+    const role = data?.role || 'awam'
+    console.log('Final role:', role)
+    return role
+  } catch (error) {
+    console.error('Exception in getUserRole:', error)
+    return 'awam'
   }
 }
 
@@ -164,53 +274,79 @@ export default function PlaygroundPage() {
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: '1',
-      name: 'main.js',
-      content: LANGUAGE_CONFIG.javascript.defaultContent,
+      name: 'main',
+      content: `// Welcome to CodeCikgu Playground!
+console.log('Hello, World!');
+
+function greet(name) {
+  return 'Hello, ' + name + '!';
+}
+
+console.log(greet('CodeCikgu'));
+
+// Try some operations
+const numbers = [1, 2, 3, 4, 5];
+const doubled = numbers.map(n => n * 2);
+console.log('Doubled:', doubled);`,
       language: 'javascript',
       saved: false
     }
   ])
   const [activeTabId, setActiveTabId] = useState('1')
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [codeErrors, setCodeErrors] = useState<CodeError[]>([])
   const [executionOutput, setExecutionOutput] = useState('')
   const [showOutput, setShowOutput] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [showSearch, setShowSearch] = useState(false)
-  const [fileSystem, setFileSystem] = useState<FileSystemItem[]>([
-    {
-      id: 'root',
-      name: 'My Project',
-      type: 'folder',
-      expanded: true,
-      children: [
-        {
-          id: 'main-js',
-          name: 'main.js',
-          type: 'file',
-          content: LANGUAGE_CONFIG.javascript.defaultContent
-        }
-      ]
-    }
-  ])
-
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [savedFiles, setSavedFiles] = useState<SavedFile[]>([])
+  const [showFileManager, setShowFileManager] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     checkUser()
   }, [])
 
+  useEffect(() => {
+    if (user) {
+      loadSavedFiles()
+    }
+  }, [user])
+
+  // Sync scroll between textarea and highlight overlay
+  useEffect(() => {
+    const textarea = textareaRef.current
+    const highlight = highlightRef.current
+    
+    if (textarea && highlight) {
+      const syncScroll = () => {
+        highlight.scrollTop = textarea.scrollTop
+        highlight.scrollLeft = textarea.scrollLeft
+      }
+      
+      textarea.addEventListener('scroll', syncScroll)
+      return () => textarea.removeEventListener('scroll', syncScroll)
+    }
+  }, [])
+
   const checkUser = async () => {
     try {
+      console.log('Checking user session...')
       const { data: { session } } = await supabase.auth.getSession()
+      
       if (session && session.user) {
-        // Simple user object without complex role fetching
-        setUser({
+        console.log('Session found:', session.user.id)
+        const userRole = await getUserRole(session.user.id)
+        
+        const userData = {
           id: session.user.id,
           email: session.user.email || '',
-          role: 'awam' // Default role
-        })
+          role: userRole
+        }
+        
+        console.log('Setting user data:', userData)
+        setUser(userData)
+      } else {
+        console.log('No session found')
       }
     } catch (error) {
       console.error('Error checking user:', error)
@@ -245,103 +381,192 @@ export default function PlaygroundPage() {
   const handleContentChange = (content: string) => {
     updateTab(activeTabId, { content })
     
-    // Simple error detection for JavaScript
-    if (getActiveTab().language === 'javascript') {
-      const errors: CodeError[] = []
-      const lines = content.split('\n')
-      
-      lines.forEach((line, index) => {
-        // Simple syntax checks
-        if (line.includes('console.log(') && !line.includes(')')) {
-          errors.push({
-            line: index + 1,
-            message: 'Missing closing parenthesis',
-            type: 'error'
-          })
-        }
-        if (line.includes('{') && !content.includes('}')) {
-          errors.push({
-            line: index + 1,
-            message: 'Missing closing brace',
-            type: 'warning'
-          })
-        }
-      })
-      
-      setCodeErrors(errors)
+    // Auto-detect language
+    const detectedLang = detectLanguage(content)
+    const activeTab = getActiveTab()
+    if (detectedLang !== activeTab.language) {
+      updateTab(activeTabId, { language: detectedLang })
     }
   }
 
-  const executeCode = () => {
+  const executeCode = async () => {
     const activeTab = getActiveTab()
     
     if (activeTab.language === 'javascript') {
+      setIsExecuting(true)
+      setShowOutput(true)
+      
       try {
         const output: string[] = []
         const safeConsole = {
           log: (...args: any[]) => {
-            output.push(args.map(arg => String(arg)).join(' '))
+            output.push(args.map(arg => {
+              if (typeof arg === 'object') {
+                return JSON.stringify(arg, null, 2)
+              }
+              return String(arg)
+            }).join(' '))
           },
           error: (...args: any[]) => {
             output.push('ERROR: ' + args.map(arg => String(arg)).join(' '))
-          },
-          warn: (...args: any[]) => {
-            output.push('WARNING: ' + args.map(arg => String(arg)).join(' '))
           }
         }
         
-        // Create safe execution environment
-        const func = new Function('console', 'alert', activeTab.content)
-        func(safeConsole, () => {}) // Disable alert
+        const func = new Function('console', activeTab.content)
+        func(safeConsole)
         
-        setExecutionOutput(output.join('\n') || 'Code executed successfully (no output)')
-        setShowOutput(true)
+        setExecutionOutput(output.length > 0 ? output.join('\n') : 'Code executed successfully (no output)')
         addNotification('success', 'Code executed successfully')
       } catch (error) {
         const errorMessage = (error as Error).message
         setExecutionOutput(`Error: ${errorMessage}`)
-        setShowOutput(true)
         addNotification('error', 'Execution failed')
+      } finally {
+        setIsExecuting(false)
       }
     } else {
-      addNotification('info', `${activeTab.language} execution not supported in browser. Download file to run locally.`)
+      setExecutionOutput(`Execution not supported for ${activeTab.language}`)
+      setShowOutput(true)
+      addNotification('info', `Execution not available for ${activeTab.language}`)
     }
   }
 
   const downloadFile = () => {
     const activeTab = getActiveTab()
+    const properFileName = getFileExtension(activeTab.name, activeTab.language)
+    
     const blob = new Blob([activeTab.content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = activeTab.name
+    a.download = properFileName
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    addNotification('success', `File ${activeTab.name} downloaded`)
+    addNotification('success', `File downloaded as ${properFileName}`)
   }
 
-  const saveFile = () => {
-    updateTab(activeTabId, { saved: true })
-    addNotification('success', 'File saved successfully')
+  // FIXED: Persistent save functionality
+  const saveFile = async () => {
+    if (!user) {
+      addNotification('error', 'Please login to save files')
+      return
+    }
+
+    const activeTab = getActiveTab()
+    
+    try {
+      if (activeTab.file_id) {
+        // Update existing file
+        const { error } = await supabase
+          .from('playground_files')
+          .update({
+            name: activeTab.name,
+            content: activeTab.content,
+            language: activeTab.language,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', activeTab.file_id)
+          .eq('user_id', user.id) // Security: only update own files
+        
+        if (error) throw error
+        addNotification('success', 'File updated successfully')
+      } else {
+        // Create new file
+        const { data, error } = await supabase
+          .from('playground_files')
+          .insert({
+            name: activeTab.name,
+            content: activeTab.content,
+            language: activeTab.language,
+            user_id: user.id
+          })
+          .select()
+          .single()
+        
+        if (error) throw error
+        
+        // Update tab with file_id
+        updateTab(activeTabId, { file_id: data.id, saved: true })
+        addNotification('success', 'File saved successfully')
+      }
+      
+      // Reload saved files list
+      loadSavedFiles()
+    } catch (error) {
+      console.error('Save error:', error)
+      addNotification('error', 'Failed to save file')
+    }
   }
 
-  const createNewTab = (language: string = 'javascript') => {
-    const config = LANGUAGE_CONFIG[language as keyof typeof LANGUAGE_CONFIG]
-    const newId = Date.now().toString()
+  const loadSavedFiles = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('playground_files')
+        .select('*')
+        .eq('user_id', user.id) // Security: only load own files
+        .order('updated_at', { ascending: false })
+      
+      if (error) throw error
+      setSavedFiles(data || [])
+    } catch (error) {
+      console.error('Load files error:', error)
+    }
+  }
+
+  const loadFile = (file: SavedFile) => {
+    const newTab: Tab = {
+      id: Date.now().toString(),
+      name: file.name,
+      content: file.content,
+      language: file.language,
+      saved: true,
+      file_id: file.id
+    }
+    
+    setTabs(prev => [...prev, newTab])
+    setActiveTabId(newTab.id)
+    setShowFileManager(false)
+    addNotification('success', `Loaded ${file.name}`)
+  }
+
+  const deleteFile = async (fileId: string) => {
+    if (!user) return
+    
+    try {
+      const { error } = await supabase
+        .from('playground_files')
+        .delete()
+        .eq('id', fileId)
+        .eq('user_id', user.id) // Security: only delete own files
+      
+      if (error) throw error
+      
+      loadSavedFiles()
+      addNotification('success', 'File deleted')
+    } catch (error) {
+      console.error('Delete error:', error)
+      addNotification('error', 'Failed to delete file')
+    }
+  }
+
+  const createNewTab = () => {
+    const newId = (tabs.length + 1).toString()
     const newTab: Tab = {
       id: newId,
-      name: `new-file${config.extension}`,
-      content: config.defaultContent,
-      language,
+      name: `untitled-${newId}`,
+      content: '// New file\nconsole.log("Hello from new file!");',
+      language: 'javascript',
       saved: false
     }
     
     setTabs(prev => [...prev, newTab])
     setActiveTabId(newId)
-    addNotification('success', `New ${language} file created`)
+    addNotification('info', 'New tab created')
   }
 
   const closeTab = (tabId: string) => {
@@ -356,25 +581,13 @@ export default function PlaygroundPage() {
       const remainingTabs = tabs.filter(tab => tab.id !== tabId)
       setActiveTabId(remainingTabs[0].id)
     }
+    
+    addNotification('info', 'Tab closed')
   }
 
-  const searchInCode = (term: string) => {
-    const activeTab = getActiveTab()
-    const textarea = textareaRef.current
-    
-    if (!textarea || !term) return
-    
-    const content = activeTab.content.toLowerCase()
-    const searchTerm = term.toLowerCase()
-    const index = content.indexOf(searchTerm)
-    
-    if (index !== -1) {
-      textarea.focus()
-      textarea.setSelectionRange(index, index + term.length)
-      addNotification('success', `Found "${term}"`)
-    } else {
-      addNotification('error', `"${term}" not found`)
-    }
+  const getLineNumbers = (content: string): string => {
+    const lines = content.split('\n')
+    return lines.map((_, index) => index + 1).join('\n')
   }
 
   if (loading) {
@@ -405,7 +618,7 @@ export default function PlaygroundPage() {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-400">
-                Editor kod online dengan syntax highlighting dan auto error detection
+                Editor kod online dengan auto-detect dan persistent save
               </span>
               
               {user && (
@@ -414,35 +627,35 @@ export default function PlaygroundPage() {
                     ? 'bg-green-500/20 text-green-400' 
                     : 'bg-blue-500/20 text-blue-400'
                 }`}>
-                  <Shield className="w-3 h-3" />
+                  <div className="w-2 h-2 bg-current rounded-full"></div>
                   <span>Secure session untuk {user.role}: {user.email}</span>
                 </div>
               )}
 
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setShowSearch(!showSearch)}
+                  onClick={() => setShowFileManager(!showFileManager)}
                   className="p-2 text-gray-400 hover:text-white transition-colors duration-300"
-                  title="Search in code"
+                  title="File Manager"
                 >
-                  <Search className="w-4 h-4" />
-                </button>
-                
-                <button
-                  onClick={executeCode}
-                  disabled={!LANGUAGE_CONFIG[activeTab.language as keyof typeof LANGUAGE_CONFIG]?.executable}
-                  className="flex items-center space-x-2 px-4 py-2 bg-neon-green hover:bg-neon-green/90 disabled:bg-gray-600 disabled:cursor-not-allowed text-dark-black font-medium rounded-lg transition-colors duration-300"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>Run</span>
+                  <Folder className="w-4 h-4" />
                 </button>
                 
                 <button
                   onClick={saveFile}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-300"
+                  className="flex items-center space-x-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors duration-300"
                 >
                   <Save className="w-4 h-4" />
                   <span>Save</span>
+                </button>
+                
+                <button
+                  onClick={executeCode}
+                  disabled={isExecuting}
+                  className="flex items-center space-x-2 px-4 py-2 bg-neon-green hover:bg-neon-green/90 text-dark-black font-medium rounded-lg transition-colors duration-300 disabled:opacity-50"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>{isExecuting ? 'Running...' : 'Run'}</span>
                 </button>
                 
                 <button
@@ -458,25 +671,52 @@ export default function PlaygroundPage() {
         </div>
       </header>
 
-      {/* Search Bar */}
-      {showSearch && (
-        <div className="bg-gray-800/50 border-b border-gray-700 px-4 py-3">
-          <div className="max-w-7xl mx-auto flex items-center space-x-4">
-            <Search className="w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && searchInCode(searchTerm)}
-              placeholder="Search in code..."
-              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
-            />
-            <button
-              onClick={() => searchInCode(searchTerm)}
-              className="px-4 py-2 bg-electric-blue hover:bg-electric-blue/90 text-white text-sm rounded transition-colors duration-300"
-            >
-              Find
-            </button>
+      {/* File Manager Modal */}
+      {showFileManager && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-gray-900 rounded-xl p-6 w-96 max-w-90vw max-h-80vh overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Saved Files</h3>
+              <button
+                onClick={() => setShowFileManager(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {savedFiles.length === 0 ? (
+                <p className="text-gray-400 text-center py-4">No saved files yet</p>
+              ) : (
+                savedFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="text-white font-medium">{getFileExtension(file.name, file.language)}</div>
+                      <div className="text-xs text-gray-400">{file.language} • {new Date(file.updated_at).toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => loadFile(file)}
+                        className="px-3 py-1 bg-electric-blue hover:bg-electric-blue/90 text-white text-sm rounded transition-colors"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => deleteFile(file.id)}
+                        className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -507,16 +747,56 @@ export default function PlaygroundPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            {/* File Info */}
             <div className="glass-dark rounded-xl p-6">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                <File className="w-5 h-5 mr-2" />
-                Maklumat File
-              </h3>
+              <h3 className="text-lg font-bold text-white mb-4">File Explorer</h3>
+              
+              <div className="space-y-2">
+                {tabs.map((tab) => (
+                  <div
+                    key={tab.id}
+                    className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors duration-300 ${
+                      tab.id === activeTabId 
+                        ? 'bg-electric-blue/20 text-electric-blue' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                    }`}
+                    onClick={() => setActiveTabId(tab.id)}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <File className="w-4 h-4" />
+                      <span className="text-sm">{getFileExtension(tab.name, tab.language)}</span>
+                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                    </div>
+                    
+                    {tabs.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          closeTab(tab.id)
+                        }}
+                        className="text-gray-500 hover:text-red-400"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                
+                <button
+                  onClick={createNewTab}
+                  className="flex items-center space-x-2 w-full p-2 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded transition-colors duration-300"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="text-sm">New File</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="glass-dark rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">File Info</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Nama Fail</label>
+                  <label className="block text-sm text-gray-400 mb-2">File Name</label>
                   <input
                     type="text"
                     value={activeTab.name}
@@ -526,187 +806,81 @@ export default function PlaygroundPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Bahasa (Auto-Detect)</label>
+                  <label className="block text-sm text-gray-400 mb-2">Language (Auto-detected)</label>
                   <select
                     value={activeTab.language}
                     onChange={(e) => updateTab(activeTabId, { language: e.target.value })}
                     className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
                   >
                     <option value="javascript">JavaScript</option>
+                    <option value="php">PHP</option>
+                    <option value="python">Python</option>
                     <option value="html">HTML</option>
                     <option value="css">CSS</option>
-                    <option value="python">Python</option>
-                    <option value="php">PHP</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
                   </select>
                 </div>
                 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Status</label>
-                  <div className={`flex items-center space-x-2 px-3 py-2 rounded text-sm ${
-                    activeTab.saved 
-                      ? 'bg-green-500/20 text-green-400' 
-                      : 'bg-yellow-500/20 text-yellow-400'
-                  }`}>
-                    {activeTab.saved ? (
-                      <>
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Saved</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>Unsaved</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Source</label>
-                  <div className="flex items-center space-x-2 px-3 py-2 bg-gray-800/30 rounded text-sm text-gray-300">
-                    <HardDrive className="w-4 h-4" />
-                    <span>Memory</span>
-                  </div>
+                <div className="text-sm text-gray-400 space-y-1">
+                  <div>Lines: {activeTab.content.split('\n').length}</div>
+                  <div>Characters: {activeTab.content.length}</div>
+                  <div>Download as: <span className="text-electric-blue">{getFileExtension(activeTab.name, activeTab.language)}</span></div>
+                  <div>Status: <span className={activeTab.saved ? 'text-green-400' : 'text-yellow-400'}>{activeTab.saved ? 'Saved' : 'Unsaved'}</span></div>
                 </div>
               </div>
-            </div>
-
-            {/* User Session */}
-            <div className="glass-dark rounded-xl p-6">
-              <h3 className="text-lg font-bold text-white mb-4">User Session</h3>
-              
-              {user ? (
-                <div className={`p-4 rounded-lg ${
-                  user.role === 'murid' 
-                    ? 'bg-green-500/20 border border-green-500/30' 
-                    : 'bg-blue-500/20 border border-blue-500/30'
-                }`}>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Shield className="w-4 h-4 text-current" />
-                    <span className="font-medium text-current">
-                      {user.role === 'murid' ? 'awam' : user.role}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-300">{user.email}</p>
-                </div>
-              ) : (
-                <div className="p-4 bg-gray-500/20 border border-gray-500/30 rounded-lg">
-                  <p className="text-sm text-gray-400">Not logged in</p>
-                </div>
-              )}
-            </div>
-
-            {/* Theme */}
-            <div className="glass-dark rounded-xl p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Tema</h3>
-              
-              <select
-                value={theme}
-                onChange={(e) => setTheme(e.target.value as 'dark' | 'light')}
-                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-electric-blue"
-              >
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-              </select>
             </div>
           </div>
 
           {/* Main Editor */}
           <div className="lg:col-span-3">
             <div className="space-y-6">
-              {/* Tindakan Pantas */}
-              <div className="glass-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Tindakan Pantas</h3>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <button
-                    onClick={() => createNewTab('javascript')}
-                    className="flex items-center space-x-2 p-3 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 rounded-lg transition-colors duration-300"
-                  >
-                    <Plus className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm text-yellow-400">New Tab</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => setShowOutput(!showOutput)}
-                    className="flex items-center space-x-2 p-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors duration-300"
-                  >
-                    <Terminal className="w-4 h-4 text-blue-400" />
-                    <span className="text-sm text-blue-400">Console</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => window.open('https://developer.mozilla.org/en-US/docs/Web/JavaScript', '_blank')}
-                    className="flex items-center space-x-2 p-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg transition-colors duration-300"
-                  >
-                    <FileText className="w-4 h-4 text-purple-400" />
-                    <span className="text-sm text-purple-400">Docs</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      updateTab(activeTabId, { content: LANGUAGE_CONFIG[activeTab.language as keyof typeof LANGUAGE_CONFIG]?.defaultContent || '' })
-                      addNotification('success', 'Template loaded')
-                    }}
-                    className="flex items-center space-x-2 p-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg transition-colors duration-300"
-                  >
-                    <RefreshCw className="w-4 h-4 text-green-400" />
-                    <span className="text-sm text-green-400">Reset</span>
-                  </button>
-                </div>
-              </div>
-
               {/* Editor */}
               <div className="glass-dark rounded-xl overflow-hidden">
                 {/* Tab Bar */}
                 <div className="flex items-center bg-gray-800/50 border-b border-gray-700">
-                  {tabs.map((tab) => (
-                    <div
-                      key={tab.id}
-                      className={`flex items-center space-x-2 px-4 py-3 border-r border-gray-700 cursor-pointer transition-colors duration-300 ${
-                        tab.id === activeTabId 
-                          ? 'bg-gray-700/50 text-white' 
-                          : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-                      }`}
-                      onClick={() => setActiveTabId(tab.id)}
-                    >
-                      <span className="text-sm font-medium">{tab.name}</span>
-                      {!tab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
-                      {tabs.length > 1 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            closeTab(tab.id)
-                          }}
-                          className="text-gray-500 hover:text-red-400 transition-colors duration-300"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <button
-                    onClick={() => createNewTab()}
-                    className="p-3 text-gray-400 hover:text-white transition-colors duration-300"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-2 px-4 py-3 bg-gray-700/50 text-white">
+                    <span className="text-sm font-medium">{getFileExtension(activeTab.name, activeTab.language)}</span>
+                    {!activeTab.saved && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
+                  </div>
                 </div>
 
-                {/* Code Editor */}
+                {/* Code Editor with FIXED Syntax Highlighting */}
                 <div className="relative">
+                  {/* Line Numbers */}
+                  <div 
+                    className="absolute left-0 top-0 w-12 h-full bg-gray-800/30 border-r border-gray-700 p-4 font-mono text-sm text-gray-500 pointer-events-none overflow-hidden"
+                    style={{ fontSize: '14px', lineHeight: '1.5' }}
+                  >
+                    <pre className="whitespace-pre">{getLineNumbers(activeTab.content)}</pre>
+                  </div>
+                  
+                  {/* FIXED: Syntax Highlighted Background */}
+                  <div 
+                    ref={highlightRef}
+                    className="absolute inset-0 pl-12 p-4 font-mono pointer-events-none overflow-auto whitespace-pre-wrap break-words text-white"
+                    style={{ 
+                      fontSize: '14px',
+                      lineHeight: '1.5',
+                      backgroundColor: '#1a1a1a',
+                      zIndex: 1
+                    }}
+                    dangerouslySetInnerHTML={{
+                      __html: applySyntaxHighlighting(activeTab.content, activeTab.language)
+                    }}
+                  />
+                  
+                  {/* Transparent Textarea */}
                   <textarea
                     ref={textareaRef}
                     value={activeTab.content}
                     onChange={(e) => handleContentChange(e.target.value)}
-                    placeholder="Mula tulis kod anda di sini..."
-                    className="w-full h-96 p-4 bg-gray-900/50 text-white font-mono text-sm resize-none focus:outline-none"
+                    placeholder="Write your code here..."
+                    className="relative w-full h-96 pl-12 p-4 resize-none focus:outline-none font-mono bg-transparent text-transparent caret-white"
                     style={{ 
                       fontSize: '14px',
                       lineHeight: '1.5',
-                      backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff',
-                      color: theme === 'dark' ? '#ffffff' : '#000000'
+                      zIndex: 2
                     }}
                     spellCheck={false}
                   />
@@ -715,19 +889,15 @@ export default function PlaygroundPage() {
                 {/* Status Bar */}
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-800/30 border-t border-gray-700 text-sm text-gray-400">
                   <div className="flex items-center space-x-4">
-                    <span>Bahasa: {activeTab.language}</span>
-                    <span>Baris: {activeTab.content.split('\n').length}</span>
-                    <span>Aksara: {activeTab.content.length}</span>
-                    {codeErrors.length > 0 && (
-                      <span className="text-red-400">
-                        ⚠ {codeErrors.length} issues
-                      </span>
-                    )}
+                    <span>Language: {activeTab.language}</span>
+                    <span>Lines: {activeTab.content.split('\n').length}</span>
+                    <span>Characters: {activeTab.content.length}</span>
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <span>Tema: {theme}</span>
-                    <span className="text-green-400">✓ Syntax Highlighting FS API</span>
+                    <span className="text-green-400">✓ Syntax Highlighting FIXED</span>
+                    <span className="text-blue-400">💾 Persistent Save</span>
+                    {user && <span className="text-purple-400">🔒 User: {user.role}</span>}
                   </div>
                 </div>
               </div>
@@ -744,14 +914,6 @@ export default function PlaygroundPage() {
                     <div className="flex-1"></div>
                     
                     <button
-                      onClick={() => setExecutionOutput('')}
-                      className="p-3 text-gray-400 hover:text-white transition-colors duration-300"
-                      title="Clear output"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                    
-                    <button
                       onClick={() => setShowOutput(false)}
                       className="p-3 text-gray-400 hover:text-white transition-colors duration-300"
                     >
@@ -764,36 +926,11 @@ export default function PlaygroundPage() {
                       {executionOutput ? (
                         <pre className="text-gray-300 whitespace-pre-wrap">{executionOutput}</pre>
                       ) : (
-                        <div className="text-gray-500 flex items-center space-x-2">
-                          <Terminal className="w-4 h-4" />
-                          <span>Tiada error dijumpai!</span>
+                        <div className="text-gray-500">
+                          Click "Run" to execute your code and see the output here...
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Error Panel */}
-              {codeErrors.length > 0 && (
-                <div className="glass-dark rounded-xl overflow-hidden">
-                  <div className="flex items-center bg-red-500/20 border-b border-red-500/30 px-4 py-3">
-                    <AlertTriangle className="w-4 h-4 text-red-400 mr-2" />
-                    <span className="text-sm text-red-400">Errors ({codeErrors.length})</span>
-                  </div>
-
-                  <div className="p-4 space-y-2">
-                    {codeErrors.map((error, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 bg-red-500/10 border border-red-500/20 rounded">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                          error.type === 'error' ? 'bg-red-400' : 'bg-yellow-400'
-                        }`}></div>
-                        <div>
-                          <p className="text-sm text-gray-300">Line {error.line}: {error.message}</p>
-                          <p className="text-xs text-gray-500 capitalize">{error.type}</p>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}
