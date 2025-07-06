@@ -9,7 +9,6 @@ import {
   EyeOff, 
   Mail, 
   Lock, 
-  User, 
   ArrowRight, 
   Code, 
   Sparkles, 
@@ -19,7 +18,9 @@ import {
   Zap,
   Shield,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  User,
+  GraduationCap
 } from 'lucide-react'
 
 interface Notification {
@@ -30,8 +31,10 @@ interface Notification {
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -48,10 +51,65 @@ export default function LoginPage() {
     }, 5000)
   }
 
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        await redirectBasedOnRole(session.user.id)
+      }
+    }
+    checkUser()
+  }, [])
+
+  // Function to get user role and redirect accordingly
+  const redirectBasedOnRole = async (userId: string) => {
+    try {
+      console.log('Getting user role for redirect...', userId)
+      
+      // Get user profile to determine role
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role, name, email')
+        .eq('id', userId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching user profile:', error)
+        // Fallback: redirect to awam dashboard if profile not found
+        console.log('Profile not found, redirecting to awam dashboard')
+        router.push('/dashboard-awam')
+        return
+      }
+
+      console.log('User profile found:', profile)
+
+      // Redirect based on role
+      if (profile.role === 'murid') {
+        console.log('Redirecting murid to /dashboard-murid')
+        addNotification('success', `Selamat datang, ${profile.name}! (Murid)`)
+        router.push('/dashboard-murid')
+      } else {
+        console.log('Redirecting awam to /dashboard-awam')
+        addNotification('success', `Selamat datang, ${profile.name}! (Awam)`)
+        router.push('/dashboard-awam')
+      }
+    } catch (error: any) {
+      console.error('Error in redirectBasedOnRole:', error)
+      // Fallback to awam dashboard
+      addNotification('info', 'Selamat datang! Mengalihkan ke dashboard awam.')
+      router.push('/dashboard-awam')
+    }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!email || !password) {
+    if (!formData.email || !formData.password) {
       addNotification('error', 'Sila masukkan email dan password')
       return
     }
@@ -59,21 +117,39 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      console.log('Starting login process...', formData.email)
+
+      // Attempt login
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: formData.email,
+        password: formData.password
       })
 
       if (error) {
-        addNotification('error', error.message)
-      } else {
-        addNotification('success', 'Login berjaya! Mengalihkan ke dashboard...')
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 1500)
+        console.error('Login error:', error)
+        
+        if (error.message.includes('Invalid login credentials')) {
+          addNotification('error', 'Email atau password tidak betul')
+        } else if (error.message.includes('Email not confirmed')) {
+          addNotification('error', 'Sila sahkan email anda terlebih dahulu')
+        } else {
+          addNotification('error', `Ralat log masuk: ${error.message}`)
+        }
+        return
       }
-    } catch (error) {
-      addNotification('error', 'Ralat tidak dijangka berlaku')
+
+      if (data.user) {
+        console.log('Login successful, user ID:', data.user.id)
+        
+        // Get user role and redirect accordingly
+        await redirectBasedOnRole(data.user.id)
+      } else {
+        addNotification('error', 'Ralat: Log masuk tidak berjaya')
+      }
+
+    } catch (error: any) {
+      console.error('Unexpected login error:', error)
+      addNotification('error', `Ralat tidak dijangka: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -83,7 +159,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Floating Code Symbols */}
         <div className="absolute top-20 left-10 text-electric-blue/20 text-6xl font-mono animate-pulse">
           {'</>'}
         </div>
@@ -97,7 +172,6 @@ export default function LoginPage() {
           {'[]'}
         </div>
         
-        {/* Gradient Orbs */}
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-electric-blue/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-neon-green/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
@@ -126,7 +200,7 @@ export default function LoginPage() {
 
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex">
-        {/* Left Side - Branding & Features */}
+        {/* Left Side - Branding & Benefits */}
         <div className="hidden lg:flex lg:w-1/2 flex-col justify-center px-12 xl:px-16">
           <div className="max-w-lg">
             {/* Logo & Brand */}
@@ -138,39 +212,62 @@ export default function LoginPage() {
                 <h1 className="text-3xl font-bold text-gradient">CodeCikgu</h1>
               </div>
               <p className="text-xl text-gray-300 leading-relaxed">
-                Platform pembelajaran programming yang interaktif dengan playground kod online
+                Selamat kembali! Log masuk untuk meneruskan journey programming anda
               </p>
             </div>
 
-            {/* Features */}
+            {/* Role-based Access Info */}
+            <div className="mb-8 space-y-4">
+              <div className="p-4 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-xl border border-green-500/20">
+                <div className="flex items-center mb-3">
+                  <GraduationCap className="w-6 h-6 text-green-400 mr-2" />
+                  <h4 className="text-lg font-semibold text-white">Pelajar MOE (Murid)</h4>
+                </div>
+                <p className="text-gray-300 text-sm">
+                  Akses penuh ke dashboard murid dengan semua features XP, challenges, dan leaderboard
+                </p>
+              </div>
+
+              <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20">
+                <div className="flex items-center mb-3">
+                  <User className="w-6 h-6 text-blue-400 mr-2" />
+                  <h4 className="text-lg font-semibold text-white">Pengguna Awam</h4>
+                </div>
+                <p className="text-gray-300 text-sm">
+                  Akses ke dashboard awam dengan nota, playground, dan features pembelajaran asas
+                </p>
+              </div>
+            </div>
+
+            {/* Benefits */}
             <div className="space-y-6">
               <div className="flex items-start space-x-4">
                 <div className="w-10 h-10 bg-electric-blue/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 text-electric-blue" />
+                  <Sparkles className="w-5 h-5 text-electric-blue" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">Pembelajaran Interaktif</h3>
-                  <p className="text-gray-400">Nota, video, dan latihan yang mudah difahami untuk semua tahap</p>
+                  <h3 className="text-lg font-semibold text-white mb-1">Pembelajaran Berterusan</h3>
+                  <p className="text-gray-400">Akses ke nota, video, dan playground kod yang dikemas kini</p>
                 </div>
               </div>
 
               <div className="flex items-start space-x-4">
                 <div className="w-10 h-10 bg-neon-green/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Code className="w-5 h-5 text-neon-green" />
+                  <Zap className="w-5 h-5 text-neon-green" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">Playground Kod Online</h3>
-                  <p className="text-gray-400">Editor kod dengan syntax highlighting untuk JavaScript, PHP, Python, dan lagi</p>
+                  <h3 className="text-lg font-semibold text-white mb-1">Progress Tracking</h3>
+                  <p className="text-gray-400">Jejak kemajuan pembelajaran dan pencapaian anda</p>
                 </div>
               </div>
 
               <div className="flex items-start space-x-4">
                 <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Trophy className="w-5 h-5 text-purple-400" />
+                  <Code className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">Sistem XP & Leaderboard</h3>
-                  <p className="text-gray-400">Kumpul XP, naik level, dan bersaing dengan pelajar lain</p>
+                  <h3 className="text-lg font-semibold text-white mb-1">Kod Playground</h3>
+                  <p className="text-gray-400">Editor kod canggih untuk practice dan experiment</p>
                 </div>
               </div>
 
@@ -179,8 +276,8 @@ export default function LoginPage() {
                   <Users className="w-5 h-5 text-orange-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-1">Komuniti Pelajar</h3>
-                  <p className="text-gray-400">Belajar bersama dan berkongsi pengetahuan dengan rakan-rakan</p>
+                  <h3 className="text-lg font-semibold text-white mb-1">Komuniti</h3>
+                  <p className="text-gray-400">Belajar dan berkongsi dengan komuniti programmer</p>
                 </div>
               </div>
             </div>
@@ -198,21 +295,21 @@ export default function LoginPage() {
                 </div>
                 <h1 className="text-2xl font-bold text-gradient">CodeCikgu</h1>
               </div>
-              <p className="text-gray-400">Selamat kembali ke platform pembelajaran programming</p>
+              <p className="text-gray-400">Selamat kembali! Log masuk untuk meneruskan pembelajaran</p>
             </div>
 
             {/* Login Form */}
             <div className="glass-dark rounded-2xl p-8 border border-gray-700/50">
               <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-white mb-2">Log Masuk</h2>
-                <p className="text-gray-400">Masukkan maklumat akaun anda untuk meneruskan pembelajaran</p>
+                <p className="text-gray-400">Masukkan maklumat akaun anda</p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-6">
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                    Email
+                    Email *
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -221,10 +318,10 @@ export default function LoginPage() {
                     <input
                       id="email"
                       type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
                       className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300"
-                      placeholder="nama@example.com"
+                      placeholder="email@example.com"
                       required
                     />
                   </div>
@@ -233,7 +330,7 @@ export default function LoginPage() {
                 {/* Password Field */}
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                    Password
+                    Password *
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -242,8 +339,8 @@ export default function LoginPage() {
                     <input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      value={formData.password}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
                       className="w-full pl-10 pr-12 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-electric-blue focus:border-transparent transition-all duration-300"
                       placeholder="Masukkan password anda"
                       required
@@ -258,18 +355,8 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Remember Me & Forgot Password */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <input
-                      id="remember-me"
-                      type="checkbox"
-                      className="h-4 w-4 text-electric-blue focus:ring-electric-blue border-gray-600 rounded bg-gray-800"
-                    />
-                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-300">
-                      Ingat saya
-                    </label>
-                  </div>
+                {/* Forgot Password Link */}
+                <div className="text-right">
                   <Link
                     href="/forgot-password"
                     className="text-sm text-electric-blue hover:text-electric-blue/80 transition-colors duration-300"
@@ -287,7 +374,7 @@ export default function LoginPage() {
                   {loading ? (
                     <div className="flex items-center">
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                      Sedang log masuk...
+                      Log masuk...
                     </div>
                   ) : (
                     <div className="flex items-center">
@@ -297,16 +384,6 @@ export default function LoginPage() {
                   )}
                 </button>
 
-                {/* Divider */}
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-600"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-800 text-gray-400">atau</span>
-                  </div>
-                </div>
-
                 {/* Register Link */}
                 <div className="text-center">
                   <p className="text-gray-400">
@@ -315,7 +392,7 @@ export default function LoginPage() {
                       href="/daftar"
                       className="text-electric-blue hover:text-electric-blue/80 font-medium transition-colors duration-300"
                     >
-                      Daftar sekarang
+                      Daftar di sini
                     </Link>
                   </p>
                 </div>
@@ -324,13 +401,13 @@ export default function LoginPage() {
               {/* Security Badge */}
               <div className="mt-6 flex items-center justify-center text-gray-500 text-xs">
                 <Shield className="w-4 h-4 mr-1" />
-                <span>Dilindungi dengan enkripsi end-to-end</span>
+                <span>Sambungan anda dilindungi dengan enkripsi SSL</span>
               </div>
             </div>
 
             {/* Quick Access */}
             <div className="mt-6 text-center">
-              <p className="text-gray-500 text-sm mb-3">Akses pantas:</p>
+              <p className="text-gray-500 text-sm mb-3">Atau jelajahi tanpa log masuk:</p>
               <div className="flex justify-center space-x-4">
                 <Link
                   href="/playground"
