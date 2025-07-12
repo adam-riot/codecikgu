@@ -1,6 +1,28 @@
 # 📚 CodeCikgu - Penjajaran Kurikulum Sains Komputer Malaysia
 
-## 🎓 **Fokus Utama: Platform PdP Sains Komputer Tingkatan 4 & 5**
+## 🎓 **Platform PdP Sains Komputer Tingkatan 4 & 5**
+
+### 👥 **Struktur Pengguna Platform**
+
+#### 🎓 **MURID** (Pengguna Berdaftar)
+- ✅ Akses penuh kepada sistem gamifikasi (XP, lencana, streak)
+- ✅ Penjejakan kemajuan dan analitik pembelajaran
+- ✅ Kumpulan belajar dan features sosial
+- ✅ Leaderboard dan pertandingan
+- ✅ Simpan projek dan portfolio SPM
+
+#### 🌐 **AWAM** (Pengguna Umum)  
+- ✅ Akses kepada semua nota dan kandungan pembelajaran
+- ✅ Playground untuk mencuba kod
+- ✅ Kuiz dan latihan (tanpa penjejakan skor)
+- ❌ Tidak boleh akses sistem gamifikasi
+- ❌ Tidak boleh simpan kemajuan
+
+#### 👨‍💼 **ADMIN** (Pengurusan Platform)
+- 🔧 Memasukkan dan menguruskan cabaran baru
+- 🔧 Memasukkan dan menguruskan nota pembelajaran
+- 🔧 Memantau statistik dan analitik platform
+- 🔧 Pengurusan kandungan DSKP
 
 ### 📋 **Penjajaran dengan DSKP (Dokumen Standard Kurikulum dan Pentaksiran)**
 
@@ -21,9 +43,9 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Perkakasan komputer (input, pemprosesan, output, storan)
   - Perisian sistem dan aplikasi
   - Sistem pengendalian
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Lencana "Pakar Perkakasan" - kenalpasti komponen
-  - Kuiz interaktif tentang jenis-jenis perisian
+  - Kuiz interaktif dengan mata XP (murid berdaftar)
   - Simulasi pembinaan sistem komputer
 
 ### **Bab 2: Rangkaian Komputer**
@@ -32,9 +54,9 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Jenis-jenis rangkaian (LAN, WAN, Internet)
   - Protokol rangkaian
   - Keselamatan rangkaian
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Cabaran "Arkitek Rangkaian" - reka bentuk topologi
-  - Mini-game keselamatan siber
+  - Mini-game keselamatan siber dengan skor XP
   - Projek konfigurasi rangkaian maya
 
 ### **Bab 3: Penyelesaian Masalah**
@@ -43,10 +65,10 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Kaedah penyelesaian masalah
   - Carta alir dan pseudokod
   - Algoritma asas
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Lencana "Pemikir Logik" - selesaikan puzzles algoritma
-  - Cabaran carta alir interaktif
-  - Pertandingan pseudokod terbaik
+  - Cabaran carta alir interaktif dengan XP rewards
+  - Pertandingan pseudokod terbaik (leaderboard murid)
 
 ### **Bab 4: Pengaturcaraan Python (Asas)**
 **Standard Kandungan**: Memahami konsep pengaturcaraan asas
@@ -55,11 +77,11 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Pembolehubah dan jenis data
   - Operator dan ungkapan
   - Input dan output
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Sistem mata XP untuk setiap program berjaya
   - Lencana "Python Pemula" hingga "Python Mahir"
-  - Cabaran kod harian
-  - Leaderboard kemajuan kelas
+  - Cabaran kod harian dengan leaderboard
+  - Streak pembelajaran untuk memotivasi konsistensi
 
 ---
 
@@ -71,10 +93,10 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Pernyataan if-else
   - Gelung for dan while
   - Struktur kawalan bersarang
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Lencana "Master Control" - kuasai semua struktur
-  - Puzzle logik dengan if-else
-  - Cabaran gelung kreatif
+  - Puzzle logik dengan if-else dan XP rewards
+  - Cabaran gelung kreatif untuk murid berdaftar
 
 ### **Bab 2: Fungsi**
 **Standard Kandungan**: Memahami konsep fungsi dan modulariti
@@ -82,10 +104,10 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Definisi dan panggilan fungsi
   - Parameter dan pulangan nilai
   - Skop pembolehubah
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Lencana "Function Master" - cipta fungsi berguna
-  - Cabaran perpustakaan fungsi
-  - Projek kerjasama membina modul
+  - Cabaran perpustakaan fungsi dengan leaderboard
+  - Projek kerjasama membina modul (murid berdaftar)
 
 ### **Bab 3: Senarai dan String**
 **Standard Kandungan**: Memahami struktur data asas
@@ -93,10 +115,10 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
   - Operasi senarai Python
   - Manipulasi string
   - Kaedah built-in
-- 🎮 **Elemen Gamifikasi**:
+- 🎮 **Elemen Gamifikasi (Murid Sahaja)**:
   - Lencana "Data Ninja" - manipulasi data mahir
-  - Game pengisihan senarai
-  - Cabaran pemprosesan teks
+  - Game pengisihan senarai dengan mata XP
+  - Cabaran pemprosesan teks untuk murid berdaftar
 
 ### **Bab 4: Fail dan Pangkalan Data**
 **Standard Kandungan**: Memahami pengendalian data
@@ -111,39 +133,45 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
 
 ---
 
-## 🎯 **Sistem Gamifikasi Berasaskan DSKP**
+## 🎯 **Sistem Gamifikasi Berasaskan DSKP (Khusus Murid Berdaftar)**
 
-### **Mata XP (Experience Points)**
-- **10 XP**: Selesaikan nota satu subtopik
-- **25 XP**: Lulus kuiz dengan 80% ke atas
-- **50 XP**: Selesaikan cabaran kod
-- **100 XP**: Siapkan projek akhir bab
-- **200 XP**: Skor A dalam ujian sumatif
+### **Mata XP (Experience Points) - Murid Sahaja**
+- **10 XP**: Selesaikan nota satu subtopik (murid berdaftar)
+- **25 XP**: Lulus kuiz dengan 80% ke atas (murid berdaftar) 
+- **50 XP**: Selesaikan cabaran kod (murid berdaftar)
+- **100 XP**: Siapkan projek akhir bab (murid berdaftar)
+- **200 XP**: Skor A dalam ujian sumatif (murid berdaftar)
 
-### **Sistem Lencana (Badges)**
+### **Sistem Lencana (Badges) - Murid Sahaja**
 
-#### **Lencana Kemahiran Asas**
+#### **Lencana Kemahiran Asas (Murid Berdaftar)**
 - 🥉 **Bronze Coder**: Tulis 10 program Python pertama
 - 🥈 **Silver Solver**: Selesaikan 25 masalah algoritma
 - 🥇 **Gold Developer**: Cipta 5 projek kreatif
 
-#### **Lencana Topik Khusus**
+#### **Lencana Topik Khusus (Admin Tetapkan Criteria)**
 - 🖥️ **Hardware Hero**: Kuasai Bab Sistem Komputer
 - 🌐 **Network Ninja**: Mahir dalam Rangkaian Komputer
 - 🧠 **Logic Master**: Cemerlang dalam Penyelesaian Masalah
 - 🐍 **Python Pro**: Pakar dalam semua aspek Python
 
-#### **Lencana Prestasi**
+#### **Lencana Prestasi (Streak & Social)**
 - 📈 **Consistent Learner**: Login 30 hari berturut-turut
-- 🏆 **Class Champion**: Ranking 1 dalam kelas
-- 🤝 **Team Player**: Aktif dalam projek berkumpulan
+- 🏆 **Class Champion**: Top 10 dalam leaderboard murid
+- 🤝 **Team Player**: Aktif dalam projek berkumpulan (murid sahaja)
 - 📚 **Knowledge Seeker**: Baca semua nota tambahan
 
-### **Cabaran Mingguan/Bulanan**
+### **Cabaran Mingguan/Bulanan (Admin Cipta, Murid Sertai)**
 - **Minggu 1**: "Debug Detective" - betulkan kod yang rosak
 - **Minggu 2**: "Algorithm Artist" - cipta algoritma kreatif
-- **Minggu 3**: "Team Builder" - projek kerjasama
+- **Minggu 3**: "Team Builder" - projek kerjasama murid
 - **Minggu 4**: "Innovation Hub" - bina sesuatu yang baru
+
+### **Leaderboard & Social (Murid Sahaja)**
+- 🏆 **Weekly Leaderboard**: Reset setiap minggu untuk murid
+- 📊 **Monthly Champions**: Pengiktirafan bulanan murid cemerlang
+- 🎯 **Subject Masters**: Ranking mengikut topik T4/T5
+- 🤝 **Study Groups**: Kumpulan belajar untuk murid berdaftar
 
 ---
 
@@ -151,29 +179,31 @@ CodeCikgu direka khusus untuk menyokong pengajaran dan pembelajaran subjek **Sai
 
 ### **Jenis Penilaian**
 
-#### **1. Kuiz Formatif (20%)**
-- Soalan objektif (MCQ) berasaskan buku teks
-- Respons segera dengan penjelasan
-- Pembetulan automatik
-- Skor disimpan untuk analitik guru
+#### **1. Kuiz Formatif (Akses Awam & Murid)**
+- Soalan objektif (MCQ) berasaskan buku teks - semua boleh akses
+- Respons segera dengan penjelasan - awam & murid
+- Pembetulan automatik - universal access
+- **Skor XP**: Hanya untuk murid berdaftar
+- **Analytics**: Hanya tracking untuk murid
 
-#### **2. Tugasan Praktik (30%)**
-- Cabaran pengaturcaraan mengikut topik
-- Sistem ujian automatik
-- Rubrik penilaian yang jelas
-- Portfolio digital murid
+#### **2. Tugasan Praktik (Akses Awam & Murid)**
+- Cabaran pengaturcaraan mengikut topik - semua boleh akses
+- Sistem ujian automatik - universal access
+- **XP & Progress**: Hanya untuk murid berdaftar
+- **Portfolio Digital**: Hanya murid boleh simpan
+- **Admin**: Cipta dan urus semua cabaran
 
-#### **3. Projek Berkumpulan (25%)**
-- Simulasi projek SPM
-- Kerjasama dalam kumpulan 3-4 orang
-- Penilaian rakan sebaya
-- Pembentangan digital
+#### **3. Projek Berkumpulan (Murid Sahaja)**
+- Simulasi projek SPM - murid berdaftar sahaja
+- Kerjasama dalam kumpulan 3-4 orang - social features
+- Penilaian rakan sebaya - murid sahaja
+- Pembentangan digital dengan XP rewards
 
-#### **4. Ujian Sumatif (25%)**
-- Format sama dengan kertas SPM
-- Soalan struktural dan esei
-- Penjadwalan fleksibel
-- Analisis prestasi detail
+#### **4. Ujian Sumatif (Akses Awam & Murid)**
+- Format sama dengan kertas SPM - semua boleh akses
+- Soalan struktural dan esei - universal access
+- **Grade Tracking**: Hanya untuk murid berdaftar
+- **Analisis Prestasi**: Hanya murid dapat insights
 
 ### **Contoh Soalan Berasaskan DSKP**
 
@@ -213,19 +243,29 @@ def process_student_data(filename):
 
 ---
 
-## 🏫 **Peranan Guru dan Murid**
+## 🏫 **Struktur Akses Platform**
 
-### **Dashboard Guru**
-- 📊 **Pemantauan Kemajuan**: Real-time progress setiap murid
-- 📈 **Analitik Prestasi**: Breakdown mengikut topik dan kemahiran
-- 📋 **Pengurusan Kelas**: Tugasan, ujian, dan cabaran
-- 💬 **Komunikasi**: Maklum balas dan perbincangan dengan murid
-- 📁 **Sumber Bahan**: Bank soalan dan bahan tambahan
+### **Admin Platform**
+- � **Pengurusan Kandungan**: Cipta dan edit cabaran baru
+- 📝 **Pengurusan Nota**: Muat naik dan organisasi nota pembelajaran  
+- � **Analitik Platform**: Monitor penggunaan dan prestasi keseluruhan
+- � **Pengurusan Pengguna**: Pantau aktiviti murid dan awam
+- � **Laporan Statistik**: Data penggunaan dan engagement metrics
 
-### **Dashboard Murid**
-- 🎯 **Kemajuan Diri**: XP, lencana, dan pencapaian
-- 📚 **Nota Digital**: Akses kepada semua bab dan subtopik
-- 🎮 **Gamifikasi**: Cabaran harian dan mingguan
+### **Dashboard Murid (Berdaftar)**
+- 🎯 **Kemajuan Diri**: XP, lencana, dan pencapaian terkumpul
+- 📚 **Nota Digital**: Akses penuh kepada semua kandungan
+- 🎮 **Gamifikasi**: Cabaran harian, streak, dan leaderboard
+- 🤝 **Kumpulan Belajar**: Join dan cipta study groups
+- 📊 **Analitik Peribadi**: Track progress dan areas untuk improvement
+- 💾 **Portfolio**: Simpan dan urus projek-projek
+
+### **Akses Awam (Tidak Berdaftar)**
+- 📖 **Nota Pembelajaran**: Baca semua kandungan buku teks
+- 💻 **Playground**: Mencuba kod dan latihan
+- 📝 **Kuiz Asas**: Buat kuiz tanpa tracking skor
+- ❌ **Tiada Gamifikasi**: Tidak dapat XP, lencana, atau leaderboard
+- ❌ **Tiada Simpanan**: Tidak boleh save progress atau projek
 - 👥 **Kolaborasi**: Projek berkumpulan dan perbincangan
 - 📊 **Analitik Diri**: Kekuatan dan kelemahan dalam topik
 

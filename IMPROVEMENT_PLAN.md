@@ -9,12 +9,36 @@ CodeCikgu adalah platform pembelajaran digital khusus untuk **subjek Sains Kompu
 - 🎯 **Sistem Gamifikasi** untuk meningkatkan penglibatan murid
 - 🏫 **Keperluan Guru dan Murid** sekolah menengah Malaysia
 
+### 👥 **Struktur Pengguna Platform**
+Platform ini mempunyai **DUA jenis pengguna utama** dengan had akses yang berbeza:
+
+#### 🎓 **MURID** (Pengguna Berdaftar)
+- ✅ Akses penuh kepada semua ciri platform
+- ✅ Sistem gamifikasi (XP, lencana, cabaran, streak)
+- ✅ Penjejakan kemajuan dan analitik
+- ✅ Ciri sosial (kumpulan belajar, leaderboard)
+- ✅ Simpan projek dan kemajuan pembelajaran
+
+#### 🌐 **AWAM** (Pengguna Umum)
+- ✅ Akses kepada nota dan kandungan pembelajaran
+- ✅ Playground untuk mencuba kod
+- ✅ Kuiz dan latihan asas
+- ❌ **TIDAK** boleh akses sistem gamifikasi
+- ❌ **TIDAK** boleh simpan kemajuan
+- ❌ **TIDAK** boleh sertai kumpulan atau leaderboard
+
+#### 👨‍💼 **ADMIN** (Pengurusan Kandungan)
+- 🔧 Menguruskan dan memasukkan **cabaran** baru
+- 🔧 Menguruskan dan memasukkan **nota** pembelajaran
+- 🔧 Memantau prestasi platform secara keseluruhan
+- 🔧 Pengurusan kandungan dan kurikulum
+
 ### 🎯 **Objektif Utama**
 1. **Sokongan Kurikulum**: Mengikut DSKP Sains Komputer Malaysia
 2. **Pembelajaran Interaktif**: Nota, latihan, dan aktiviti berasaskan buku teks
-3. **Gamifikasi**: Sistem mata, lencana, dan cabaran untuk motivasi
+3. **Gamifikasi Terhad**: Sistem mata, lencana, dan cabaran **khusus untuk murid**
 4. **Penilaian**: Ujian dan kuiz selaras dengan format SPM
-5. **Pemantauan**: Analitik untuk guru memantau kemajuan murid
+5. **Akses Terbuka**: Kandungan asas boleh diakses oleh awam
 
 ## 🎯 Keutamaan Penambahbaikan (Selaras dengan Kurikulum Malaysia)
 
@@ -34,13 +58,13 @@ CodeCikgu adalah platform pembelajaran digital khusus untuk **subjek Sains Kompu
 - [x] Ciri kerjasama kod untuk kerja berkumpulan
 - [x] Alat debugging langkah-demi-langkah
 
-### 3. Peningkatan Gamifikasi (Motivasi Murid)
-- [x] Sistem lencana pencapaian
-- [x] Cabaran mingguan/bulanan
-- [x] Penjejakan streak pembelajaran
-- [x] Ciri sosial (kumpulan belajar)
-- [x] Carta visualisasi kemajuan
-- [x] Pertandingan pengaturcaraan kompetitif
+### 3. Peningkatan Gamifikasi (Khusus untuk Murid)
+- [x] Sistem lencana pencapaian untuk murid berdaftar
+- [x] Cabaran mingguan/bulanan (dimasukkan oleh admin)
+- [x] Penjejakan streak pembelajaran untuk murid
+- [x] Ciri sosial (kumpulan belajar untuk murid)
+- [x] Carta visualisasi kemajuan (profil murid)
+- [x] Pertandingan pengaturcaraan kompetitif (murid sahaja)
 
 ### 4. Prestasi & Teknikal
 - [x] Pengoptimuman dan pemuatan lembap imej
@@ -51,19 +75,19 @@ CodeCikgu adalah platform pembelajaran digital khusus untuk **subjek Sains Kompu
 - [x] Penambahbaikan SEO
 
 ### 5. Kandungan & Pembelajaran (Selaras Kurikulum Malaysia)
-- [x] Integrasi video untuk pelajaran
-- [x] Kuiz interaktif berasaskan soalan SPM
-- [x] Cabaran kod dengan ujian automatik
-- [ ] Tugasan projek dunia sebenar (Portfolio SPM)
-- [ ] Bahagian bimbingan kerjaya dalam ICT
-- [ ] Temu bual pakar industri
+- [x] Integrasi video untuk pelajaran (admin menguruskan)
+- [x] Kuiz interaktif berasaskan soalan SPM (akses awam & murid)
+- [x] Cabaran kod dengan ujian automatik (admin cipta, murid/awam guna)
+- [ ] Tugasan projek dunia sebenar (Portfolio SPM - murid sahaja)
+- [ ] Bahagian bimbingan kerjaya dalam ICT (akses awam & murid)
+- [ ] Temu bual pakar industri (akses awam & murid)
 
-### 6. Analitik & Pelaporan (Untuk Guru & Pentadbir)
-- [x] Analitik kemajuan murid
-- [x] Cadangan laluan pembelajaran
-- [x] Wawasan prestasi untuk guru
-- [x] Dashboard statistik penggunaan
-- [x] Fungsi eksport untuk laporan
+### 6. Analitik & Pelaporan (Untuk Admin & Murid)
+- [x] Analitik kemajuan murid (profil murid & dashboard admin)
+- [x] Cadangan laluan pembelajaran (murid berdaftar)
+- [x] Dashboard statistik penggunaan (admin sahaja)
+- [x] Fungsi eksport untuk laporan (admin & murid)
+- [x] Pemantauan prestasi platform (admin sahaja)
 
 ## 🛠 Keutamaan Pelaksanaan (Berasaskan Kurikulum Sains Komputer Malaysia)
 
@@ -74,16 +98,16 @@ CodeCikgu adalah platform pembelajaran digital khusus untuk **subjek Sains Kompu
 4. Pengoptimuman prestasi
 
 ### Fasa 2 (Jangka pendek - 1 bulan): Ciri Pembelajaran Lanjutan
-1. Ciri playground yang dipertingkatkan
-2. Sistem pencapaian berasaskan DSKP
-3. Organisasi kandungan yang lebih baik mengikut topik buku teks
-4. Dashboard analitik untuk guru
+1. Ciri playground yang dipertingkatkan (akses awam & murid)
+2. Sistem pencapaian berasaskan DSKP (murid sahaja)
+3. Organisasi kandungan yang lebih baik mengikut topik buku teks (admin urus)
+4. Dashboard analitik untuk murid dan admin
 
 ### Fasa 3 (Jangka sederhana - 2-3 bulan): Ciri Sosial & Laporan
-1. Ciri sosial untuk pembelajaran berkumpulan
-2. Gamifikasi lanjutan dengan mata XP
-3. Integrasi kandungan video mengikut bab
-4. Pelaporan lanjutan untuk guru dan pentadbir
+1. Ciri sosial untuk pembelajaran berkumpulan (murid sahaja)
+2. Gamifikasi lanjutan dengan mata XP (murid sahaja)
+3. Integrasi kandungan video mengikut bab (admin urus, semua akses)
+4. Pelaporan lanjutan untuk admin dan profil murid
 
 ### Fasa 4 (Jangka panjang - 3-6 bulan): AI & Ciri Perusahaan
 1. Cadangan berasaskan AI untuk laluan pembelajaran
@@ -413,14 +437,14 @@ Ready to proceed to **Phase 3** implementation or begin comprehensive integratio
 - **100% Phase 2 completion** with comprehensive feature coverage
 
 **🔥 World-Class Features Delivered:**
-1. **Advanced Syntax Highlighting** - Professional code editor with 5 themes
-2. **Real-time Collaboration** - Live coding with voice/video and chat
-3. **Competitive Programming** - Complete contest platform with leaderboards  
-4. **Multimedia Learning** - Video integration with interactive features
-5. **Automated Assessment** - Code testing with real-time feedback
-6. **Analytics Dashboard** - Comprehensive progress visualization
-7. **Social Learning** - Study groups with community features
-8. **Professional Tools** - Project management and debugging systems
+1. **Advanced Syntax Highlighting** - Professional code editor (akses awam & murid)
+2. **Real-time Collaboration** - Live coding untuk murid berdaftar
+3. **Competitive Programming** - Contest platform untuk murid sahaja
+4. **Multimedia Learning** - Video integration (admin urus, semua akses)
+5. **Automated Assessment** - Code testing (admin cipta, semua guna)
+6. **Analytics Dashboard** - Progress visualization untuk murid & admin
+7. **Social Learning** - Study groups khusus untuk murid
+8. **Professional Tools** - Project management dan debugging (semua pengguna)
 
 **🌟 Platform Transformation:**
 CodeCikgu has evolved from a basic learning platform into a **world-class coding education ecosystem** that rivals industry leaders like LeetCode, HackerRank, and Coursera, while maintaining its unique Malaysian identity and educational focus.
@@ -506,17 +530,17 @@ The platform now offers a comprehensive learning ecosystem with advanced educati
 - Alat kerjasama masa nyata untuk kerja berkumpulan
 - Sistem penilaian komprehensif selaras dengan format SPM
 
-**🎯 Gamifikasi & Penglibatan:**
-- Sistem lencana dan pencapaian berasaskan DSKP
-- Penjejakan streak pembelajaran harian
-- Ciri pembelajaran sosial dan alat komuniti
-- Visualisasi kemajuan dan analitik
+**🎯 Gamifikasi & Penglibatan (Murid Sahaja):**
+- Sistem lencana dan pencapaian berasaskan DSKP (murid berdaftar)
+- Penjejakan streak pembelajaran harian (profil murid)
+- Ciri pembelajaran sosial dan alat komuniti (murid sahaja)
+- Visualisasi kemajuan dan analitik (dashboard murid)
 
 **📊 Analitik & Kecerdasan:**
-- Cadangan berasaskan AI untuk laluan pembelajaran
-- Penjejakan kemajuan komprehensif mengikut topik
-- Analitik prestasi guru
-- Statistik penggunaan dan pelaporan untuk pentadbir
+- Cadangan berasaskan AI untuk laluan pembelajaran (murid berdaftar)
+- Penjejakan kemajuan komprehensif mengikut topik (murid & admin)
+- Statistik penggunaan dan pelaporan untuk admin
+- Analytics dashboard untuk murid dan pengurusan admin
 
 **🔧 Kecemerlangan Teknikal:**
 - Reka bentuk responsif mudah alih dengan keupayaan PWA
@@ -573,17 +597,18 @@ With Phases 1-3 at 100% completion, CodeCikgu is now a production-ready platform
 
 ### 🏢 **4.3 Enterprise & Institutional Features**
 - **School Management System**
-  - Multi-school district support
-  - Administrative dashboards for principals
-  - Curriculum mapping and standards alignment
-  - Grade book integration
-  - Parent portal and progress reports
+  - Multi-school district support dengan admin panel
+  - Administrative dashboards untuk admin platform
+  - Curriculum mapping dan standards alignment (admin kelola)
+  - Monitoring penggunaan murid dan awam
+  - Reports dan analytics untuk pentadbiran sekolah
 
-- **Corporate Training Platform**
-  - Employee skill assessment and training
-  - Team collaboration tools
-  - Professional certification programs
-  - Skills gap analysis and reporting
+- **Content Management Platform**
+  - Admin tools untuk menguruskan nota dan cabaran
+  - Content creation dan editing tools untuk admin
+  - Bulk upload dan import system untuk kandungan
+  - Version control untuk notes dan challenges
+  - Quality assurance untuk kandungan platform
 
 ### 🔒 **4.4 Advanced Security & Assessment**
 - **Anti-Plagiarism System**
