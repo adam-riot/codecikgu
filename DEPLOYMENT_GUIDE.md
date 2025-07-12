@@ -14,8 +14,6 @@ Your CodeCikgu platform is now fully ready for deployment with:
 
 1. **Push to GitHub**:
    ```bash
-   git add .
-   git commit -m "🚀 Production Ready - CodeCikgu Platform v3.0"
    git push origin main
    ```
 
@@ -23,8 +21,12 @@ Your CodeCikgu platform is now fully ready for deployment with:
    - Visit: https://vercel.com/dashboard
    - Click "New Project"
    - Import your `codecikgu` repository
-   - Vercel auto-detects Next.js ✅
+   - Vercel auto-detects Next.js ✅ (No vercel.json needed!)
    - Click "Deploy" - Done in ~2 minutes!
+
+   **✅ Deployment Error Fixed!** 
+   - Removed vercel.json to avoid function runtime issues
+   - Next.js 15 handles everything automatically
 
 ### Option 2: CLI Deployment
 
