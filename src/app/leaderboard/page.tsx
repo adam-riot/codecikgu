@@ -4,6 +4,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
+import { SkeletonLeaderboard } from '@/components/LoadingSkeletons'
 
 interface LeaderboardEntry {
   id: string
@@ -208,11 +209,7 @@ export default function LeaderboardPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             {loading ? (
-              <div className="text-center py-12">
-                <div className="glass-dark rounded-2xl p-8">
-                  <div className="text-xl text-gray-400 loading-dots">Memuat papan pendahulu</div>
-                </div>
-              </div>
+              <SkeletonLeaderboard />
             ) : filteredLeaderboard.length > 0 ? (
               <>
                 {/* Top 3 Podium */}

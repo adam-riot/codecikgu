@@ -5,6 +5,10 @@ import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import { BookOpen, Video, FileText, Upload, Trophy, Star, Clock, CheckCircle, Code } from 'lucide-react'
 import Link from 'next/link'
+import { SkeletonStats, SkeletonCard } from '@/components/LoadingSkeletons'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { AchievementSummary, useAchievements } from '@/components/AchievementSystem'
+import { useMobileGestures } from '@/components/MobileGestures'
 
 interface Challenge {
   id: string
@@ -46,6 +50,10 @@ export default function DashboardMurid() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('available')
   const [user, setUser] = useState<any>(null)
+  const { checkAchievements } = useAchievements()
+  
+  // Add mobile gesture support
+  useMobileGestures()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -103,6 +111,18 @@ export default function DashboardMurid() {
       console.error('Error fetching data:', error)
     }
     setLoading(false)
+    
+    // Check for new achievements
+    if (user) {
+      checkAchievements({
+        totalXP: userStats.total_xp,
+        challengesCompleted: userStats.completed_challenges,
+        codeExecutions: 0, // Would need to track this
+        consecutiveDays: 0, // Would need to track this
+        notesRead: 0, // Would need to track this
+        tutorialsCompleted: 0, // Would need to track this
+      })
+    }
   }
 
   const getChallengeIcon = (type: string) => {
@@ -177,16 +197,48 @@ export default function DashboardMurid() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="text-2xl text-gradient loading-dots">Memuat dashboard murid</div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+        {/* Hero Section Skeleton */}
+        <section className="relative py-16 overflow-hidden bg-circuit">
+          <div className="absolute inset-0 bg-grid opacity-10"></div>
+          <div className="container mx-auto px-4 relative z-10">
+            <div className="max-w-6xl mx-auto text-center">
+              <div className="h-12 bg-gray-700 rounded w-64 mx-auto mb-6 animate-pulse"></div>
+              <div className="h-6 bg-gray-700 rounded w-96 mx-auto mb-8 animate-pulse"></div>
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Section Skeleton */}
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
+              <SkeletonStats />
+            </div>
+          </div>
+        </section>
+
+        {/* Challenges Section Skeleton */}
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
+              <div className="h-8 bg-gray-700 rounded w-48 mb-8 animate-pulse"></div>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+      <Breadcrumbs />
+      
       {/* Hero Section */}
       <section className="relative py-16 overflow-hidden bg-circuit">
         <div className="absolute inset-0 bg-grid opacity-10"></div>
@@ -263,6 +315,16 @@ export default function DashboardMurid() {
                 <div className="text-2xl mt-2">📊</div>
               </div>
             </div>
+            
+            {/* Achievement Summary */}
+            <AchievementSummary stats={{
+              totalXP: userStats.total_xp,
+              challengesCompleted: userStats.completed_challenges,
+              codeExecutions: 0, // Would need to track this
+              consecutiveDays: 0, // Would need to track this
+              notesRead: 0, // Would need to track this
+              tutorialsCompleted: 0, // Would need to track this
+            }} />
           </div>
         </div>
       </section>
@@ -364,7 +426,7 @@ export default function DashboardMurid() {
                     <button
                       onClick={() => handleStartChallenge(challenge.id, challenge.type)}
                       className="w-full btn-primary"
-                      disabled={challenge.deadline && new Date(challenge.deadline) < new Date()}
+                      disabled={!!(challenge.deadline && new Date(challenge.deadline) < new Date())}
                     >
                       {challenge.submission && challenge.submission.passed 
                         ? 'Lihat Semula' 

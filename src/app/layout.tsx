@@ -2,6 +2,12 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import NotificationProvider from '@/components/NotificationProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
+import { TutorialProvider } from '@/components/TutorialSystem'
+import { AchievementProvider } from '@/components/AchievementSystem'
+import { MobileBottomNav } from '@/components/MobileGestures'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -110,12 +116,36 @@ export default function RootLayout({
         
         {/* Preload critical resources */}
         <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
+        
+        {/* Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                  .then(registration => console.log('SW registered:', registration))
+                  .catch(error => console.log('SW registration failed:', error))
+              }
+            `
+          }}
+        />
       </head>
       <body className={inter.className}>
-        <Navbar />
-        <main>
-          {children}
-        </main>
+        <ThemeProvider>
+          <ErrorBoundary>
+            <NotificationProvider>
+              <TutorialProvider>
+                <AchievementProvider>
+                  <Navbar />
+                  <main>
+                    {children}
+                  </main>
+                  <MobileBottomNav />
+                </AchievementProvider>
+              </TutorialProvider>
+            </NotificationProvider>
+          </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   )

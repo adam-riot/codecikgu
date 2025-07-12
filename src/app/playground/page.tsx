@@ -7,6 +7,7 @@ import { Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
+import { useAutoSave, useKeyboardShortcuts } from '@/hooks/useAutoSave'
 import { 
   Code, Play, Download, Save, Plus, X, File, Terminal, CheckCircle, XCircle, Info,
   Folder, Trash2, FolderOpen, PlayCircle, FileText
@@ -258,6 +259,33 @@ console.log(greet('CodeCikgu'));
         : tab
     ))
   }
+
+  // Auto-save functionality
+  useAutoSave({
+    data: { tabs, activeTabId },
+    saveAction: async () => {
+      const currentTab = getActiveTab()
+      if (!user || !currentTab.content.trim()) return
+      await saveFile()
+    },
+    delay: 5000, // Auto-save every 5 seconds
+    enabled: !!user && !!getActiveTab()?.content?.trim()
+  })
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    'ctrl+s': () => saveFile(),
+    'ctrl+n': () => createNewTab(),
+    'ctrl+w': () => closeTab(activeTabId),
+    'ctrl+enter': () => executeCode(),
+    'ctrl+shift+f': () => setShowFileManager(true),
+    'ctrl+shift+p': () => setShowPreview(!showPreview),
+    'f9': () => executeCode(),
+    'escape': () => {
+      setShowFileManager(false)
+      setShowPreview(false)
+    }
+  })
 
   const handleContentChange = (content: string) => {
     updateTab(activeTabId, { content, saved: false })

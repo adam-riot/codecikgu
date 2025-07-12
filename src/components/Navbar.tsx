@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
+import { ThemeToggle } from '@/components/ThemeProvider'
+import { TutorialSelector } from '@/components/TutorialSystem'
 
 export default function Navbar() {
   const router = useRouter()
@@ -221,6 +223,8 @@ export default function Navbar() {
 
           {/* User Actions */}
           <div className="hidden md:flex items-center space-x-4">
+            <TutorialSelector />
+            <ThemeToggle />
             {user ? (
               <>
                 {dashboardLink && (
@@ -341,6 +345,11 @@ export default function Navbar() {
                 </Link>
               </>
             )}
+
+            {/* Theme Toggle for Mobile */}
+            <div className="py-2 flex justify-center">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
