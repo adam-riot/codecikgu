@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { FaCheckCircle } from 'react-icons/fa'
-import { Challenge } from '@/types'
+import type { Challenge } from '@/types/index'
 
 interface VideoChallengeProps {
   challenge: Challenge

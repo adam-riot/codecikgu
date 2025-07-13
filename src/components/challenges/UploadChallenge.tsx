@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { supabase } from '@/utils/supabase'
 import { FaCheckCircle } from 'react-icons/fa'
-import { Challenge } from '@/types'
+import type { Challenge } from '@/types/index'
 
 interface UploadChallengeProps {
   challenge: Challenge

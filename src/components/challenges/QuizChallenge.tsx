@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Challenge, Question } from '@/types'
+import type { Challenge, Question } from '@/types/index'
 
 interface QuizChallengeProps {
   challenge: Challenge;
@@ -61,7 +61,7 @@ export default function QuizChallenge({ challenge, questions, onComplete, onBack
     <div className="max-w-4xl mx-auto p-6">
       <h2 className="text-lg text-white mb-6">{currentQuestion?.question_text}</h2>
       <div className="space-y-3 mb-6">
-        {currentQuestion?.options.map((option, index) => {
+        {currentQuestion?.options.map((option: string, index: number) => {
           const optionLetter = String.fromCharCode(65 + index);
           return (
             <button 

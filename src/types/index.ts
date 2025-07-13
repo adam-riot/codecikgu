@@ -57,17 +57,19 @@ export interface Challenge {
   id: string;
   title: string;
   description: string;
-  type: 'quiz' | 'video' | 'reading' | 'upload';
-  subject: string;
-  tingkatan: string;
+  type: 'upload' | 'quiz' | 'video' | 'reading' | 'coding';
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
   xp_reward: number;
-  is_active: boolean;
+  content: ChallengeContent;
+  pass_criteria: ChallengePassCriteria;
+  created_by: string;
   created_at: string;
-  due_date?: string;
-  evaluation_type: 'automatic' | 'manual';
-  content?: ChallengeContent;
-  pass_criteria?: ChallengePassCriteria;
-  challenge_submissions?: { count: number }[];
+  updated_at: string;
+  status: 'draft' | 'published' | 'archived';
+  tags?: string[];
+  category?: string;
+  subject?: string;
+  tingkatan?: string;
 }
 
 export interface UserChallenge {
@@ -86,6 +88,8 @@ export interface ProjectFile {
   name: string;
   language: string;
   content: string;
+  lastModified?: Date;
+  size?: number;
 }
 
 export interface Project {
@@ -93,4 +97,17 @@ export interface Project {
   name: string;
   files: ProjectFile[];
   created_at: string;
+  user_id?: string;
+  updated_at?: string;
+  language?: string;
+  content?: string;
+  description?: string;
+  isStarred?: boolean;
+  createdAt?: Date;
+  lastModified?: Date;
+  tags?: string[];
+  isTemplate?: boolean;
 }
+
+// Explicitly re-export main types for better compatibility
+export type { Challenge as ChallengeType, Question as QuestionType, Project as ProjectType };

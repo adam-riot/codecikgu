@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { FaCheckCircle } from 'react-icons/fa'
-import { Challenge } from '@/types'
+import type { Challenge } from '@/types/index'
 
 interface ReadingChallengeProps {
   challenge: Challenge

@@ -18,41 +18,78 @@ import {
   Copy
 } from 'lucide-react'
 import { useNotifications } from '../NotificationProvider'
-
-interface ProjectFile {
-  id: string
-  name: string
-  content: string
-  language: string
-  lastModified: Date
-  size: number
-}
-
-interface Project {
-  id: string
-  name: string
-  description: string
-  files: ProjectFile[]
-  language: string
-  isStarred: boolean
-  createdAt: Date
-  lastModified: Date
-  tags: string[]
-  isTemplate: boolean
-}
+import type { Project, ProjectFile } from '@/types/index'
 
 // Sample projects and templates
 const defaultProjects: Project[] = [
   {
     id: 'php-hello-world',
     name: 'Hello World PHP',
-    description: 'Projek asas PHP untuk pemula',
+    created_at: '2024-01-01T00:00:00Z',
     language: 'php',
-    isStarred: false,
-    createdAt: new Date('2024-01-01'),
-    lastModified: new Date('2024-01-01'),
-    tags: ['beginner', 'tutorial'],
-    isTemplate: true,
+    content: `<?php
+// Program Hello World pertama saya
+echo "Hello, World!";
+
+// Memaparkan tarikh dan masa
+echo "<br>Tarikh: " . date("Y-m-d H:i:s");
+
+// Menggunakan pembolehubah
+$nama = "Pelajar";
+echo "<b      {project.tags && project.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {project.tags.slice(0, 3).map(tag => (
+            <span key={tag} className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded text-xs">
+              {tag}
+            </span>
+          ))}
+          {project.tags.length > 3 && (
+            <span className="px-2 py-1 bg-gray-600/20 text-gray-400 rounded text-xs">
+              +{project.tags.length - 3}
+            </span>
+          )}
+        </div>
+      )}ng, " . $nama . "!";
+?>`,
+    files: [
+      {
+        id: 'index-php',
+        name: 'index.php',
+        content: `<?php
+// Program Hello World pertama saya
+echo "Hello, World!";
+
+// Memaparkan tarikh dan masa
+echo "<br>Tarikh: " . date("Y-m-d H:i:s");
+
+// Menggunakan pembolehubah
+$nama = "Pelajar";
+echo "<br>Selamat datang, " . $nama . "!";
+?>`,
+        language: 'php'
+      }
+    ]
+  },
+  {
+    id: 'js-calculator',
+    name: 'Kalkulator JavaScript',
+    created_at: '2024-01-02T00:00:00Z',
+    language: 'javascript',
+    content: `// Kalkulator mudah
+function calculate(operation, a, b) {
+  switch(operation) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': return b !== 0 ? a / b : 'Error: Division by zero';
+    default: return 'Error: Invalid operation';
+  }
+}
+
+console.log('5 + 3 =', calculate('+', 5, 3));
+console.log('10 - 4 =', calculate('-', 10, 4));
+console.log('6 * 7 =', calculate('*', 6, 7));
+console.log('15 / 3 =', calculate('/', 15, 3));`,
     files: [
       {
         id: 'index-php',
@@ -77,6 +114,7 @@ echo "<br>Selamat datang, " . $nama . "!";
   {
     id: 'js-calculator',
     name: 'Kalkulator JavaScript',
+    created_at: '2024-01-02T00:00:00Z',
     description: 'Kalkulator mudah menggunakan JavaScript',
     language: 'javascript',
     isStarred: true,
@@ -264,7 +302,12 @@ button:active {
   }
 ]
 
-export function ProjectManager() {
+interface ProjectManagerProps {
+  onSelectProject?: (project: Project) => void
+  selectedProjectId?: string
+}
+
+export function ProjectManager({ onSelectProject, selectedProjectId }: ProjectManagerProps = {}) {
   const [projects, setProjects] = useState<Project[]>(defaultProjects)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [currentView, setCurrentView] = useState<'list' | 'project' | 'new'>('list')
@@ -297,6 +340,7 @@ export function ProjectManager() {
     const newProject: Project = {
       id: Date.now().toString(),
       name,
+      created_at: new Date().toISOString(),
       description,
       language,
       isStarred: false,
@@ -509,8 +553,8 @@ print("Hello, World!")
   const filteredProjects = projects
     .filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           p.description.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesTag = !filterTag || p.tags.includes(filterTag)
+                           (p.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+      const matchesTag = !filterTag || (p.tags?.includes(filterTag) ?? false)
       return matchesSearch && matchesTag
     })
     .sort((a, b) => {
@@ -518,14 +562,19 @@ print("Hello, World!")
         case 'name':
           return a.name.localeCompare(b.name)
         case 'starred':
-          return b.isStarred ? 1 : -1
+          if (a.isStarred !== b.isStarred) {
+            return (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0)
+          }
+          return 0
         case 'date':
         default:
-          return b.lastModified.getTime() - a.lastModified.getTime()
+          const aTime = a.lastModified?.getTime() ?? 0
+          const bTime = b.lastModified?.getTime() ?? 0
+          return bTime - aTime
       }
     })
 
-  const allTags = [...new Set(projects.flatMap(p => p.tags))]
+  const allTags = [...new Set(projects.flatMap(p => p.tags || []))]
 
   if (currentView === 'new') {
     return <NewProjectForm onCreateProject={createProject} onCancel={() => setCurrentView('list')} />
@@ -615,6 +664,7 @@ print("Hello, World!")
             onSelect={() => {
               setSelectedProject(project)
               setCurrentView('project')
+              onSelectProject?.(project)
             }}
             onToggleStar={() => toggleStar(project.id)}
             onDelete={() => deleteProject(project.id)}
@@ -704,9 +754,9 @@ function ProjectCard({
 
       {/* Info */}
       <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getLanguageColor(project.language)}`}>
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getLanguageColor(project.language || 'javascript')}`}>
           <Code className="w-3 h-3 mr-1" />
-          {project.language.toUpperCase()}
+          {(project.language || 'javascript').toUpperCase()}
         </span>
         
         <div className="flex items-center space-x-3">
@@ -716,13 +766,13 @@ function ProjectCard({
           </span>
           <span className="flex items-center">
             <Clock className="w-3 h-3 mr-1" />
-            {formatDate(project.lastModified)}
+            {project.lastModified ? formatDate(project.lastModified) : 'Unknown'}
           </span>
         </div>
       </div>
 
       {/* Tags */}
-      {project.tags.length > 0 && (
+      {project.tags && project.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-4">
           {project.tags.slice(0, 3).map(tag => (
             <span key={tag} className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded">

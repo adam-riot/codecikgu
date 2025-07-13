@@ -46,12 +46,11 @@ export default function DynamicCodeEditor({
 
   return (
     <CodeEditor
-      initialCode={value}
-      onCodeChange={onChange}
+      code={value}
+      onChange={onChange}
       language={language}
       theme={theme}
-      height={height}
-      readOnly={readOnly}
+      fileName="code.js"
     />
   )
 }

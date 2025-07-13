@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/utils/supabase'
 import { FaPlay, FaSave, FaCode, FaFolder, FaSun, FaMoon } from 'react-icons/fa'
+import type { Project } from '@/types/index'
 
 // Import other components
-import ProjectManager from '@/components/playground/ProjectManager'
+import { ProjectManager } from '@/components/playground/ProjectManager'
 
 // Dynamically import DynamicCodeEditor
 const DynamicCodeEditor = dynamic(() => import('@/components/playground/DynamicCodeEditor'), {
@@ -17,16 +18,6 @@ const DynamicCodeEditor = dynamic(() => import('@/components/playground/DynamicC
     </div>
   )
 })
-
-interface Project {
-  id: string
-  name: string
-  user_id: string
-  created_at: string
-  updated_at: string
-  language: string
-  content: string
-}
 
 export default function PlaygroundPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -59,7 +50,7 @@ export default function PlaygroundPage() {
 
   useEffect(() => {
     if (selectedProject) {
-      setCode(selectedProject.content)
+      setCode(selectedProject.content || '')
       setCurrentProject(selectedProject)
       
       // Update language based on project

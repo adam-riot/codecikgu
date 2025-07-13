@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
+import { EmailValidationService, useEmailValidation } from '@/utils/emailValidation'
 import { 
   Eye, 
   EyeOff, 
@@ -41,13 +42,6 @@ interface PasswordStrength {
   color: string
 }
 
-interface EmailValidation {
-  isValid: boolean
-  isMOE: boolean
-  role: 'murid' | 'awam'
-  message: string
-}
-
 interface DebugLog {
   timestamp: string
   step: string
@@ -75,15 +69,12 @@ export default function RegisterPage() {
     feedback: [],
     color: 'red'
   })
-  const [emailValidation, setEmailValidation] = useState<EmailValidation>({
-    isValid: false,
-    isMOE: false,
-    role: 'awam',
-    message: ''
-  })
   const [step, setStep] = useState(1)
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([])
   const [showDebug, setShowDebug] = useState(false)
+
+  // Use the new email validation hook
+  const { validation: emailValidation, isValidating, validateEmail: validateEmailNew, reset: resetValidation } = useEmailValidation()
 
   // Debug logging function
   const addDebugLog = (step: string, status: 'success' | 'error' | 'info', message: string, data?: any) => {
@@ -108,46 +99,6 @@ export default function RegisterPage() {
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
-  }
-
-  // MOE Email validation function - FIXED: Only m- prefix gets murid role
-  const validateMOEEmail = (email: string): EmailValidation => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return {
-        isValid: false,
-        isMOE: false,
-        role: 'awam',
-        message: 'Format email tidak sah'
-      }
-    }
-
-    // FIXED: Only m- prefix gets murid role, g- prefix gets awam role
-    const moeStudentPattern = /^m-\d{7,8}@moe-dl\.edu\.my$/i
-    const moeStaffPattern = /^g-\d{6,8}@moe-dl\.edu\.my$/i
-    
-    if (moeStudentPattern.test(email)) {
-      return {
-        isValid: true,
-        isMOE: true,
-        role: 'murid',
-        message: 'Email MOE Pelajar sah - Anda akan didaftarkan sebagai Murid'
-      }
-    } else if (moeStaffPattern.test(email)) {
-      return {
-        isValid: true,
-        isMOE: false, // g- prefix is not considered MOE for murid role
-        role: 'awam',
-        message: 'Email MOE Staff - Anda akan didaftarkan sebagai Awam'
-      }
-    } else {
-      return {
-        isValid: true,
-        isMOE: false,
-        role: 'awam',
-        message: 'Email awam - Anda akan didaftarkan sebagai Awam'
-      }
-    }
   }
 
   // Password strength checker
@@ -201,16 +152,11 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (formData.email) {
-      setEmailValidation(validateMOEEmail(formData.email))
+      validateEmailNew(formData.email)
     } else {
-      setEmailValidation({
-        isValid: false,
-        isMOE: false,
-        role: 'awam',
-        message: ''
-      })
+      resetValidation()
     }
-  }, [formData.email])
+  }, [formData.email, validateEmailNew, resetValidation])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -221,7 +167,7 @@ export default function RegisterPage() {
       addNotification('error', 'Sila lengkapkan maklumat peribadi')
       return false
     }
-    if (!emailValidation.isValid) {
+    if (!emailValidation?.isValid) {
       addNotification('error', 'Format email tidak sah')
       return false
     }
@@ -265,7 +211,7 @@ export default function RegisterPage() {
     try {
       addDebugLog('INIT', 'info', 'Starting registration process', {
         email: formData.email,
-        role: emailValidation.role,
+        role: getUserRole(),
         timestamp: new Date().toISOString()
       })
 
@@ -303,7 +249,7 @@ export default function RegisterPage() {
         name: formData.name,
         sekolah: formData.sekolah || '',
         tingkatan: formData.tingkatan || '',
-        role: emailValidation.role,
+        role: getUserRole(),
         xp: 0,
         level: 1,
         avatar_url: '',
@@ -368,10 +314,10 @@ export default function RegisterPage() {
         // Check if user needs email confirmation
         if (!data.session && !data.user.email_confirmed_at) {
           addDebugLog('EMAIL_CONFIRMATION', 'info', 'Email confirmation required')
-          addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Sila semak email untuk pengesahan.`)
+          addNotification('success', `Pendaftaran berjaya sebagai ${EmailValidationService.getUserTypeDescription(emailValidation?.type || 'public')}! Sila semak email untuk pengesahan.`)
         } else {
           addDebugLog('IMMEDIATE_ACCESS', 'success', 'User can access immediately')
-          addNotification('success', `Pendaftaran berjaya sebagai ${emailValidation.role}! Anda boleh log masuk sekarang.`)
+          addNotification('success', `Pendaftaran berjaya sebagai ${EmailValidationService.getUserTypeDescription(emailValidation?.type || 'public')}! Anda boleh log masuk sekarang.`)
         }
         
         // Redirect to login after success
@@ -394,6 +340,26 @@ export default function RegisterPage() {
       setLoading(false)
       addDebugLog('COMPLETE', 'info', 'Registration process completed')
     }
+  }
+
+  // Helper function to get role from email validation
+  const getUserRole = () => {
+    if (!emailValidation) return 'awam'
+    return EmailValidationService.getDefaultRole(emailValidation.type)
+  }
+
+  // Helper function to check if email is MOE student
+  const isMOEStudent = () => {
+    return emailValidation?.type === 'moe_student'
+  }
+
+  // Helper function to get validation message
+  const getValidationMessage = () => {
+    if (!emailValidation) return ''
+    if (emailValidation.errors) return emailValidation.errors.join('. ')
+    
+    const userType = EmailValidationService.getUserTypeDescription(emailValidation.type)
+    return `Email sah - Anda akan didaftarkan sebagai ${userType}`
   }
 
   return (
@@ -654,11 +620,11 @@ export default function RegisterPage() {
                           value={formData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
                           className={`w-full pl-10 pr-4 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-300 ${
-                            formData.email && emailValidation.isValid
-                              ? emailValidation.isMOE 
+                            formData.email && emailValidation?.isValid
+                              ? isMOEStudent()
                                 ? 'border-green-500 focus:ring-green-500'
                                 : 'border-blue-500 focus:ring-blue-500'
-                              : formData.email && !emailValidation.isValid
+                              : formData.email && !emailValidation?.isValid
                               ? 'border-red-500 focus:ring-red-500'
                               : 'border-gray-600 focus:ring-electric-blue'
                           }`}
@@ -668,30 +634,30 @@ export default function RegisterPage() {
                       </div>
                       
                       {/* Email Validation Feedback */}
-                      {formData.email && emailValidation.message && (
+                      {formData.email && getValidationMessage() && (
                         <div className={`mt-2 flex items-center text-xs ${
-                          emailValidation.isValid
-                            ? emailValidation.isMOE
+                          emailValidation?.isValid
+                            ? isMOEStudent()
                               ? 'text-green-400'
                               : 'text-blue-400'
                             : 'text-red-400'
                         }`}>
-                          {emailValidation.isValid ? (
-                            emailValidation.isMOE ? (
+                          {emailValidation?.isValid ? (
+                            isMOEStudent() ? (
                               <div className="flex items-center">
                                 <GraduationCap className="w-3 h-3 mr-1" />
-                                <span>{emailValidation.message}</span>
+                                <span>{getValidationMessage()}</span>
                               </div>
                             ) : (
                               <div className="flex items-center">
                                 <UserCheck className="w-3 h-3 mr-1" />
-                                <span>{emailValidation.message}</span>
+                                <span>{getValidationMessage()}</span>
                               </div>
                             )
                           ) : (
                             <div className="flex items-center">
                               <X className="w-3 h-3 mr-1" />
-                              <span>{emailValidation.message}</span>
+                              <span>{getValidationMessage()}</span>
                             </div>
                           )}
                         </div>
@@ -770,22 +736,22 @@ export default function RegisterPage() {
                   <>
                     {/* Role Display */}
                     <div className={`p-4 rounded-lg border ${
-                      emailValidation.isMOE 
+                      isMOEStudent()
                         ? 'bg-green-500/10 border-green-500/30' 
                         : 'bg-blue-500/10 border-blue-500/30'
                     }`}>
                       <div className="flex items-center">
-                        {emailValidation.isMOE ? (
+                        {isMOEStudent() ? (
                           <GraduationCap className="w-5 h-5 text-green-400 mr-2" />
                         ) : (
                           <UserCheck className="w-5 h-5 text-blue-400 mr-2" />
                         )}
                         <div>
-                          <div className={`font-medium ${emailValidation.isMOE ? 'text-green-400' : 'text-blue-400'}`}>
-                            Pendaftaran sebagai: {emailValidation.role.toUpperCase()}
+                          <div className={`font-medium ${isMOEStudent() ? 'text-green-400' : 'text-blue-400'}`}>
+                            Pendaftaran sebagai: {EmailValidationService.getUserTypeDescription(emailValidation?.type || 'public').toUpperCase()}
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
-                            {emailValidation.isMOE 
+                            {isMOEStudent()
                               ? 'Akses penuh ke semua features dan XP system'
                               : 'Akses terhad ke features awam'
                             }

@@ -7,7 +7,7 @@ import QuizChallenge from '@/components/challenges/QuizChallenge'
 import VideoChallenge from '@/components/challenges/VideoChallenge'
 import ReadingChallenge from '@/components/challenges/ReadingChallenge'
 import UploadChallenge from '@/components/challenges/UploadChallenge'
-import { Challenge, Question } from '@/types' // Removed unused import
+import type { Challenge, Question } from '../../types/index'
 
 interface Submission {
   id: string;

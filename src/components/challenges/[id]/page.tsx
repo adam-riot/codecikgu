@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/utils/supabase'
-import { Challenge, Question } from '@/types'
+import type { Challenge, Question } from '@/types/index'
 import QuizChallenge from '@/components/challenges/QuizChallenge'
 import VideoChallenge from '@/components/challenges/VideoChallenge'
 import ReadingChallenge from '@/components/challenges/ReadingChallenge'

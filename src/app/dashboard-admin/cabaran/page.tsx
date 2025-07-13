@@ -1,657 +1,368 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
+import CreateChallenge from '@/components/CreateChallenge'
+import CreateMultiTypeChallenge from '@/components/CreateMultiTypeChallenge'
+import SimpleCreateChallenge from '@/components/SimpleCreateChallenge'
 
-interface Challenge {
-  id: string
-  title: string
-  description: string
-  difficulty: 'Mudah' | 'Sederhana' | 'Sukar'
-  language: string
-  xp_reward: number
-  time_limit: number
-  test_cases: TestCase[]
-  starter_code: string
-  solution_code: string
-  created_at: string
-  updated_at: string
-  is_active: boolean
-}
-
-interface TestCase {
-  input: string
-  expected_output: string
-  is_hidden: boolean
-}
-
-interface FormData {
-  title: string
-  description: string
-  difficulty: 'Mudah' | 'Sederhana' | 'Sukar'
-  language: string
-  xp_reward: number
-  time_limit: number
-  starter_code: string
-  solution_code: string
-  test_cases: TestCase[]
-  is_active: boolean
-}
-
-export default function AdminCabaranManager() {
-  const router = useRouter()
-  const [challenges, setChallenges] = useState<Challenge[]>([])
+export default function AdminCabaranPage() {
+  const [user, setUser] = useState<any>(null)
+  const [challenges, setChallenges] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [modalType, setModalType] = useState<'add' | 'edit' | 'delete'>('add')
-  const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null)
+  const [showCreateChallenge, setShowCreateChallenge] = useState(false)
+  const [showCreateMultiChallenge, setShowCreateMultiChallenge] = useState(false)
+  const [showSimpleTest, setShowSimpleTest] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterDifficulty, setFilterDifficulty] = useState<string>('all')
-  const [filterLanguage, setFilterLanguage] = useState<string>('all')
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    difficulty: 'Mudah',
-    language: 'Java',
-    xp_reward: 10,
-    time_limit: 30,
-    starter_code: '',
-    solution_code: '',
-    test_cases: [{ input: '', expected_output: '', is_hidden: false }],
-    is_active: true
-  })
+  const [filterType, setFilterType] = useState('all')
+  const [filterSubject, setFilterSubject] = useState('all')
+  const router = useRouter()
 
-  // Mock data untuk demo
   useEffect(() => {
-    const mockChallenges: Challenge[] = [
-      {
-        id: '1',
-        title: 'Hello World',
-        description: 'Tulis program yang mencetak "Hello, World!" ke output.',
-        difficulty: 'Mudah',
-        language: 'Java',
-        xp_reward: 10,
-        time_limit: 15,
-        test_cases: [
-          { input: '', expected_output: 'Hello, World!', is_hidden: false }
-        ],
-        starter_code: 'public class Main {\n    public static void main(String[] args) {\n        // Tulis kod anda di sini\n    }\n}',
-        solution_code: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}',
-        created_at: '2024-01-15T10:00:00Z',
-        updated_at: '2024-01-15T10:00:00Z',
-        is_active: true
-      },
-      {
-        id: '2',
-        title: 'Jumlah Dua Nombor',
-        description: 'Baca dua nombor integer dan cetak jumlahnya.',
-        difficulty: 'Mudah',
-        language: 'Python',
-        xp_reward: 15,
-        time_limit: 20,
-        test_cases: [
-          { input: '5 3', expected_output: '8', is_hidden: false },
-          { input: '10 -2', expected_output: '8', is_hidden: true }
-        ],
-        starter_code: '# Baca input\na, b = map(int, input().split())\n\n# Tulis kod anda di sini',
-        solution_code: '# Baca input\na, b = map(int, input().split())\n\n# Cetak jumlah\nprint(a + b)',
-        created_at: '2024-01-16T14:30:00Z',
-        updated_at: '2024-01-16T14:30:00Z',
-        is_active: true
-      },
-      {
-        id: '3',
-        title: 'Fibonacci Sequence',
-        description: 'Hasilkan n nombor pertama dalam jujukan Fibonacci.',
-        difficulty: 'Sederhana',
-        language: 'C++',
-        xp_reward: 25,
-        time_limit: 45,
-        test_cases: [
-          { input: '5', expected_output: '0 1 1 2 3', is_hidden: false },
-          { input: '8', expected_output: '0 1 1 2 3 5 8 13', is_hidden: true }
-        ],
-        starter_code: '#include <iostream>\nusing namespace std;\n\nint main() {\n    int n;\n    cin >> n;\n    \n    // Tulis kod anda di sini\n    \n    return 0;\n}',
-        solution_code: '#include <iostream>\nusing namespace std;\n\nint main() {\n    int n;\n    cin >> n;\n    \n    int a = 0, b = 1;\n    for (int i = 0; i < n; i++) {\n        cout << a;\n        if (i < n - 1) cout << " ";\n        int temp = a + b;\n        a = b;\n        b = temp;\n    }\n    \n    return 0;\n}',
-        created_at: '2024-01-17T09:15:00Z',
-        updated_at: '2024-01-17T09:15:00Z',
-        is_active: false
-      }
-    ]
-    
-    setChallenges(mockChallenges)
-    setLoading(false)
+    checkUser()
+    fetchChallenges()
   }, [])
 
-  const handleAddChallenge = () => {
-    setModalType('add')
-    setCurrentChallenge(null)
-    setFormData({
-      title: '',
-      description: '',
-      difficulty: 'Mudah',
-      language: 'Java',
-      xp_reward: 10,
-      time_limit: 30,
-      starter_code: '',
-      solution_code: '',
-      test_cases: [{ input: '', expected_output: '', is_hidden: false }],
-      is_active: true
-    })
-    setShowModal(true)
-  }
-
-  const handleEditChallenge = (challenge: Challenge) => {
-    setModalType('edit')
-    setCurrentChallenge(challenge)
-    setFormData({
-      title: challenge.title,
-      description: challenge.description,
-      difficulty: challenge.difficulty,
-      language: challenge.language,
-      xp_reward: challenge.xp_reward,
-      time_limit: challenge.time_limit,
-      starter_code: challenge.starter_code,
-      solution_code: challenge.solution_code,
-      test_cases: challenge.test_cases,
-      is_active: challenge.is_active
-    })
-    setShowModal(true)
-  }
-
-  const handleDeleteChallenge = (challenge: Challenge) => {
-    setModalType('delete')
-    setCurrentChallenge(challenge)
-    setShowModal(true)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (modalType === 'add') {
-      const newChallenge: Challenge = {
-        id: Date.now().toString(),
-        ...formData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+  const checkUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
       }
-      setChallenges([...challenges, newChallenge])
-      alert('Cabaran berjaya ditambah!')
-    } else if (modalType === 'edit' && currentChallenge) {
-      const updatedChallenges = challenges.map(challenge =>
-        challenge.id === currentChallenge.id
-          ? { ...challenge, ...formData, updated_at: new Date().toISOString() }
-          : challenge
-      )
-      setChallenges(updatedChallenges)
-      alert('Cabaran berjaya dikemaskini!')
-    } else if (modalType === 'delete' && currentChallenge) {
-      const filteredChallenges = challenges.filter(challenge => challenge.id !== currentChallenge.id)
-      setChallenges(filteredChallenges)
-      alert('Cabaran berjaya dipadam!')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || profile.role !== 'admin') {
+        router.push('/dashboard-awam')
+        return
+      }
+
+      setUser(profile)
+    } catch (error) {
+      console.error('Error checking user:', error)
+      router.push('/login')
     }
-    
-    setShowModal(false)
   }
 
-  const addTestCase = () => {
-    setFormData({
-      ...formData,
-      test_cases: [...formData.test_cases, { input: '', expected_output: '', is_hidden: false }]
-    })
+  const fetchChallenges = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('cabaran')
+        .select(`
+          *,
+          cabaran_soalan (
+            id,
+            question_text
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setChallenges(data || [])
+    } catch (error) {
+      console.error('Error fetching challenges:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const removeTestCase = (index: number) => {
-    const newTestCases = formData.test_cases.filter((_, i) => i !== index)
-    setFormData({ ...formData, test_cases: newTestCases })
-  }
+  const handleDeleteChallenge = async (challengeId: string) => {
+    if (!confirm('Adakah anda pasti mahu memadam cabaran ini?')) return
 
-  const updateTestCase = (index: number, field: keyof TestCase, value: string | boolean) => {
-    const newTestCases = formData.test_cases.map((testCase, i) =>
-      i === index ? { ...testCase, [field]: value } : testCase
-    )
-    setFormData({ ...formData, test_cases: newTestCases })
+    try {
+      // Delete related quiz questions first
+      await supabase
+        .from('cabaran_soalan')
+        .delete()
+        .eq('cabaran_id', challengeId)
+
+      // Delete the challenge
+      const { error } = await supabase
+        .from('cabaran')
+        .delete()
+        .eq('id', challengeId)
+
+      if (error) throw error
+
+      // Refresh the list
+      fetchChallenges()
+      alert('Cabaran berjaya dipadam!')
+    } catch (error) {
+      console.error('Error deleting challenge:', error)
+      alert('Ralat semasa memadam cabaran')
+    }
   }
 
   const filteredChallenges = challenges.filter(challenge => {
     const matchesSearch = challenge.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          challenge.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDifficulty = filterDifficulty === 'all' || challenge.difficulty === filterDifficulty
-    const matchesLanguage = filterLanguage === 'all' || challenge.language === filterLanguage
+    const matchesType = filterType === 'all' || challenge.type === filterType
+    const matchesSubject = filterSubject === 'all' || challenge.subject === filterSubject
     
-    return matchesSearch && matchesDifficulty && matchesLanguage
+    return matchesSearch && matchesType && matchesSubject
   })
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Mudah': return 'text-green-400 bg-green-500/20 border-green-500/30'
-      case 'Sederhana': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30'
-      case 'Sukar': return 'text-red-400 bg-red-500/20 border-red-500/30'
-      default: return 'text-gray-400 bg-gray-500/20 border-gray-500/30'
+  const getChallengeTypeColor = (type: string) => {
+    const colors = {
+      quiz: 'bg-blue-500',
+      video: 'bg-purple-500',
+      coding: 'bg-green-500',
+      interactive: 'bg-yellow-500',
+      reading: 'bg-red-500',
+      discussion: 'bg-indigo-500',
+      project: 'bg-pink-500',
+      assessment: 'bg-gray-500'
     }
+    return colors[type as keyof typeof colors] || 'bg-gray-500'
   }
 
-  const getLanguageColor = (language: string) => {
-    switch (language) {
-      case 'Java': return 'text-orange-400 bg-orange-500/20'
-      case 'Python': return 'text-green-400 bg-green-500/20'
-      case 'C++': return 'text-blue-400 bg-blue-500/20'
-      case 'JavaScript': return 'text-yellow-400 bg-yellow-500/20'
-      default: return 'text-gray-400 bg-gray-500/20'
-    }
-  }
-
-  if (loading) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-circuit dark:bg-gray-900 text-white flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-electric-blue mb-4"></div>
-          <p className="text-gray-400">Memuat cabaran...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memeriksa akses...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-circuit dark:bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gradient">Urus Cabaran</h1>
-            <p className="text-gray-400 mt-2">Pengurusan cabaran pengaturcaraan untuk pelajar</p>
-          </div>
-          <Link 
-            href="/dashboard-admin" 
-            className="btn-primary flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-            Kembali ke Dashboard Admin
-          </Link>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Pengurusan Cabaran
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            Cipta dan urus cabaran untuk platform CodeCikgu
+          </p>
         </div>
 
-        {/* Controls */}
-        <div className="glass-dark rounded-xl p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-4 flex-1">
-              {/* Search */}
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  placeholder="Cari cabaran..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 pl-10 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                />
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-3 top-2.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                </svg>
-              </div>
+        {/* Action Buttons */}
+        <div className="mb-6 flex flex-wrap gap-4">
+          <button
+            onClick={() => setShowCreateChallenge(true)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Cipta Cabaran Asas
+          </button>
+          
+          <button
+            onClick={() => setShowCreateMultiChallenge(true)}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Cipta Cabaran Multi-Jenis
+          </button>
 
-              {/* Filters */}
-              <select
-                value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value)}
-                className="px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-              >
-                <option value="all">Semua Kesukaran</option>
-                <option value="Mudah">Mudah</option>
-                <option value="Sederhana">Sederhana</option>
-                <option value="Sukar">Sukar</option>
-              </select>
+          <button
+            onClick={() => setShowSimpleTest(true)}
+            className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            🧪 Test Input Form
+          </button>
+        </div>
 
+        {/* Filters */}
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Cari Cabaran
+              </label>
+              <input
+                type="text"
+                placeholder="Cari mengikut tajuk atau deskripsi..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Jenis Cabaran
+              </label>
               <select
-                value={filterLanguage}
-                onChange={(e) => setFilterLanguage(e.target.value)}
-                className="px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               >
-                <option value="all">Semua Bahasa</option>
-                <option value="Java">Java</option>
-                <option value="Python">Python</option>
-                <option value="C++">C++</option>
-                <option value="JavaScript">JavaScript</option>
+                <option value="all">Semua Jenis</option>
+                <option value="quiz">Kuiz</option>
+                <option value="video">Video</option>
+                <option value="coding">Pengaturcaraan</option>
+                <option value="interactive">Interaktif</option>
+                <option value="reading">Pembacaan</option>
+                <option value="discussion">Perbincangan</option>
+                <option value="project">Projek</option>
+                <option value="assessment">Penilaian</option>
               </select>
             </div>
 
-            <button
-              onClick={handleAddChallenge}
-              className="btn-primary flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              Tambah Cabaran
-            </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Subjek
+              </label>
+              <select
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="all">Semua Subjek</option>
+                <option value="sains-komputer">Sains Komputer</option>
+                <option value="matematik">Matematik</option>
+                <option value="fizik">Fizik</option>
+                <option value="kimia">Kimia</option>
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Challenges List */}
-        <div className="space-y-4">
-          {filteredChallenges.length === 0 ? (
-            <div className="glass-dark rounded-xl p-8 text-center">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-xl font-semibold mb-2">Tiada Cabaran Ditemui</h3>
-              <p className="text-gray-400">Cuba ubah kriteria carian atau tambah cabaran baru.</p>
-            </div>
-          ) : (
-            filteredChallenges.map((challenge) => (
-              <div key={challenge.id} className="glass-dark rounded-xl p-6 hover:bg-gray-800/50 transition-all duration-300">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-semibold text-gradient">{challenge.title}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${getDifficultyColor(challenge.difficulty)}`}>
-                        {challenge.difficulty}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getLanguageColor(challenge.language)}`}>
-                        {challenge.language}
-                      </span>
-                      {!challenge.is_active && (
-                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                          Tidak Aktif
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-400 mb-3 line-clamp-2">{challenge.description}</p>
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                        {challenge.xp_reward} XP
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                        </svg>
-                        {challenge.time_limit} minit
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                        </svg>
-                        {challenge.test_cases.length} test case
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditChallenge(challenge)}
-                      className="px-4 py-2 bg-electric-blue/20 text-electric-blue border border-electric-blue/30 rounded-lg hover:bg-electric-blue/30 transition-all duration-300 flex items-center gap-2"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                      </svg>
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteChallenge(challenge)}
-                      className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-all duration-300 flex items-center gap-2"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd" />
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                      Padam
-                    </button>
-                  </div>
-                </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Senarai Cabaran ({filteredChallenges.length})
+            </h2>
+
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Memuatkan cabaran...</p>
               </div>
-            ))
-          )}
-        </div>
-
-        {/* Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="glass-dark rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gradient">
-                  {modalType === 'add' && 'Tambah Cabaran Baru'}
-                  {modalType === 'edit' && 'Edit Cabaran'}
-                  {modalType === 'delete' && 'Padam Cabaran'}
-                </h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-white transition-colors duration-300"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
+            ) : filteredChallenges.length === 0 ? (
+              <div className="text-center py-8">
+                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p className="text-gray-600 dark:text-gray-400 text-lg">Tiada cabaran dijumpai</p>
+                <p className="text-gray-500 dark:text-gray-500 mt-2">Cipta cabaran pertama anda sekarang!</p>
               </div>
-
-              {modalType === 'delete' ? (
-                <div className="text-center">
-                  <div className="text-6xl mb-4">⚠️</div>
-                  <h3 className="text-xl font-semibold mb-4">Adakah anda pasti?</h3>
-                  <p className="text-gray-400 mb-6">
-                    Cabaran "{currentChallenge?.title}" akan dipadam secara kekal. Tindakan ini tidak boleh dibatalkan.
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <button
-                      onClick={() => setShowModal(false)}
-                      className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-all duration-300"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300"
-                    >
-                      Ya, Padam
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">Tajuk Cabaran</label>
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">Bahasa Pengaturcaraan</label>
-                      <select
-                        value={formData.language}
-                        onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                      >
-                        <option value="Java">Java</option>
-                        <option value="Python">Python</option>
-                        <option value="C++">C++</option>
-                        <option value="JavaScript">JavaScript</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">Kesukaran</label>
-                      <select
-                        value={formData.difficulty}
-                        onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'Mudah' | 'Sederhana' | 'Sukar' })}
-                        className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                      >
-                        <option value="Mudah">Mudah</option>
-                        <option value="Sederhana">Sederhana</option>
-                        <option value="Sukar">Sukar</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">Ganjaran XP</label>
-                      <input
-                        type="number"
-                        value={formData.xp_reward}
-                        onChange={(e) => setFormData({ ...formData, xp_reward: parseInt(e.target.value) })}
-                        className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                        min="1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">Had Masa (minit)</label>
-                      <input
-                        type="number"
-                        value={formData.time_limit}
-                        onChange={(e) => setFormData({ ...formData, time_limit: parseInt(e.target.value) })}
-                        className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                        min="1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={formData.is_active}
-                          onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                          className="rounded border-gray-700 bg-gray-800 text-electric-blue focus:ring-electric-blue"
-                        />
-                        <span className="text-sm font-medium text-gray-400">Cabaran Aktif</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Penerangan</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      rows={3}
-                      className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Kod Permulaan</label>
-                    <textarea
-                      value={formData.starter_code}
-                      onChange={(e) => setFormData({ ...formData, starter_code: e.target.value })}
-                      rows={6}
-                      className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue font-mono text-sm"
-                      placeholder="Kod template untuk pelajar..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Kod Penyelesaian</label>
-                    <textarea
-                      value={formData.solution_code}
-                      onChange={(e) => setFormData({ ...formData, solution_code: e.target.value })}
-                      rows={6}
-                      className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-electric-blue font-mono text-sm"
-                      placeholder="Kod penyelesaian yang betul..."
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="block text-sm font-medium text-gray-400">Test Cases</label>
-                      <button
-                        type="button"
-                        onClick={addTestCase}
-                        className="px-3 py-1 bg-electric-blue/20 text-electric-blue border border-electric-blue/30 rounded-lg hover:bg-electric-blue/30 transition-all duration-300 text-sm"
-                      >
-                        + Tambah Test Case
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      {formData.test_cases.map((testCase, index) => (
-                        <div key={index} className="border border-gray-700 rounded-lg p-4">
-                          <div className="flex justify-between items-center mb-3">
-                            <h4 className="font-medium">Test Case {index + 1}</h4>
-                            {formData.test_cases.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeTestCase(index)}
-                                className="text-red-400 hover:text-red-300 transition-colors duration-300"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">Input</label>
-                              <textarea
-                                value={testCase.input}
-                                onChange={(e) => updateTestCase(index, 'input', e.target.value)}
-                                rows={2}
-                                className="w-full px-3 py-2 rounded bg-gray-900 text-white border border-gray-600 focus:outline-none focus:ring-1 focus:ring-electric-blue text-sm font-mono"
-                                placeholder="Input untuk test case..."
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-xs text-gray-500 mb-1">Expected Output</label>
-                              <textarea
-                                value={testCase.expected_output}
-                                onChange={(e) => updateTestCase(index, 'expected_output', e.target.value)}
-                                rows={2}
-                                className="w-full px-3 py-2 rounded bg-gray-900 text-white border border-gray-600 focus:outline-none focus:ring-1 focus:ring-electric-blue text-sm font-mono"
-                                placeholder="Output yang dijangka..."
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3">
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={testCase.is_hidden}
-                                onChange={(e) => updateTestCase(index, 'is_hidden', e.target.checked)}
-                                className="rounded border-gray-600 bg-gray-900 text-electric-blue focus:ring-electric-blue"
-                              />
-                              <span className="text-xs text-gray-500">Test case tersembunyi</span>
-                            </label>
-                          </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredChallenges.map((challenge) => (
+                  <div key={challenge.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getChallengeTypeColor(challenge.type || 'quiz')}`}>
+                            {challenge.type || 'quiz'}
+                          </span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {challenge.subject} • Tingkatan {challenge.tingkatan}
+                          </span>
+                          <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                            {challenge.xp_reward} XP
+                          </span>
                         </div>
-                      ))}
+                        
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          {challenge.title}
+                        </h3>
+                        
+                        <p className="text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
+                          {challenge.description}
+                        </p>
+                        
+                        <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <span>
+                            Dicipta: {new Date(challenge.created_at).toLocaleDateString('ms-MY')}
+                          </span>
+                          {challenge.cabaran_soalan && challenge.cabaran_soalan.length > 0 && (
+                            <span>
+                              {challenge.cabaran_soalan.length} soalan
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 ml-4">
+                        <button
+                          onClick={() => router.push(`/challenges/${challenge.id}`)}
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                          title="Lihat cabaran"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleDeleteChallenge(challenge.id)}
+                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          title="Padam cabaran"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex gap-4 justify-end pt-6 border-t border-gray-700">
-                    <button
-                      type="button"
-                      onClick={() => setShowModal(false)}
-                      className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-all duration-300"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-2 bg-electric-blue text-dark-black font-semibold rounded-lg hover:bg-electric-blue/90 transition-all duration-300"
-                    >
-                      {modalType === 'add' ? 'Tambah Cabaran' : 'Simpan Perubahan'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Create Challenge Modals */}
+      {showCreateChallenge && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <CreateChallenge
+              onClose={() => setShowCreateChallenge(false)}
+              onChallengeCreated={() => {
+                setShowCreateChallenge(false)
+                fetchChallenges()
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {showCreateMultiChallenge && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <CreateMultiTypeChallenge
+              onClose={() => setShowCreateMultiChallenge(false)}
+              onChallengeCreated={() => {
+                setShowCreateMultiChallenge(false)
+                fetchChallenges()
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {showSimpleTest && (
+        <SimpleCreateChallenge
+          onClose={() => setShowSimpleTest(false)}
+          onChallengeCreated={() => {
+            setShowSimpleTest(false)
+            fetchChallenges()
+          }}
+        />
+      )}
     </div>
   )
 }
-
