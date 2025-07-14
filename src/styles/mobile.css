@@ -1,0 +1,382 @@
+/* Mobile-Specific CSS Optimizations */
+/* src/styles/mobile.css */
+
+/* Core mobile variables */
+:root {
+  --mobile-header-height: 56px;
+  --mobile-tab-height: 44px;
+  --mobile-bottom-nav-height: 64px;
+  --mobile-quick-actions-height: 48px;
+  --keyboard-height: 0px;
+  --safe-area-inset-top: env(safe-area-inset-top, 0);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0);
+  --safe-area-inset-left: env(safe-area-inset-left, 0);
+  --safe-area-inset-right: env(safe-area-inset-right, 0);
+}
+
+/* Mobile viewport height fix */
+.mobile-vh {
+  height: calc(100vh - var(--keyboard-height, 0px));
+  height: calc(100 * var(--vh, 1vh) - var(--keyboard-height, 0px));
+}
+
+/* Safe area support */
+.safe-area-padding {
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: var(--safe-area-inset-bottom);
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+}
+
+/* Touch targets */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(138, 43, 226, 0.3);
+}
+
+/* Mobile code editor optimizations */
+.mobile-code-editor {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
+  overscroll-behavior: contain;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-appearance: none) {
+  .mobile-code-editor {
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  /* Fix iOS zoom on input focus */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+  
+  /* Prevent iOS bounce scroll */
+  .no-bounce {
+    position: fixed;
+    overflow: hidden;
+  }
+  
+  /* iOS safe area */
+  .ios-safe-bottom {
+    padding-bottom: calc(var(--safe-area-inset-bottom) + 8px);
+  }
+}
+
+/* Android specific fixes */
+@media screen and (max-width: 768px) and (orientation: portrait) {
+  .android-keyboard-fix {
+    height: calc(100vh - var(--keyboard-height, 0px));
+  }
+}
+
+/* Landscape mode optimizations */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .mobile-header {
+    height: 44px;
+  }
+  
+  .mobile-tabs {
+    height: 36px;
+  }
+  
+  .mobile-quick-actions {
+    height: 40px;
+  }
+  
+  .landscape-compact .mobile-code-editor {
+    font-size: 12px;
+  }
+}
+
+/* High DPI screens */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  .mobile-code-editor {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}
+
+/* Dark mode mobile optimizations */
+@media (prefers-color-scheme: dark) {
+  .mobile-code-editor {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    caret-color: #8b5cf6;
+  }
+  
+  .mobile-line-number {
+    color: #666666;
+    background-color: #2d2d2d;
+  }
+}
+
+/* Light mode mobile optimizations */
+@media (prefers-color-scheme: light) {
+  .mobile-code-editor {
+    background-color: #ffffff;
+    color: #1a1a1a;
+    caret-color: #8b5cf6;
+  }
+  
+  .mobile-line-number {
+    color: #999999;
+    background-color: #f5f5f5;
+  }
+}
+
+/* Touch feedback animations */
+.touch-feedback {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+.touch-feedback::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(138, 43, 226, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+.touch-feedback:active::before {
+  width: 200px;
+  height: 200px;
+}
+
+/* Mobile gesture indicators */
+.gesture-indicator {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  pointer-events: none;
+  z-index: 1000;
+  animation: fadeInOut 3s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; }
+  20%, 80% { opacity: 1; }
+}
+
+/* Virtual keyboard handling */
+.keyboard-open {
+  height: calc(100vh - var(--keyboard-height));
+}
+
+.keyboard-open .mobile-bottom-nav {
+  transform: translateY(var(--keyboard-height));
+}
+
+.keyboard-open .mobile-editor-container {
+  height: calc(100vh - var(--keyboard-height) - var(--mobile-header-height) - var(--mobile-tab-height) - var(--mobile-quick-actions-height));
+}
+
+/* Scroll optimizations */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
+/* Tab navigation for mobile */
+.mobile-tab-nav {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+}
+
+.mobile-tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-tab {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  transition: transform 0.2s ease;
+}
+
+.mobile-tab:active {
+  transform: scale(0.95);
+}
+
+/* Code syntax highlighting optimized for mobile */
+.mobile-syntax-highlight .keyword {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.mobile-syntax-highlight .string {
+  color: #4ecdc4;
+}
+
+.mobile-syntax-highlight .comment {
+  color: #95a5a6;
+  font-style: italic;
+}
+
+.mobile-syntax-highlight .number {
+  color: #f39c12;
+}
+
+.mobile-syntax-highlight .function {
+  color: #3498db;
+}
+
+/* Mobile-specific component styles */
+.mobile-playground {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #1a1a1a;
+  color: white;
+}
+
+.mobile-header {
+  height: var(--mobile-header-height);
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  position: relative;
+  z-index: 100;
+}
+
+.mobile-tab-bar {
+  height: var(--mobile-tab-height);
+  background: rgba(0, 0, 0, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.mobile-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.mobile-quick-actions {
+  height: var(--mobile-quick-actions-height);
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.mobile-output {
+  max-height: 40vh;
+  background: #000000;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Performance optimizations */
+.mobile-optimized {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.mobile-optimized.animating {
+  will-change: transform, opacity;
+}
+
+.mobile-optimized:not(.animating) {
+  will-change: auto;
+}
+
+/* Accessibility improvements for mobile */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-tab,
+  .touch-feedback,
+  .gesture-indicator {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .mobile-code-editor {
+    border: 2px solid currentColor;
+  }
+  
+  .mobile-tab.active {
+    outline: 3px solid #ffffff;
+    outline-offset: -3px;
+  }
+}
+
+/* Focus management for mobile */
+.mobile-focus-trap {
+  outline: 3px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
+.mobile-focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 1px;
+}
+
+/* Mobile loading states */
+.mobile-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.mobile-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-top: 2px solid #8b5cf6;
+  border-radius: 50%;
+  animation: mobile-spin 1s linear infinite;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes mobile-spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}

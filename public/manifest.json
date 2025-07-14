@@ -4,12 +4,16 @@
     "description": "Platform pembelajaran Sains Komputer yang interaktif untuk murid Tingkatan 4 & 5",
     "start_url": "/",
     "display": "standalone",
+    "display_override": ["window-controls-overlay", "standalone"],
     "background_color": "#000000",
-    "theme_color": "#00d4ff",
-    "orientation": "portrait-primary",
+    "theme_color": "#8b5cf6",
+    "orientation": "any",
     "scope": "/",
     "lang": "ms",
-    "categories": ["education", "productivity"],
+    "categories": ["education", "productivity", "developer"],
+    "edge_side_panel": {
+      "preferred_width": 480
+    },
     "icons": [
       {
         "src": "/favicon.svg",

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
+const MobilePlayground = dynamic(() => import('@/components/playground/MobilePlayground').then(mod => ({ default: mod.MobilePlayground })), { ssr: false })
 import { useEffect, useState, useRef } from 'react'
 import { Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -12,6 +13,29 @@ import {
   Code, Play, Download, Save, Plus, X, File, Terminal, CheckCircle, XCircle, Info,
   Folder, Trash2, FolderOpen, PlayCircle, FileText
 } from 'lucide-react'
+
+// Mobile detection hook
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = window.navigator.userAgent
+      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+      const isTouchDevice = 'ontouchstart' in window
+      const isSmallScreen = window.innerWidth <= 768
+      
+      setIsMobile(mobileRegex.test(userAgent) || (isTouchDevice && isSmallScreen))
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  return isMobile
+}
 
 // Type Definitions
 interface User {
@@ -154,6 +178,13 @@ function getPreviewHtml(tab: Tab) {
 
 export default function PlaygroundPage() {
   const router = useRouter()
+  const isMobile = useIsMobile()
+  
+  // If mobile, use mobile-optimized playground
+  if (isMobile) {
+    return <MobilePlayground />
+  }
+  
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [tabs, setTabs] = useState<Tab[]>([
