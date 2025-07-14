@@ -512,3 +512,5 @@ Memory usage: 12.4 MB`
     </div>
   )
 }
+
+export default MobilePlayground

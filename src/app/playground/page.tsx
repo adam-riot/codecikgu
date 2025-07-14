@@ -1,8 +1,11 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+// Temporarily disable error boundary for debugging
+// import PlaygroundErrorBoundary from '@/components/PlaygroundErrorBoundary'
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
-const MobilePlayground = dynamic(() => import('@/components/playground/MobilePlayground').then(mod => ({ default: mod.MobilePlayground })), { ssr: false })
+// Temporarily disable mobile playground import
+// const MobilePlayground = dynamic(() => import('@/components/playground/MobilePlayground'), { ssr: false })
 import { useEffect, useState, useRef } from 'react'
 import { Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -178,15 +181,35 @@ function getPreviewHtml(tab: Tab) {
 
 export default function PlaygroundPage() {
   const router = useRouter()
-  const isMobile = useIsMobile()
-  
-  // If mobile, use mobile-optimized playground
-  if (isMobile) {
-    return <MobilePlayground />
-  }
-  
+  // Temporarily disable mobile detection to fix error
+  // const isMobile = useIsMobile()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isClient, setIsClient] = useState(false)
+
+  // Ensure client-side rendering
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // If not yet client-side, show loading
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p>Loading CodeCikgu...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Temporarily disable mobile playground to fix error
+  // If mobile, use mobile-optimized playground
+  // if (isMobile) {
+  //   return <MobilePlayground />
+  // }
+  
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: '1',
@@ -568,7 +591,9 @@ console.log(greet('CodeCikgu'));
   const isPreviewable = ['html', 'css', 'javascript'].includes(activeTab.language.toLowerCase())
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+    // Temporarily disable error boundary
+    // <PlaygroundErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
       <input
         ref={fileInputRef}
         type="file"
@@ -975,5 +1000,6 @@ console.log(greet('CodeCikgu'));
         </div>
       </div>
     </div>
+    // </PlaygroundErrorBoundary>
   )
 }
