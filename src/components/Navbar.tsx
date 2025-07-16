@@ -105,6 +105,7 @@ export default function Navbar() {
   const navigationItems = [
     { href: '/', label: 'Laman Utama' },
     { href: '/playground', label: 'Playground' },
+    { href: '/gamification', label: 'Gamifikasi' },
     { href: '/nota', label: 'Nota' },
     { href: '/leaderboard', label: 'Leaderboard' }
   ]

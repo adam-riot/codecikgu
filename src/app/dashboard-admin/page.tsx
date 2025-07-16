@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
+import { AdminGamificationPanel } from '@/components/gamification'
 
 interface Profile {
   id: string
@@ -304,6 +305,16 @@ export default function DashboardAdmin() {
                 }`}
               >
                 🎁 Ganjaran
+              </button>
+              <button
+                onClick={() => setActiveTab('gamification')}
+                className={`px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'gamification'
+                    ? 'bg-gradient-to-r from-electric-blue to-neon-cyan text-white'
+                    : 'text-gray-400 hover:text-electric-blue hover:bg-electric-blue/10'
+                }`}
+              >
+                🎮 Gamifikasi
               </button>
             </div>
           </div>
@@ -651,6 +662,10 @@ export default function DashboardAdmin() {
                 )}
               </div>
             </div>
+          )}
+
+          {activeTab === 'gamification' && (
+            <AdminGamificationPanel />
           )}
         </div>
       </div>

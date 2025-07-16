@@ -61,7 +61,7 @@ export interface StudentAttempt {
   timeSpent: number // seconds
 }
 
-// SPM Question Bank Data
+// SPM Question Bank Data - Enhanced with Authentic Malaysian Format
 export const SPM_QUESTIONS_2023: SPMQuestion[] = [
   {
     id: 'spm-2023-p1-q1',
@@ -97,6 +97,109 @@ export const SPM_QUESTIONS_2023: SPMQuestion[] = [
     paper: 1,
     section: 'A',
     questionNumber: 2,
+    question: 'Tukarkan nombor binary 1101 kepada nombor perpuluhan.',
+    options: [
+      '11',
+      '13', 
+      '15',
+      '17'
+    ],
+    correctAnswer: '13',
+    markingScheme: [
+      '1 markah untuk jawapan yang betul'
+    ],
+    expectedAnswer: '1×2³ + 1×2² + 0×2¹ + 1×2⁰ = 8 + 4 + 0 + 1 = 13',
+    difficulty: 'medium',
+    topics: ['t4-2-1'],
+    marks: 1,
+    timeAllocation: 2,
+    sampleAnswer: 'Langkah penyelesaian:\n1101₂ = 1×2³ + 1×2² + 0×2¹ + 1×2⁰\n= 1×8 + 1×4 + 0×2 + 1×1\n= 8 + 4 + 0 + 1\n= 13₁₀',
+    commonMistakes: [
+      'Tidak menggunakan pangkat 2 yang betul',
+      'Tersilap mengira nilai tempat'
+    ]
+  },
+  {
+    id: 'spm-2023-p1-q3',
+    year: 2023,
+    paper: 1,
+    section: 'A',
+    questionNumber: 3,
+    question: 'Antara berikut, yang manakah peranti input komputer?',
+    options: [
+      'Monitor dan printer',
+      'Papan kekunci dan tetikus',
+      'Speaker dan headphone', 
+      'Hard disk dan RAM'
+    ],
+    correctAnswer: 'Papan kekunci dan tetikus',
+    markingScheme: [
+      '1 markah untuk jawapan yang betul'
+    ],
+    expectedAnswer: 'Papan kekunci dan tetikus adalah peranti input yang membolehkan pengguna memasukkan data ke dalam komputer.',
+    difficulty: 'easy',
+    topics: ['t4-1-1'],
+    marks: 1,
+    timeAllocation: 1,
+    commonMistakes: [
+      'Keliru antara peranti input dan output',
+      'Tidak faham fungsi setiap peranti'
+    ]
+  },
+  {
+    id: 'spm-2023-p1-q4',
+    year: 2023,
+    paper: 1,
+    section: 'A',
+    questionNumber: 4,
+    question: 'Apakah output bagi kod Python berikut?\n\nfor i in range(2, 6):\n    print(i * 3)',
+    options: [
+      '6 9 12 15',
+      '2 3 4 5',
+      '3 6 9 12',
+      '6 12 18'
+    ],
+    correctAnswer: '6 9 12 15',
+    markingScheme: [
+      '1 markah untuk jawapan yang betul'
+    ],
+    expectedAnswer: 'Loop akan iterate dari 2 hingga 5, mencetak setiap nilai didarab dengan 3.',
+    difficulty: 'medium',
+    topics: ['t5-2-1'],
+    marks: 1,
+    timeAllocation: 2,
+    commonMistakes: [
+      'Tidak faham range() bermula dari 2',
+      'Keliru dengan operasi matematik dalam loop'
+    ]
+  },
+  {
+    id: 'spm-2023-p1-q5',
+    year: 2023,
+    paper: 1,
+    section: 'A',
+    questionNumber: 5,
+    question: 'Dalam pseudokod, simbol yang digunakan untuk assignment adalah:',
+    options: [
+      '=',
+      '←',
+      '==',
+      ':='
+    ],
+    correctAnswer: '←',
+    markingScheme: [
+      '1 markah untuk jawapan yang betul'
+    ],
+    expectedAnswer: 'Simbol ← digunakan dalam pseudokod untuk menunjukkan assignment nilai kepada pembolehubah.',
+    difficulty: 'easy',
+    topics: ['t4-3-1'],
+    marks: 1,
+    timeAllocation: 1,
+    commonMistakes: [
+      'Keliru dengan operator perbandingan ==',
+      'Menggunakan simbol = dari bahasa pengaturcaraan'
+    ]
+  },
     question: 'Tukarkan nombor binary 1101 kepada nombor perpuluhan.',
     correctAnswer: '13',
     markingScheme: [
