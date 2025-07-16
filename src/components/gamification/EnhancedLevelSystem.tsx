@@ -18,6 +18,20 @@ import {
 } from 'lucide-react'
 import { useNotifications } from '../NotificationProvider'
 
+// Utility function for difficulty colors
+const getDifficultyColor = (difficulty: 'beginner' | 'intermediate' | 'hard') => {
+  switch (difficulty) {
+    case 'beginner':
+      return 'bg-green-500/20 text-green-400 border-green-500/30'
+    case 'intermediate':
+      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+    case 'hard':
+      return 'bg-red-500/20 text-red-400 border-red-500/30'
+    default:
+      return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+  }
+}
+
 interface Level {
   id: string
   level_number: number
@@ -222,15 +236,6 @@ export function EnhancedLevelSystem() {
     badges_earned: 2
   })
   const { addNotification } = useNotifications()
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner': return 'text-green-400 bg-green-400/20 border-green-400/30'
-      case 'intermediate': return 'text-yellow-400 bg-yellow-400/20 border-yellow-400/30'
-      case 'hard': return 'text-red-400 bg-red-400/20 border-red-400/30'
-      default: return 'text-gray-400 bg-gray-400/20 border-gray-400/30'
-    }
-  }
 
   const isLevelUnlocked = (level: Level) => {
     return studentStats.current_xp >= level.xp_required_min

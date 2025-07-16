@@ -44,7 +44,7 @@ export function MobileGestureManager({
   const containerRef = useRef<HTMLDivElement>(null)
   const [touches, setTouches] = useState<TouchPoint[]>([])
   const [lastTap, setLastTap] = useState<TouchPoint | null>(null)
-  const longPressTimer = useRef<NodeJS.Timeout>()
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
 
   const defaultConfig: GestureConfig = {
     swipeThreshold: 50,

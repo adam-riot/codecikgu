@@ -62,8 +62,11 @@ export class PerformanceOptimizer {
     // First Input Delay
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        console.log('📊 FID:', entry.processingStart - entry.startTime)
-        this.reportMetric('fid', entry.processingStart - entry.startTime)
+        const fidEntry = entry as any
+        if (fidEntry.processingStart) {
+          console.log('📊 FID:', fidEntry.processingStart - fidEntry.startTime)
+          this.reportMetric('fid', fidEntry.processingStart - fidEntry.startTime)
+        }
       }
     }).observe({ entryTypes: ['first-input'] })
 
@@ -123,8 +126,8 @@ export class PerformanceOptimizer {
    */
   private static reportMetric(name: string, value: number): void {
     // Send to analytics service (implementation depends on analytics provider)
-    if (typeof gtag !== 'undefined') {
-      gtag('event', 'web_vitals', {
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'web_vitals', {
         metric_name: name,
         metric_value: Math.round(value),
         custom_parameter: 'codecikgu_performance'
@@ -224,7 +227,7 @@ export class PerformanceOptimizer {
   /**
    * Optimize code editor performance
    */
-  static optimizeCodeEditor(): void {
+  static optimizeCodeEditor() {
     // Debounce untuk syntax highlighting
     let highlightTimeout: NodeJS.Timeout
     

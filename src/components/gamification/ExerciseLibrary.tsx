@@ -237,7 +237,7 @@ export function ExerciseLibrary() {
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'rating' | 'xp'>('featured')
+  const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'rating' | 'xp'>('newest')
   const [currentView, setCurrentView] = useState<'library' | 'exercise'>('library')
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null)
   const [studentStats, setStudentStats] = useState<StudentExerciseStats>({

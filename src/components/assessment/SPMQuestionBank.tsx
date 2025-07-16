@@ -200,6 +200,12 @@ export const SPM_QUESTIONS_2023: SPMQuestion[] = [
       'Menggunakan simbol = dari bahasa pengaturcaraan'
     ]
   },
+  {
+    id: 'spm-2023-p1-q6',
+    year: 2023,
+    paper: 1,
+    section: 'A',
+    questionNumber: 6,
     question: 'Tukarkan nombor binary 1101 kepada nombor perpuluhan.',
     correctAnswer: '13',
     markingScheme: [
