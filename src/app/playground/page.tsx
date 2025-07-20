@@ -1,8 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-// Temporarily disable error boundary for debugging
-// import PlaygroundErrorBoundary from '@/components/PlaygroundErrorBoundary'
+import PlaygroundErrorBoundary from '@/components/PlaygroundErrorBoundary'
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 // Temporarily disable mobile playground import
 // const MobilePlayground = dynamic(() => import('@/components/playground/MobilePlayground'), { ssr: false })
@@ -240,9 +239,14 @@ console.log(greet('CodeCikgu'));
   const [showPreview, setShowPreview] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Ensure client-side rendering  
+  // Ensure client-side rendering with proper error handling
   useEffect(() => {
-    setIsClient(true)
+    try {
+      setIsClient(true)
+    } catch (error) {
+      console.error('Error setting client state:', error)
+      setIsClient(true) // Still set it to true to allow rendering
+    }
   }, [])
 
   useEffect(() => {
@@ -587,8 +591,7 @@ console.log(greet('CodeCikgu'));
   const isPreviewable = ['html', 'css', 'javascript'].includes(activeTab.language.toLowerCase())
 
   return (
-    // Temporarily disable error boundary
-    // <PlaygroundErrorBoundary>
+    <PlaygroundErrorBoundary>
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
       <input
         ref={fileInputRef}
@@ -996,6 +999,6 @@ console.log(greet('CodeCikgu'));
         </div>
       </div>
     </div>
-    // </PlaygroundErrorBoundary>
+    </PlaygroundErrorBoundary>
   )
 }
