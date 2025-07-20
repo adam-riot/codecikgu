@@ -7,14 +7,10 @@ import {
   XCircle, 
   Clock, 
   Trophy, 
-  Star,
   Code,
-  Bug,
   Target,
-  Zap,
   AlertCircle,
   Info,
-  Award,
   Flame,
   Users,
   Timer
@@ -232,7 +228,7 @@ function fibonacci($n) {
 ]
 
 export function CodeChallengeTestingSystem() {
-  const [challenges, setChallenges] = useState<CodeChallenge[]>(sampleChallenges)
+  const [challenges] = useState<CodeChallenge[]>(sampleChallenges)
   const [selectedChallenge, setSelectedChallenge] = useState<CodeChallenge | null>(null)
   const [currentView, setCurrentView] = useState<'list' | 'challenge'>('list')
   const [userCode, setUserCode] = useState('')
@@ -326,7 +322,7 @@ export function CodeChallengeTestingSystem() {
         testResults,
         executionTime: Math.random() * 1000,
         score,
-        feedback: generateFeedback(passedTests, totalTests, selectedChallenge),
+        feedback: generateFeedback(passedTests, totalTests),
         passed
       }
 
@@ -346,7 +342,7 @@ export function CodeChallengeTestingSystem() {
         })
       }
 
-    } catch (error) {
+    } catch {
       addNotification({
         type: 'error',
         title: '🐛 Ralat Pelaksanaan',
@@ -357,7 +353,7 @@ export function CodeChallengeTestingSystem() {
     }
   }
 
-  const generateFeedback = (passed: number, total: number, challenge: CodeChallenge): string => {
+  const generateFeedback = (passed: number, total: number): string => {
     const percentage = (passed / total) * 100
     
     if (percentage === 100) {

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 
 export default function HomeMuridPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [progress, setProgress] = useState({
     totalXP: 0,
     completedChallenges: 0,

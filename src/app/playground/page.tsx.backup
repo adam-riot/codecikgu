@@ -16,30 +16,28 @@ import {
   Folder, Trash2, FolderOpen, PlayCircle, FileText
 } from 'lucide-react'
 
-// Mobile detection hook (commented out, not used)
-/*
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false)
-  
-  useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = window.navigator.userAgent
-      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
-      const isTouchDevice = 'ontouchstart' in window
-      const isSmallScreen = window.innerWidth <= 768
-      
-      setIsMobile(mobileRegex.test(userAgent) || (isTouchDevice && isSmallScreen))
-    }
-    
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
-  
-  return isMobile
-}
-*/
+// Mobile detection hook (unused but keeping for potential future use)
+// function useIsMobile() {
+//   const [isMobile, setIsMobile] = useState(false)
+//   
+//   useEffect(() => {
+//     const checkMobile = () => {
+//       const userAgent = window.navigator.userAgent
+//       const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
+//       const isTouchDevice = 'ontouchstart' in window
+//       const isSmallScreen = window.innerWidth <= 768
+//       
+//       setIsMobile(mobileRegex.test(userAgent) || (isTouchDevice && isSmallScreen))
+//     }
+//     
+//     checkMobile()
+//     window.addEventListener('resize', checkMobile)
+//     
+//     return () => window.removeEventListener('resize', checkMobile)
+//   }, [])
+//   
+//   return isMobile
+// }
 
 // Type Definitions
 interface User {
@@ -181,8 +179,8 @@ function getPreviewHtml(tab: Tab) {
 }
 
 export default function PlaygroundPage() {
-  // All hooks must be called at the top level, before any conditional returns
-  // Temporarily disable mobile detection to fix error  
+  // All hooks must be called at the top level before any early returns
+  // Temporarily disable mobile detection to fix error
   // const isMobile = useIsMobile()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -240,7 +238,7 @@ console.log(greet('CodeCikgu'));
   const [showPreview, setShowPreview] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Ensure client-side rendering  
+  // Ensure client-side rendering
   useEffect(() => {
     setIsClient(true)
   }, [])
@@ -258,30 +256,27 @@ console.log(greet('CodeCikgu'));
     if (tabs.length > 0) saveToLocalStorage(tabs, activeTabId)
   }, [tabs, activeTabId])
 
-  // Define functions needed by hooks
-  const getActiveTab = (): Tab => tabs.find(tab => tab.id === activeTabId) || tabs[0]
-
-  // Auto-save functionality  
+  // Auto-save functionality
   useAutoSave({
     data: { tabs, activeTabId },
     saveAction: async () => {
       const currentTab = getActiveTab()
       if (!user || !currentTab.content.trim()) return
-      // Define saveFile inline to avoid reference issues
+      await saveFile()
     },
     delay: 5000, // Auto-save every 5 seconds
-    enabled: false // Disable for now to avoid issues
+    enabled: !!user && !!getActiveTab()?.content?.trim()
   })
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
-    'ctrl+s': () => {}, // Define inline to avoid reference issues
-    'ctrl+n': () => {},
-    'ctrl+w': () => {},
-    'ctrl+enter': () => {},
+    'ctrl+s': () => saveFile(),
+    'ctrl+n': () => createNewTab(),
+    'ctrl+w': () => closeTab(activeTabId),
+    'ctrl+enter': () => executeCode(),
     'ctrl+shift+f': () => setShowFileManager(true),
     'ctrl+shift+p': () => setShowPreview(!showPreview),
-    'f9': () => {},
+    'f9': () => executeCode(),
     'escape': () => {
       setShowFileManager(false)
       setShowPreview(false)
@@ -329,6 +324,8 @@ console.log(greet('CodeCikgu'));
     }, 5000)
   }
 
+  const getActiveTab = (): Tab => tabs.find(tab => tab.id === activeTabId) || tabs[0]
+
   const updateTab = (tabId: string, updates: Partial<Tab>) => {
     setTabs(prev => prev.map(tab => 
       tab.id === tabId 
@@ -350,18 +347,71 @@ console.log(greet('CodeCikgu'));
     fileInputRef.current?.click()
   }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
+    reader.onload = (event) => {
+      const content = event.target?.result as string
       const language = detectLanguage(content, file.name)
       const newTab: Tab = {
         id: Date.now().toString(),
         name: file.name.replace(/\.[^/.]+$/, ""),
         content,
         language,
+        saved: false
+      }
+      setTabs(prev => [...prev, newTab])
+      setActiveTabId(newTab.id)
+      addNotification('success', `File ${file.name} uploaded successfully`)
+    }
+    reader.readAsText(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const executeCode = () => {
+    const activeTab = getActiveTab()
+    const nonExecutableFiles = ['php', 'java', 'cpp', 'c', 'python']
+    if (nonExecutableFiles.includes(activeTab.language)) {
+      const descriptions: Record<string, string> = {
+        php: 'PHP requires a web server like XAMPP, WAMP, or MAMP to run.',
+        java: 'Java requires JDK installation and compilation with javac.',
+        cpp: 'C++ requires a compiler like g++ or clang++.',
+        c: 'C requires a compiler like gcc.',
+        python: 'Python requires Python interpreter installation.'
+      }
+      const description = descriptions[activeTab.language] || 'This language requires external tools to run.'
+      setExecutionOutput(`${activeTab.language.toUpperCase()} files cannot be executed in browser.\n\n${description}`)
+      setShowOutput(true)
+      addNotification('info', `${activeTab.language.toUpperCase()} files need external tools to run`)
+      return
+    }
+
+    if (activeTab.language === 'javascript') {
+      setIsExecuting(true)
+      setShowOutput(true)
+      try {
+        const output: string[] = []
+        const safeConsole = {
+          log: (...args: unknown[]) => {
+            output.push(args.map(arg => String(arg)).join(' '))
+          },
+          error: (...args: unknown[]) => {
+            output.push('ERROR: ' + args.map(arg => String(arg)).join(' '))
+          }
+        }
+        const func = new Function('console', activeTab.content)
+        func(safeConsole)
+        setExecutionOutput(output.length > 0 ? output.join('\n') : 'Code executed successfully (no output)')
+        addNotification('success', 'Code executed successfully')
+      } catch (error) {
+        setExecutionOutput(`Error: ${(error as Error).message}`)
+        addNotification('error', 'Execution failed')
+      } finally {
+        setIsExecuting(false)
+      }
+    }
+  }
         saved: false
       }
       setTabs(prev => [...prev, newTab])
@@ -416,11 +466,9 @@ console.log(greet('CodeCikgu'));
     const fileContent = activeTab.content
 
     // Try File System Access API (Chromium browsers)
-    // @ts-ignore
-    if ('showSaveFilePicker' in window) {
+    if ('showSaveFilePicker' in window && typeof (window as any).showSaveFilePicker === 'function') {
       try {
-        // @ts-ignore
-        const handle = await window.showSaveFilePicker({
+        const handle = await (window as any).showSaveFilePicker({
           suggestedName: properFileName,
           types: [
             {

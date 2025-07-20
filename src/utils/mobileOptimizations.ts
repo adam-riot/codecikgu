@@ -138,7 +138,7 @@ export class MobileOptimizer {
   }
 
   private setupKeyboardHandler(): void {
-    let initialViewportHeight = window.innerHeight
+    const initialViewportHeight = window.innerHeight
     
     const handleViewportChange = () => {
       const currentHeight = window.innerHeight

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
+import { Stats, Profile } from '@/types/common'
 
 export default function AboutPage() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<Stats>({
     totalStudents: 0,
     totalSchools: 0,
     totalRewards: 0,
@@ -28,7 +29,7 @@ export default function AboutPage() {
           .eq('role', 'murid')
           .not('sekolah', 'is', null)
 
-        const uniqueSchools = new Set(schoolsData?.map(item => item.sekolah) || [])
+        const uniqueSchools = new Set(schoolsData?.map((item: Profile) => item.sekolah) || [])
 
         // Fetch total rewards
         const { count: rewardsCount } = await supabase
@@ -41,7 +42,7 @@ export default function AboutPage() {
           .select('xp')
           .eq('role', 'murid')
 
-        const totalXP = xpData?.reduce((sum, profile) => sum + (profile.xp || 0), 0) || 0
+        const totalXP = xpData?.reduce((sum: number, profile: Profile) => sum + (profile.xp || 0), 0) || 0
 
         setStats({
           totalStudents: studentsCount || 1250,

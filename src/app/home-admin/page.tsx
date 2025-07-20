@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 
 export default function HomeAdminPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalNotes: 0,

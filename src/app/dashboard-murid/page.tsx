@@ -7,7 +7,7 @@ import { BookOpen, Video, FileText, Upload, Trophy, Star, Clock, CheckCircle, Co
 import Link from 'next/link'
 import { SkeletonStats, SkeletonCard } from '@/components/LoadingSkeletons'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { AchievementSummary, useAchievements } from '@/components/AchievementSystem'
+import { AchievementSummary } from '@/components/AchievementSystem'
 import { useMobileGestures } from '@/components/MobileGestures'
 
 interface Challenge {
@@ -21,6 +21,14 @@ interface Challenge {
   deadline: string | null
   is_active: boolean
   created_at: string
+  challenge_submissions?: {
+    id: string
+    score: number
+    max_score: number
+    passed: boolean
+    xp_earned: number
+    submitted_at: string
+  }[]
   submission?: {
     id: string
     score: number
@@ -38,6 +46,11 @@ interface UserStats {
   average_score: number
 }
 
+interface User {
+  id: string
+  email?: string
+}
+
 export default function DashboardMurid() {
   const router = useRouter()
   const [challenges, setChallenges] = useState<Challenge[]>([])
@@ -49,8 +62,7 @@ export default function DashboardMurid() {
   })
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('available')
-  const [user, setUser] = useState<any>(null)
-  const { checkAchievements } = useAchievements()
+    const [/* user */, setUser] = useState<User | null>(null)
   
   // Add mobile gesture support
   useMobileGestures()
@@ -65,65 +77,51 @@ export default function DashboardMurid() {
       }
 
       setUser(user)
-      await fetchData(user.id)
+      
+      try {
+        // Fetch challenges with user submissions
+        const { data: challengesData } = await supabase
+          .from('challenges')
+          .select(`
+            *,
+            challenge_submissions!left (
+              id,
+              score,
+              max_score,
+              passed,
+              xp_earned,
+              submitted_at
+            )
+          `)
+          .eq('is_active', true)
+          .eq('challenge_submissions.user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (challengesData) {
+          const formattedChallenges = challengesData.map((challenge: Challenge) => ({
+            ...challenge,
+            submission: challenge.challenge_submissions?.[0] || null
+          }))
+          setChallenges(formattedChallenges)
+        }
+
+        // Fetch user statistics
+        const { data: statsData } = await supabase
+          .rpc('get_user_challenge_stats', { user_uuid: user.id })
+
+        if (statsData && statsData.length > 0) {
+          setUserStats(statsData[0])
+        }
+
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
+      }
     }
 
     checkAuth()
   }, [router])
-
-  const fetchData = async (userId: string) => {
-    try {
-      // Fetch challenges with user submissions
-      const { data: challengesData } = await supabase
-        .from('challenges')
-        .select(`
-          *,
-          challenge_submissions!left (
-            id,
-            score,
-            max_score,
-            passed,
-            xp_earned,
-            submitted_at
-          )
-        `)
-        .eq('is_active', true)
-        .eq('challenge_submissions.user_id', userId)
-        .order('created_at', { ascending: false })
-
-      if (challengesData) {
-        const formattedChallenges = challengesData.map(challenge => ({
-          ...challenge,
-          submission: challenge.challenge_submissions?.[0] || null
-        }))
-        setChallenges(formattedChallenges)
-      }
-
-      // Fetch user statistics
-      const { data: statsData } = await supabase
-        .rpc('get_user_challenge_stats', { user_uuid: userId })
-
-      if (statsData && statsData.length > 0) {
-        setUserStats(statsData[0])
-      }
-
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    }
-    setLoading(false)
-    
-    // Check for new achievements
-    if (user) {
-      checkAchievements({
-        totalXP: userStats.total_xp,
-        challengesCompleted: userStats.completed_challenges,
-        codeExecutions: 0, // Would need to track this
-        consecutiveDays: 0, // Would need to track this
-        notesRead: 0, // Would need to track this
-        tutorialsCompleted: 0, // Would need to track this
-      })
-    }
-  }
 
   const getChallengeIcon = (type: string) => {
     switch (type) {

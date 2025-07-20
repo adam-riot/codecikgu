@@ -8,22 +8,17 @@ import {
   BookOpen, 
   Code, 
   Trophy, 
-  Target, 
-  Clock, 
-  TrendingUp,
-  Users,
   Star,
-  Play,
   FileText,
-  Award,
   Activity
 } from 'lucide-react'
 
 export default function DashboardAwam() {
   const router = useRouter()
   const [user, setUser] = useState<CustomUser | null>(null)
-  const [userRole, setUserRole] = useState<string>('awam')
-  const [userName, setUserName] = useState<string>('Tetamu')
+  // User state (not tracked for awam users, but keep for potential future use)
+  const [/* userRole */, setUserRole] = useState<string>('')
+  const [/* userName */, setUserName] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

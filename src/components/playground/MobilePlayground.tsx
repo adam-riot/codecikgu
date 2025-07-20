@@ -237,7 +237,7 @@ Memory usage: 12.4 MB`
         onClick={() => insertText('{')} 
         className="p-2 bg-gray-700 rounded text-xs"
       >
-        {/* eslint-disable-next-line react/no-unescaped-entities */}
+        { }
         { }
       </button>
       <button 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
@@ -63,7 +63,7 @@ export default function LoginPage() {
   }, [])
 
   // Function to get user role and redirect accordingly
-  const redirectBasedOnRole = async (userId: string) => {
+  const redirectBasedOnRole = useCallback(async (userId: string) => {
     try {
       console.log('Getting user role for redirect...', userId)
       
@@ -94,13 +94,23 @@ export default function LoginPage() {
         addNotification('success', `Selamat datang, ${profile.name}! (Awam)`)
         router.push('/dashboard-awam')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in redirectBasedOnRole:', error)
       // Fallback to awam dashboard
       addNotification('info', 'Selamat datang! Mengalihkan ke dashboard awam.')
       router.push('/dashboard-awam')
     }
-  }
+  }, [router, addNotification])
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        await redirectBasedOnRole(session.user.id)
+      }
+    }
+    checkUser()
+  }, [redirectBasedOnRole])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -147,9 +157,10 @@ export default function LoginPage() {
         addNotification('error', 'Ralat: Log masuk tidak berjaya')
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Unexpected login error:', error)
-      addNotification('error', `Ralat tidak dijangka: ${error.message}`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      addNotification('error', `Ralat tidak dijangka: ${errorMessage}`)
     } finally {
       setLoading(false)
     }

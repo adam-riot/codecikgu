@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { FileText, Download, Eye, ChevronLeft, Search, Filter } from 'lucide-react'
+import { FileText, Download, Eye, ChevronLeft, Search } from 'lucide-react'
 
 // Contoh data nota untuk Tingkatan 4
 const notesData = [

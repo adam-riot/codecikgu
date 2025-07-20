@@ -43,13 +43,41 @@ export interface UserProfile {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Semak jika pembolehubah wujud sebelum mencipta client
-if (!supabaseUrl || !supabaseAnonKey) {
+// Fallback untuk development tanpa Supabase
+const isDevelopment = process.env.NODE_ENV === 'development'
+const hasSupabaseConfig = supabaseUrl && supabaseAnonKey
+
+// Mock client untuk development
+function createMockClient() {
+  return {
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: null }),
+      signInWithPassword: async () => ({ data: { user: null }, error: null }),
+      signOut: async () => ({ error: null }),
+      getSession: async () => ({ data: { session: null }, error: null })
+    },
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: null, error: { code: 'PGRST116' } })
+        }),
+        order: () => ({ data: [], error: null })
+      }),
+      insert: async () => ({ data: null, error: null }),
+      update: async () => ({ data: null, error: null }),
+      delete: async () => ({ data: null, error: null })
+    })
+  } as any
+}
+
+if (!hasSupabaseConfig && !isDevelopment) {
   throw new Error('Supabase URL or Anon Key is missing from environment variables.')
 }
 
-// Cipta dan eksport client Supabase
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Cipta client Supabase atau mock client untuk development
+export const supabase = hasSupabaseConfig 
+  ? createClient(supabaseUrl!, supabaseAnonKey!)
+  : createMockClient()
 
 // Cache for user profiles to avoid repeated database calls
 const profileCache = new Map<string, { profile: UserProfile | null, timestamp: number }>()

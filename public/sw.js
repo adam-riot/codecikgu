@@ -6,9 +6,8 @@ const urlsToCache = [
   '/nota',
   '/leaderboard',
   '/dashboard-murid',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/favicon.svg'
+  '/favicon.svg',
+  '/manifest.json'
 ]
 
 // Install event - cache resources

@@ -14,9 +14,12 @@ import {
   Code,
   Video,
   FileText,
-  Award
+  Award,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react'
 import { useNotifications } from '../NotificationProvider'
+import { supabase } from '@/utils/supabase'
 
 // Utility function for difficulty colors
 const getDifficultyColor = (difficulty: 'beginner' | 'intermediate' | 'hard') => {
@@ -223,19 +226,146 @@ const sampleChallenges: Challenge[] = [
 ]
 
 export function EnhancedLevelSystem() {
-  const [levels, setLevels] = useState<Level[]>(sampleLevels)
-  const [challenges, setChallenges] = useState<Challenge[]>(sampleChallenges)
+  const [levels, setLevels] = useState<Level[]>([])
+  const [challenges, setChallenges] = useState<Challenge[]>([])
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null)
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null)
   const [currentView, setCurrentView] = useState<'map' | 'challenge' | 'task'>('map')
   const [studentStats, setStudentStats] = useState<StudentStats>({
-    current_xp: 50,
-    current_level: { level_number: 1, sublevel_number: 1, title: 'Hello World' },
+    current_xp: 0,
+    current_level: { level_number: 1, sublevel_number: 1, title: 'Getting Started' },
     total_challenges_completed: 0,
-    current_streak: 3,
-    badges_earned: 2
+    current_streak: 0,
+    badges_earned: 0
   })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const { addNotification } = useNotifications()
+
+  // Load data from database
+  useEffect(() => {
+    loadGamificationData()
+  }, [])
+
+  const loadGamificationData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Get user data
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        // Use sample data for non-authenticated users
+        setLevels(sampleLevels)
+        setChallenges(sampleChallenges)
+        setStudentStats({
+          current_xp: 50,
+          current_level: { level_number: 1, sublevel_number: 1, title: 'Hello World' },
+          total_challenges_completed: 0,
+          current_streak: 3,
+          badges_earned: 2
+        })
+        setLoading(false)
+        return
+      }
+
+      // Load levels from database
+      const { data: levelsData, error: levelsError } = await supabase
+        .from('levels')
+        .select('*')
+        .order('level_number', { ascending: true })
+        .order('sublevel_number', { ascending: true })
+
+      if (levelsError) {
+        console.error('Error loading levels:', levelsError)
+        // Fallback to sample data
+        setLevels(sampleLevels)
+      } else {
+        setLevels(levelsData || sampleLevels)
+      }
+
+      // Load challenges from database
+      const { data: challengesData, error: challengesError } = await supabase
+        .from('exercises')
+        .select('*')
+        .order('order_index', { ascending: true })
+
+      if (challengesError) {
+        console.error('Error loading challenges:', challengesError)
+        // Fallback to sample data
+        setChallenges(sampleChallenges)
+      } else {
+        // Transform exercises to challenges format
+        const transformedChallenges = challengesData?.map((exercise: any) => ({
+          id: exercise.id,
+          level_id: exercise.level_id || '1-1',
+          title: exercise.title,
+          description: exercise.description,
+          difficulty: exercise.difficulty as 'beginner' | 'intermediate' | 'hard',
+          xp_reward: exercise.xp_reward,
+          time_estimate: exercise.time_estimate,
+          theory_content: exercise.theory_content || {},
+          tasks: exercise.tasks || [],
+          prerequisites: exercise.prerequisites || [],
+          completion_rate: exercise.completion_rate || 0,
+          average_score: exercise.average_score || 0,
+          order_index: exercise.order_index || 0,
+          is_unlocked: true, // Default to unlocked, can be calculated based on prerequisites
+          user_progress: {
+            is_completed: false,
+            current_task_index: 0,
+            xp_earned: 0,
+            completion_percentage: 0,
+            last_attempt_date: null,
+            best_score: 0,
+            attempts: 0,
+            completed_tasks: []
+          }
+        })) || sampleChallenges
+        
+        setChallenges(transformedChallenges)
+      }
+
+      // Load user progress
+      const { data: progressData, error: progressError } = await supabase
+        .from('user_progress')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (progressError && progressError.code !== 'PGRST116') {
+        console.error('Error loading user progress:', progressError)
+      }
+
+      if (progressData) {
+        setStudentStats({
+          current_xp: progressData.current_xp || 0,
+          current_level: progressData.current_level || { level_number: 1, sublevel_number: 1, title: 'Getting Started' },
+          total_challenges_completed: progressData.total_challenges_completed || 0,
+          current_streak: progressData.current_streak || 0,
+          badges_earned: progressData.badges_earned || 0
+        })
+      }
+
+    } catch (err) {
+      console.error('Error loading gamification data:', err)
+      setError('Failed to load gamification data. Using sample data.')
+      
+      // Fallback to sample data
+      setLevels(sampleLevels)
+      setChallenges(sampleChallenges)
+      setStudentStats({
+        current_xp: 50,
+        current_level: { level_number: 1, sublevel_number: 1, title: 'Hello World' },
+        total_challenges_completed: 0,
+        current_streak: 3,
+        badges_earned: 2
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const isLevelUnlocked = (level: Level) => {
     return studentStats.current_xp >= level.xp_required_min
@@ -296,6 +426,37 @@ export function EnhancedLevelSystem() {
         message: `+${task.xp_reward} XP for "${task.title}"`
       })
     }
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-gray-300">Loading your gamification data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-400">{error}</p>
+          <button
+            onClick={() => loadGamificationData()}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry</span>
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (currentView === 'challenge' && selectedChallenge) {

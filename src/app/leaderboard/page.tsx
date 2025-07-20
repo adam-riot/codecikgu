@@ -48,8 +48,8 @@ export default function LeaderboardPage() {
         setFilteredLeaderboard(leaderboardData)
 
         // Extract unique values for filters
-        const schools = [...new Set(leaderboardData.map(entry => entry.sekolah).filter(Boolean))]
-        const tingkatan = [...new Set(leaderboardData.map(entry => entry.tingkatan).filter(Boolean))]
+        const schools = [...new Set(leaderboardData.map((entry: LeaderboardEntry) => entry.sekolah).filter(Boolean))] as string[]
+        const tingkatan = [...new Set(leaderboardData.map((entry: LeaderboardEntry) => entry.tingkatan).filter(Boolean))] as string[]
         
         setUniqueSchools(schools.sort())
         setUniqueTingkatan(tingkatan.sort())

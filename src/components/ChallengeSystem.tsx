@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { 
   Calendar, 
   Trophy, 
@@ -407,7 +407,7 @@ export function ChallengeSystem() {
             <span className="text-gray-300 text-sm">Kategori:</span>
             <select
               value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value as any)}
+              onChange={(e) => setFilterCategory(e.target.value as 'weekly' | 'monthly' | 'special' | 'all')}
               className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"
             >
               <option value="all">Semua</option>
@@ -421,7 +421,7 @@ export function ChallengeSystem() {
             <span className="text-gray-300 text-sm">Tahap:</span>
             <select
               value={filterDifficulty}
-              onChange={(e) => setFilterDifficulty(e.target.value as any)}
+              onChange={(e) => setFilterDifficulty(e.target.value as 'beginner' | 'intermediate' | 'advanced' | 'all')}
               className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm"
             >
               <option value="all">Semua</option>
@@ -643,7 +643,7 @@ function ChallengeDetails({
       {/* Tasks */}
       <div className="space-y-4">
         <h2 className="text-2xl font-bold text-white mb-4">Tugasan</h2>
-        {challenge.tasks.map((task, index) => (
+        {challenge.tasks.map((task) => (
           <div key={task.id} className={`glass-dark rounded-xl p-6 ${task.isCompleted ? 'border border-green-500/30' : ''}`}>
             <div className="flex items-start justify-between">
               <div className="flex-1">

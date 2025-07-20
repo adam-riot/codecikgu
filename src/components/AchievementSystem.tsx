@@ -269,8 +269,8 @@ export const AchievementCard: React.FC<{
 }
 
 // Achievement summary component
-export const AchievementSummary: React.FC<{ stats: UserStats }> = ({ stats }) => {
-  const { achievements, unlockedAchievements, getProgress } = useAchievements()
+export const AchievementSummary: React.FC<{ stats: UserStats }> = ({ /* stats */ }) => {
+  const { achievements, unlockedAchievements } = useAchievements()
   
   const totalXP = unlockedAchievements.reduce((sum, a) => sum + a.xpReward, 0)
   const completionRate = (unlockedAchievements.length / achievements.length) * 100

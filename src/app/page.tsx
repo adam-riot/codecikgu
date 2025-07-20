@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
-import { Play, BookOpen, Trophy, UserPlus, Code, Zap, Globe, Cpu, Database, Smartphone } from 'lucide-react'
+import { Play, BookOpen, Trophy, UserPlus } from 'lucide-react'
 
 export default function HomePage() {
   const [user, setUser] = useState<CustomUser | null>(null)

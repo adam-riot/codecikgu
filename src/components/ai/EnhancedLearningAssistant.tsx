@@ -490,7 +490,7 @@ async function generateAIResponse(message: string, skills: SkillLevel, style: Le
   // Simulate AI processing with context awareness
   const responses = [
     `Based on your current skill level in programming (${(skills.programming * 100).toFixed(0)}%), I'd recommend focusing on ${skills.programming < 0.5 ? 'fundamentals' : 'advanced concepts'}.`,
-    `Since you learn best through ${Object.entries(style).reduce((a, b) => style[a[0]] > style[b[0]] ? a : b)[0]} methods, here's a tailored approach...`,
+    `Since you learn best through ${Object.entries(style).reduce((a, b) => style[a[0] as keyof typeof style] > style[b[0] as keyof typeof style] ? a : b)[0]} methods, here's a tailored approach...`,
     `Let me break this down step by step, considering your preferred learning style...`
   ]
   

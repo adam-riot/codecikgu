@@ -47,7 +47,7 @@ interface DebugLog {
   step: string
   status: 'success' | 'error' | 'info'
   message: string
-  data?: any
+  data?: unknown
 }
 
 export default function RegisterPage() {
@@ -74,10 +74,10 @@ export default function RegisterPage() {
   const [showDebug, setShowDebug] = useState(false)
 
   // Use the new email validation hook
-  const { validation: emailValidation, isValidating, validateEmail: validateEmailNew, reset: resetValidation } = useEmailValidation()
+  const { validation: emailValidation, validateEmail: validateEmailNew, reset: resetValidation } = useEmailValidation()
 
   // Debug logging function
-  const addDebugLog = (step: string, status: 'success' | 'error' | 'info', message: string, data?: any) => {
+  const addDebugLog = (step: string, status: 'success' | 'error' | 'info', message: string, data?: unknown) => {
     const log: DebugLog = {
       timestamp: new Date().toISOString(),
       step,
@@ -219,7 +219,7 @@ export default function RegisterPage() {
       addDebugLog('CONNECTION', 'info', 'Testing Supabase connection...')
       
       try {
-        const { data: testData, error: testError } = await supabase
+        const { error: testError } = await supabase
           .from('profiles')
           .select('count')
           .limit(1)
@@ -229,7 +229,7 @@ export default function RegisterPage() {
         } else {
           addDebugLog('CONNECTION', 'success', 'Supabase connection OK')
         }
-      } catch (connError: any) {
+      } catch (connError: unknown) {
         addDebugLog('CONNECTION', 'error', 'Connection test failed', connError)
       }
 
@@ -237,9 +237,9 @@ export default function RegisterPage() {
       addDebugLog('EMAIL_CHECK', 'info', 'Checking if email already exists...')
       
       try {
-        const { data: existingUser, error: checkError } = await supabase.auth.getUser()
+        const { data: existingUser } = await supabase.auth.getUser()
         addDebugLog('EMAIL_CHECK', 'info', 'Current auth state', { user: existingUser?.user?.email || 'none' })
-      } catch (checkErr: any) {
+      } catch (checkErr: unknown) {
         addDebugLog('EMAIL_CHECK', 'error', 'Auth check failed', checkErr)
       }
 
@@ -329,13 +329,17 @@ export default function RegisterPage() {
         addNotification('error', 'Ralat: Pendaftaran tidak berjaya - tiada user dicipta')
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : undefined
+      const errorName = error instanceof Error ? error.name : 'Unknown'
+      
       addDebugLog('UNEXPECTED_ERROR', 'error', 'Unexpected registration error', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
+        message: errorMessage,
+        stack: errorStack,
+        name: errorName
       })
-      addNotification('error', `Ralat tidak dijangka: ${error.message}`)
+      addNotification('error', `Ralat tidak dijangka: ${errorMessage}`)
     } finally {
       setLoading(false)
       addDebugLog('COMPLETE', 'info', 'Registration process completed')
@@ -388,9 +392,15 @@ export default function RegisterPage() {
               }`}>
                 <div className="font-semibold">{log.step}</div>
                 <div>{log.message}</div>
-                {log.data && (
+                {log.data !== undefined && log.data !== null && (
                   <pre className="mt-1 text-xs opacity-75 overflow-x-auto">
-                    {JSON.stringify(log.data, null, 2)}
+                    {(() => {
+                      try {
+                        return typeof log.data === 'string' ? log.data : JSON.stringify(log.data, null, 2)
+                      } catch {
+                        return '[Unable to display data]'
+                      }
+                    })()}
                   </pre>
                 )}
               </div>

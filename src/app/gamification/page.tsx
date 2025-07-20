@@ -62,7 +62,7 @@ export default function GamificationPage() {
           {navItems.map(item => (
             <button
               key={item.id}
-              onClick={() => setCurrentView(item.id as any)}
+              onClick={() => setCurrentView(item.id as 'overview' | 'levels' | 'exercises')}
               className="glass-dark rounded-2xl p-8 text-left transition-all duration-300 hover:scale-105 hover:border-electric-blue/30 group"
             >
               <div className="flex items-center space-x-4 mb-4">

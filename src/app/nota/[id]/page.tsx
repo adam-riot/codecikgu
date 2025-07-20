@@ -1,11 +1,12 @@
 import { supabase } from '@/utils/supabase'
 import NotaViewer from '@/components/nota/NotaViewer'
 
-export default async function NotaPage({ params }: { params: { id: string } }) {
+export default async function NotaPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { data: nota, error } = await supabase
     .from('notes')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error || !nota) return (

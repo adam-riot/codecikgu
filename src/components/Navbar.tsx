@@ -60,7 +60,7 @@ export default function Navbar() {
     fetchUserData()
 
     // Listen for auth changes with enhanced logging
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       console.log('🔄 Navbar - Auth state changed:', event, session?.user?.email) // Enhanced debug log
       
       if (session?.user) {

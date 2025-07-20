@@ -12,7 +12,7 @@ import {
   VideoOff,
   Phone,
   PhoneOff,
-  Screen,
+  Monitor, // Changed from Screen to Monitor
   Mouse,
   Edit,
   Eye,
@@ -417,7 +417,7 @@ Execution completed successfully in 0.12 seconds`
                   isScreenSharing ? 'bg-orange-600 hover:bg-orange-700' : 'bg-gray-600 hover:bg-gray-700'
                 }`}
               >
-                <Screen className="w-4 h-4" />
+                <Monitor className="w-4 h-4" />
               </button>
 
               {/* Invite Users */}

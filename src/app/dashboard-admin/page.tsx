@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { AdminGamificationPanel } from '@/components/gamification'
 
 interface Profile {
@@ -635,9 +636,11 @@ export default function DashboardAdmin() {
                   {ganjaran.map((reward) => (
                     <div key={reward.id} className="glass-dark rounded-xl p-6 card-hover">
                       {reward.imej_url && (
-                        <img 
+                        <Image 
                           src={reward.imej_url} 
                           alt={reward.nama}
+                          width={300}
+                          height={128}
                           className="w-full h-32 object-cover rounded-lg mb-4"
                         />
                       )}
