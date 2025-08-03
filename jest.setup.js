@@ -145,6 +145,33 @@ global.sessionStorage = sessionStorageMock
 // Mock fetch
 global.fetch = jest.fn()
 
+// Mock Request and Response globals for API testing
+global.Request = class Request {
+  constructor(url, options = {}) {
+    this.url = url
+    this.method = options.method || 'GET'
+    this.headers = new Map(Object.entries(options.headers || {}))
+    this.body = options.body || null
+  }
+  
+  async json() {
+    return this.body ? JSON.parse(this.body) : {}
+  }
+}
+
+global.Response = class Response {
+  constructor(body, options = {}) {
+    this.body = body
+    this.status = options.status || 200
+    this.statusText = options.statusText || 'OK'
+    this.headers = new Map(Object.entries(options.headers || {}))
+  }
+  
+  async json() {
+    return typeof this.body === 'string' ? JSON.parse(this.body) : this.body
+  }
+}
+
 // Mock console methods to reduce noise in tests
 const originalConsoleError = console.error
 const originalConsoleWarn = console.warn

@@ -1,17 +1,16 @@
 'use client'
 
-import dynamic from 'next/dynamic'
-import { Suspense, lazy, useMemo, useCallback } from 'react'
+import React, { Suspense, useMemo, useCallback, useEffect, useState, useRef } from 'react'
 import PlaygroundErrorBoundary from '@/components/PlaygroundErrorBoundary'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import dynamic from 'next/dynamic'
 
-// Lazy load heavy components for better performance
+// Lazy load Monaco Editor with proper error handling
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { 
   ssr: false,
   loading: () => <LoadingSpinner size="lg" />
 })
 
-import { useEffect, useState, useRef } from 'react'
 import { Eye } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
@@ -180,30 +179,9 @@ export default function PlaygroundPage() {
     {
       id: '1',
       name: 'main',
-      content: `<?php
-// Sambungan ke pangkalan data
-include ('db_conn.php');
-?>
-<style>
-#mainbody {
-  background-color: #f0f0f0;
-  padding: 20px;
-  margin: 10px;
-}
+      content: `// Welcome to CodeCikgu Playground!
+// You can write and execute JavaScript code here
 
-.container {
-  width: 100%;
-  max-width: 1200px;
-}
-
-#tajuk {
-  font-size: 24px;
-  color: #333;
-  text-align: center;
-}
-</style>
-
-<script>
 function greet(name) {
   if (name) {
     return 'Hello, ' + name + '!';
@@ -213,8 +191,8 @@ function greet(name) {
 }
 
 console.log(greet('CodeCikgu'));
-</script>`,
-      language: 'php',
+console.log('Start coding and click Run to execute!');`,
+      language: 'javascript',
       saved: false
     }
   ])
