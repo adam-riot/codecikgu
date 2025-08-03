@@ -11,15 +11,10 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   loading: () => <LoadingSpinner size="lg" />
 })
 
-// Lazy load other heavy components
-const CodeEditor = lazy(() => import('@/components/playground/CodeEditor'))
-const ProjectManager = lazy(() => import('@/components/playground/ProjectManager'))
-
 import { useEffect, useState, useRef } from 'react'
 import { Eye } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase'
-import { useAutoSave, useKeyboardShortcuts } from '@/hooks/useAutoSave'
 import { 
   Code, Play, Download, Save, Plus, X, File, Terminal, CheckCircle, XCircle, Info,
   Folder, Trash2, FolderOpen, PlayCircle, FileText

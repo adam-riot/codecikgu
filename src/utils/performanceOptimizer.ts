@@ -1,5 +1,5 @@
 // Performance optimization utilities
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 
 // Performance monitoring class
 export class PerformanceMonitor {
