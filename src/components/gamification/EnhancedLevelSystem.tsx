@@ -5,866 +5,574 @@ import {
   Trophy, 
   Star, 
   Lock, 
-  CheckCircle, 
-  Clock, 
-  Zap, 
-  Target,
-  PlayCircle,
-  BookOpen,
+  Unlock, 
+  CheckCircle,
+  XCircle,
+  Play,
+  RotateCcw,
+  Brain,
   Code,
-  Video,
-  FileText,
+  Target,
   Award,
-  RefreshCw,
-  AlertCircle
+  TrendingUp,
+  Zap,
+  Shield,
+  Database,
+  FileText,
+  Network,
+  Users,
+  Crown,
+  Calendar,
+  Clock,
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react'
-import { useNotifications } from '../NotificationProvider'
 import { supabase } from '@/utils/supabase'
-
-// Utility function for difficulty colors
-const getDifficultyColor = (difficulty: 'beginner' | 'intermediate' | 'hard') => {
-  switch (difficulty) {
-    case 'beginner':
-      return 'bg-green-500/20 text-green-400 border-green-500/30'
-    case 'intermediate':
-      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-    case 'hard':
-      return 'bg-red-500/20 text-red-400 border-red-500/30'
-    default:
-      return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-  }
-}
 
 interface Level {
   id: string
-  level_number: number
-  sublevel_number: number
   title: string
   description: string
-  xp_required_min: number
-  xp_required_max: number
-  unlock_conditions: string[]
-  is_active: boolean
+  category: string
+  difficulty: 'mudah' | 'sederhana' | 'sukar'
+  xpReward: number
+  timeLimit: number
+  requirements: string[]
+  challenges: Challenge[]
+  unlocked: boolean
+  completed: boolean
+  progress: number
+  order: number
 }
 
 interface Challenge {
   id: string
-  level_id: string
   title: string
   description: string
-  difficulty: 'beginner' | 'intermediate' | 'hard'
-  xp_reward: number
-  time_estimate: number
-  theory_content: {
-    notes?: string[]
-    videos?: { title: string, url: string, duration: number }[]
-    examples?: { title: string, code: string, explanation: string }[]
-  }
-  tasks: ChallengeTask[]
-  prerequisites: string[]
-  completion_rate: number
-  average_score: number
-  order_index: number
-  is_unlocked: boolean
-  student_progress?: {
-    status: 'not_started' | 'in_progress' | 'completed' | 'locked'
-    score: number
-    attempts: number
-    time_spent: number
-    completed_tasks: string[]
-  }
-}
-
-interface ChallengeTask {
-  id: string
-  title: string
-  description: string
-  type: 'theory' | 'practice' | 'quiz' | 'project'
-  xp_reward: number
+  type: 'quiz' | 'coding' | 'theory' | 'practical'
   content: any
-  is_required: boolean
+  completed: boolean
+  score: number
+  maxScore: number
 }
 
-interface StudentStats {
-  current_xp: number
-  current_level: {
-    level_number: number
-    sublevel_number: number
-    title: string
-  }
-  total_challenges_completed: number
-  current_streak: number
-  badges_earned: number
-}
-
-// Dummy data for development
-const sampleLevels: Level[] = [
+const levels: Level[] = [
   {
-    id: '1-1',
-    level_number: 1,
-    sublevel_number: 1,
-    title: 'Hello World',
-    description: 'Your first steps into programming',
-    xp_required_min: 0,
-    xp_required_max: 100,
-    unlock_conditions: [],
-    is_active: true
-  },
-  {
-    id: '1-2',
-    level_number: 1,
-    sublevel_number: 2,
-    title: 'Variables & Data Types',
-    description: 'Understanding data storage and manipulation',
-    xp_required_min: 100,
-    xp_required_max: 200,
-    unlock_conditions: ['complete_80_percent_previous'],
-    is_active: true
-  },
-  {
-    id: '1-3',
-    level_number: 1,
-    sublevel_number: 3,
-    title: 'Basic Input/Output',
-    description: 'Interacting with users through input and output',
-    xp_required_min: 200,
-    xp_required_max: 300,
-    unlock_conditions: ['complete_80_percent_previous'],
-    is_active: true
-  }
-]
-
-const sampleChallenges: Challenge[] = [
-  {
-    id: 'challenge-1-1-1',
-    level_id: '1-1',
-    title: 'Your First "Hello World"',
-    description: 'Create your very first program that displays a greeting message',
-    difficulty: 'beginner',
-    xp_reward: 25,
-    time_estimate: 15,
-    theory_content: {
-      notes: [
-        'Programming is like giving instructions to a computer',
-        'Every program starts with a simple first step',
-        'Hello World is a tradition in programming'
-      ],
-      videos: [
-        { title: 'What is Programming?', url: '/videos/programming-intro', duration: 5 },
-        { title: 'Writing Your First Code', url: '/videos/first-code', duration: 8 }
-      ],
-      examples: [
-        {
-          title: 'Basic Hello World',
-          code: 'print("Hello, World!")',
-          explanation: 'This line tells the computer to display the text "Hello, World!" on the screen'
-        }
-      ]
-    },
-    tasks: [
+    id: 'level-1',
+    title: 'Pengenalan Sistem Komputer',
+    description: 'Belajar komponen asas sistem komputer',
+    category: 'Sistem Komputer',
+    difficulty: 'mudah',
+    xpReward: 100,
+    timeLimit: 1800,
+    requirements: [],
+    challenges: [
       {
-        id: 'task-1',
-        title: 'Read: What is Programming?',
-        description: 'Learn the basic concepts of programming',
-        type: 'theory',
-        xp_reward: 5,
-        content: { notes: ['Programming basics...'] },
-        is_required: true
-      },
-      {
-        id: 'task-2',
-        title: 'Watch: Your First Code',
-        description: 'Watch a video tutorial on writing your first program',
-        type: 'theory',
-        xp_reward: 10,
-        content: { video_url: '/videos/first-code' },
-        is_required: true
-      },
-      {
-        id: 'task-3',
-        title: 'Code: Hello World',
-        description: 'Write a program that displays "Hello, World!"',
-        type: 'practice',
-        xp_reward: 15,
-        content: {
-          starter_code: '# Write your Hello World program here\n',
-          expected_output: 'Hello, World!'
-        },
-        is_required: true
-      },
-      {
-        id: 'task-4',
-        title: 'Quiz: Programming Basics',
-        description: 'Test your understanding of basic programming concepts',
+        id: 'challenge-1-1',
+        title: 'Komponen Perkakasan',
+        description: 'Kenalpasti komponen utama sistem komputer',
         type: 'quiz',
-        xp_reward: 10,
         content: {
           questions: [
             {
-              question: 'What does "Hello World" demonstrate?',
-              options: ['Basic output', 'Complex calculations', 'User input', 'File operations'],
-              correct: 0
+              question: 'Komponen yang bertanggungjawab untuk memproses data ialah:',
+              options: ['Monitor', 'CPU', 'Keyboard', 'Mouse'],
+              correct: 1,
+              explanation: 'CPU (Central Processing Unit) ialah otak komputer yang memproses semua data'
+            },
+            {
+              question: 'Komponen yang menyimpan data secara kekal ialah:',
+              options: ['RAM', 'Hard Disk', 'Monitor', 'Power Supply'],
+              correct: 1,
+              explanation: 'Hard Disk ialah storan kekal yang menyimpan data walaupun komputer dimatikan'
             }
           ]
         },
-        is_required: false
+        completed: false,
+        score: 0,
+        maxScore: 2
       }
     ],
-    prerequisites: [],
-    completion_rate: 95.5,
-    average_score: 87.3,
-    order_index: 1,
-    is_unlocked: true,
-    student_progress: {
-      status: 'not_started',
-      score: 0,
-      attempts: 0,
-      time_spent: 0,
-      completed_tasks: []
-    }
+    unlocked: true,
+    completed: false,
+    progress: 0,
+    order: 1
+  },
+  {
+    id: 'level-2',
+    title: 'Python Asas',
+    description: 'Belajar pengaturcaraan Python',
+    category: 'Python Asas',
+    difficulty: 'sederhana',
+    xpReward: 150,
+    timeLimit: 2400,
+    requirements: ['level-1'],
+    challenges: [
+      {
+        id: 'challenge-2-1',
+        title: 'Hello World',
+        description: 'Tulis program Python pertama',
+        type: 'coding',
+        content: {
+          task: 'Tulis program untuk mencetak "Hello, CodeCikgu!"',
+          starterCode: '# Tulis kod anda di sini\n',
+          expectedOutput: 'Hello, CodeCikgu!'
+        },
+        completed: false,
+        score: 0,
+        maxScore: 1
+      }
+    ],
+    unlocked: false,
+    completed: false,
+    progress: 0,
+    order: 2
   }
 ]
 
-export function EnhancedLevelSystem() {
-  const [levels, setLevels] = useState<Level[]>([])
-  const [challenges, setChallenges] = useState<Challenge[]>([])
+export default function EnhancedLevelSystem() {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null)
-  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null)
-  const [currentView, setCurrentView] = useState<'map' | 'challenge' | 'task'>('map')
-  const [studentStats, setStudentStats] = useState<StudentStats>({
-    current_xp: 0,
-    current_level: { level_number: 1, sublevel_number: 1, title: 'Getting Started' },
-    total_challenges_completed: 0,
-    current_streak: 0,
-    badges_earned: 0
-  })
+  const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null)
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const { addNotification } = useNotifications()
+  const [userAnswers, setUserAnswers] = useState<{[key: string]: any}>({})
+  const [showResults, setShowResults] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(0)
+  const [isTimerRunning, setIsTimerRunning] = useState(false)
 
-  // Load data from database
   useEffect(() => {
-    loadGamificationData()
+    checkUser()
   }, [])
 
-  const loadGamificationData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Get user data
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        // Use sample data for non-authenticated users
-        setLevels(sampleLevels)
-        setChallenges(sampleChallenges)
-        setStudentStats({
-          current_xp: 50,
-          current_level: { level_number: 1, sublevel_number: 1, title: 'Hello World' },
-          total_challenges_completed: 0,
-          current_streak: 3,
-          badges_earned: 2
-        })
-        setLoading(false)
-        return
-      }
-
-      // Load levels from database
-      const { data: levelsData, error: levelsError } = await supabase
-        .from('levels')
-        .select('*')
-        .order('level_number', { ascending: true })
-        .order('sublevel_number', { ascending: true })
-
-      if (levelsError) {
-        console.error('Error loading levels:', levelsError)
-        // Fallback to sample data
-        setLevels(sampleLevels)
-      } else {
-        setLevels(levelsData || sampleLevels)
-      }
-
-      // Load challenges from database
-      const { data: challengesData, error: challengesError } = await supabase
-        .from('exercises')
-        .select('*')
-        .order('order_index', { ascending: true })
-
-      if (challengesError) {
-        console.error('Error loading challenges:', challengesError)
-        // Fallback to sample data
-        setChallenges(sampleChallenges)
-      } else {
-        // Transform exercises to challenges format
-        const transformedChallenges = challengesData?.map((exercise: any) => ({
-          id: exercise.id,
-          level_id: exercise.level_id || '1-1',
-          title: exercise.title,
-          description: exercise.description,
-          difficulty: exercise.difficulty as 'beginner' | 'intermediate' | 'hard',
-          xp_reward: exercise.xp_reward,
-          time_estimate: exercise.time_estimate,
-          theory_content: exercise.theory_content || {},
-          tasks: exercise.tasks || [],
-          prerequisites: exercise.prerequisites || [],
-          completion_rate: exercise.completion_rate || 0,
-          average_score: exercise.average_score || 0,
-          order_index: exercise.order_index || 0,
-          is_unlocked: true, // Default to unlocked, can be calculated based on prerequisites
-          user_progress: {
-            is_completed: false,
-            current_task_index: 0,
-            xp_earned: 0,
-            completion_percentage: 0,
-            last_attempt_date: null,
-            best_score: 0,
-            attempts: 0,
-            completed_tasks: []
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (isTimerRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            setIsTimerRunning(false)
+            return 0
           }
-        })) || sampleChallenges
-        
-        setChallenges(transformedChallenges)
-      }
-
-      // Load user progress
-      const { data: progressData, error: progressError } = await supabase
-        .from('user_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      if (progressError && progressError.code !== 'PGRST116') {
-        console.error('Error loading user progress:', progressError)
-      }
-
-      if (progressData) {
-        setStudentStats({
-          current_xp: progressData.current_xp || 0,
-          current_level: progressData.current_level || { level_number: 1, sublevel_number: 1, title: 'Getting Started' },
-          total_challenges_completed: progressData.total_challenges_completed || 0,
-          current_streak: progressData.current_streak || 0,
-          badges_earned: progressData.badges_earned || 0
+          return prev - 1
         })
-      }
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [isTimerRunning, timeLeft])
 
-    } catch (err) {
-      console.error('Error loading gamification data:', err)
-      setError('Failed to load gamification data. Using sample data.')
-      
-      // Fallback to sample data
-      setLevels(sampleLevels)
-      setChallenges(sampleChallenges)
-      setStudentStats({
-        current_xp: 50,
-        current_level: { level_number: 1, sublevel_number: 1, title: 'Hello World' },
-        total_challenges_completed: 0,
-        current_streak: 3,
-        badges_earned: 2
-      })
+  const checkUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+      }
+    } catch (error) {
+      console.error('Error checking user:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const isLevelUnlocked = (level: Level) => {
-    return studentStats.current_xp >= level.xp_required_min
-  }
-
-  const getLevelProgress = (level: Level) => {
-    if (studentStats.current_xp >= level.xp_required_max) return 100
-    if (studentStats.current_xp < level.xp_required_min) return 0
-    return ((studentStats.current_xp - level.xp_required_min) / (level.xp_required_max - level.xp_required_min)) * 100
+  const startLevel = (level: Level) => {
+    setSelectedLevel(level)
+    setTimeLeft(level.timeLimit)
+    setIsTimerRunning(true)
+    setUserAnswers({})
+    setShowResults(false)
   }
 
   const startChallenge = (challenge: Challenge) => {
-    if (!challenge.is_unlocked) {
-      addNotification({
-        type: 'error',
-        title: '🔒 Challenge Locked',
-        message: 'Complete previous challenges to unlock this one'
-      })
-      return
-    }
+    setCurrentChallenge(challenge)
+    setUserAnswers({})
+    setShowResults(false)
+  }
 
-    setSelectedChallenge(challenge)
-    setCurrentView('challenge')
+  const submitQuiz = (challenge: Challenge) => {
+    let score = 0
+    const questions = challenge.content.questions
     
-    addNotification({
-      type: 'success',
-      title: '🚀 Challenge Started!',
-      message: `Welcome to "${challenge.title}"`
+    questions.forEach((question: any, index: number) => {
+      const userAnswer = userAnswers[`question-${index}`]
+      if (userAnswer === question.correct) {
+        score++
+      }
     })
-  }
 
-  const completeTask = (challengeId: string, taskId: string) => {
-    setChallenges(prev => prev.map(challenge => 
-      challenge.id === challengeId 
-        ? {
-            ...challenge,
-            student_progress: {
-              ...challenge.student_progress!,
-              completed_tasks: [...(challenge.student_progress?.completed_tasks || []), taskId]
-            }
-          }
-        : challenge
-    ))
+    challenge.score = score
+    challenge.maxScore = questions.length
+    challenge.completed = score >= questions.length * 0.8
 
-    const challenge = challenges.find(c => c.id === challengeId)
-    const task = challenge?.tasks.find(t => t.id === taskId)
+    setShowResults(true)
     
-    if (task) {
-      // Award XP
-      setStudentStats(prev => ({
-        ...prev,
-        current_xp: prev.current_xp + task.xp_reward
-      }))
-
-      addNotification({
-        type: 'success',
-        title: '✅ Task Completed!',
-        message: `+${task.xp_reward} XP for "${task.title}"`
-      })
+    if (challenge.completed && selectedLevel) {
+      updateLevelProgress(selectedLevel, challenge)
     }
   }
 
-  // Loading state
+  const submitCodingChallenge = (challenge: Challenge) => {
+    const userCode = userAnswers[`code-${challenge.id}`] || ''
+    
+    if (userCode.includes('print') && userCode.includes('Hello')) {
+      challenge.score = 1
+      challenge.maxScore = 1
+      challenge.completed = true
+    } else {
+      challenge.score = 0
+      challenge.maxScore = 1
+      challenge.completed = false
+    }
+
+    setShowResults(true)
+    
+    if (challenge.completed && selectedLevel) {
+      updateLevelProgress(selectedLevel, challenge)
+    }
+  }
+
+  const updateLevelProgress = (level: Level, challenge: Challenge) => {
+    const completedChallenges = level.challenges.filter(c => c.completed).length
+    level.progress = (completedChallenges / level.challenges.length) * 100
+    
+    if (level.progress >= 100) {
+      level.completed = true
+      awardXP(level.xpReward, `Selesai level: ${level.title}`)
+    }
+  }
+
+  const awardXP = async (xp: number, activity: string) => {
+    if (!user) return
+
+    try {
+      const response = await fetch('/api/update-xp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          activity,
+          xpAmount: xp
+        })
+      })
+
+      if (response.ok) {
+        console.log(`Awarded ${xp} XP for ${activity}`)
+      }
+    } catch (error) {
+      console.error('Error awarding XP:', error)
+    }
+  }
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-          <p className="text-gray-300">Loading your gamification data...</p>
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-electric-blue/30 border-t-electric-blue rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Memuatkan sistem level...</p>
         </div>
       </div>
-    )
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-          <AlertCircle className="w-8 h-8 text-red-500" />
-          <p className="text-red-400">{error}</p>
-          <button
-            onClick={() => loadGamificationData()}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>Retry</span>
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (currentView === 'challenge' && selectedChallenge) {
-    return (
-      <ChallengeView 
-        challenge={selectedChallenge}
-        onBack={() => setCurrentView('map')}
-        onCompleteTask={completeTask}
-        onTaskSelect={(taskId) => {
-          // Handle task selection for detailed view
-          setCurrentView('task')
-        }}
-      />
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      {/* Header with Stats */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-4xl font-bold text-gradient mb-2">🎮 Level System</h1>
-            <p className="text-gray-400">Structured learning path from beginner to expert</p>
-          </div>
-          <div className="glass-dark rounded-xl p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-electric-blue">{studentStats.current_xp} XP</div>
-              <div className="text-sm text-gray-400">
-                Level {studentStats.current_level.level_number}.{studentStats.current_level.sublevel_number}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="glass-dark rounded-xl p-4 text-center">
-            <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-            <div className="text-lg font-bold text-white">{studentStats.total_challenges_completed}</div>
-            <div className="text-sm text-gray-400">Challenges Done</div>
-          </div>
-          <div className="glass-dark rounded-xl p-4 text-center">
-            <Target className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-            <div className="text-lg font-bold text-white">{studentStats.current_streak}</div>
-            <div className="text-sm text-gray-400">Day Streak</div>
-          </div>
-          <div className="glass-dark rounded-xl p-4 text-center">
-            <Award className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-            <div className="text-lg font-bold text-white">{studentStats.badges_earned}</div>
-            <div className="text-sm text-gray-400">Badges Earned</div>
-          </div>
-          <div className="glass-dark rounded-xl p-4 text-center">
-            <Star className="w-8 h-8 text-electric-blue mx-auto mb-2" />
-            <div className="text-lg font-bold text-white">Level {studentStats.current_level.level_number}</div>
-            <div className="text-sm text-gray-400">Current Level</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Level Map */}
-      <div className="space-y-8">
-        {[1, 2, 3, 4, 5, 6].map(levelNumber => {
-          const levelGroup = levels.filter(l => l.level_number === levelNumber)
-          const isGroupUnlocked = levelGroup.some(level => isLevelUnlocked(level))
-          
-          return (
-            <div key={levelNumber} className={`glass-dark rounded-2xl p-6 ${isGroupUnlocked ? '' : 'opacity-60'}`}>
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
-                    isGroupUnlocked ? 'bg-electric-blue/20 text-electric-blue' : 'bg-gray-700 text-gray-400'
-                  }`}>
-                    {levelNumber}
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      {levelNumber === 1 && 'Newbie Coder'}
-                      {levelNumber === 2 && 'Junior Developer'}
-                      {levelNumber === 3 && 'Intermediate Coder'}
-                      {levelNumber === 4 && 'Advanced Programmer'}
-                      {levelNumber === 5 && 'Expert Developer'}
-                      {levelNumber === 6 && 'Coding Master'}
-                    </h2>
-                    <p className="text-gray-400">
-                      {levelNumber === 1 && 'Learn the basics and get familiar with programming'}
-                      {levelNumber === 2 && 'Master control structures and problem solving'}
-                      {levelNumber === 3 && 'Explore OOP and data structures'}
-                      {levelNumber === 4 && 'Advanced concepts and web development'}
-                      {levelNumber === 5 && 'Specialization and advanced projects'}
-                      {levelNumber === 6 && 'Mentorship and community contribution'}
-                    </p>
-                  </div>
-                </div>
-                {!isGroupUnlocked && (
-                  <Lock className="w-8 h-8 text-gray-500" />
-                )}
-              </div>
-
-              {/* Sub-levels */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {levelGroup.map(level => {
-                  const isUnlocked = isLevelUnlocked(level)
-                  const progress = getLevelProgress(level)
-                  const levelChallenges = challenges.filter(c => c.level_id === level.id)
-                  
-                  return (
-                    <div key={level.id} 
-                         className={`relative p-4 rounded-xl border transition-all duration-300 cursor-pointer hover:scale-105 ${
-                           isUnlocked 
-                             ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-electric-blue/30' 
-                             : 'bg-gray-900/30 border-gray-700 cursor-not-allowed'
-                         }`}
-                         onClick={() => isUnlocked && setSelectedLevel(level)}>
-                      
-                      {/* Lock indicator */}
-                      {!isUnlocked && (
-                        <div className="absolute top-2 right-2">
-                          <Lock className="w-5 h-5 text-gray-500" />
-                        </div>
-                      )}
-
-                      <div className="mb-3">
-                        <h3 className={`font-semibold mb-1 ${isUnlocked ? 'text-white' : 'text-gray-500'}`}>
-                          {level.sublevel_number}.{level.title}
-                        </h3>
-                        <p className={`text-sm ${isUnlocked ? 'text-gray-300' : 'text-gray-600'}`}>
-                          {level.description}
-                        </p>
-                      </div>
-
-                      {/* XP Range */}
-                      <div className={`text-xs mb-3 ${isUnlocked ? 'text-electric-blue' : 'text-gray-500'}`}>
-                        {level.xp_required_min} - {level.xp_required_max} XP
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="mb-3">
-                        <div className="w-full bg-gray-700 rounded-full h-2">
-                          <div 
-                            className="bg-gradient-to-r from-electric-blue to-neon-cyan h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>Progress</span>
-                          <span>{Math.round(progress)}%</span>
-                        </div>
-                      </div>
-
-                      {/* Challenge Count */}
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs ${isUnlocked ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {levelChallenges.length} challenges
-                        </span>
-                        {isUnlocked && (
-                          <PlayCircle className="w-5 h-5 text-electric-blue" />
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Level Details Modal */}
-      {selectedLevel && (
-        <LevelDetailsModal 
-          level={selectedLevel}
-          challenges={challenges.filter(c => c.level_id === selectedLevel.id)}
-          onClose={() => setSelectedLevel(null)}
-          onStartChallenge={startChallenge}
-        />
-      )}
-    </div>
-  )
-}
-
-// Level Details Modal Component
-function LevelDetailsModal({ 
-  level, 
-  challenges, 
-  onClose, 
-  onStartChallenge 
-}: {
-  level: Level
-  challenges: Challenge[]
-  onClose: () => void
-  onStartChallenge: (challenge: Challenge) => void
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="glass-dark rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
+      <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center justify-between">
+        <div className="mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <Trophy className="w-10 h-10 text-yellow-400" />
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">{level.title}</h2>
-              <p className="text-gray-400">{level.description}</p>
+              <h1 className="text-4xl font-bold text-gradient">Jejak Pembelajaran DSKP</h1>
+              <p className="text-gray-400">Cabaran berstruktur berdasarkan kurikulum Sains Komputer Malaysia</p>
             </div>
-            <button 
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              ✕
-            </button>
           </div>
         </div>
 
-        {/* Challenges */}
-        <div className="p-6">
-          <h3 className="text-xl font-bold text-white mb-4">Challenges ({challenges.length})</h3>
-          <div className="space-y-4">
-            {challenges.map(challenge => (
-              <div key={challenge.id} className="glass-dark rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h4 className="text-lg font-semibold text-white">{challenge.title}</h4>
-                      <span className={`px-2 py-1 rounded-full text-xs border ${getDifficultyColor(challenge.difficulty)}`}>
-                        {challenge.difficulty.toUpperCase()}
-                      </span>
-                    </div>
-                    <p className="text-gray-300 mb-3">{challenge.description}</p>
-                    
-                    <div className="flex items-center space-x-4 text-sm text-gray-400">
-                      <span className="flex items-center space-x-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{challenge.time_estimate} min</span>
-                      </span>
-                      <span className="flex items-center space-x-1">
-                        <Zap className="w-4 h-4" />
-                        <span>+{challenge.xp_reward} XP</span>
-                      </span>
-                      <span className="flex items-center space-x-1">
-                        <Target className="w-4 h-4" />
-                        <span>{challenge.tasks.length} tasks</span>
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => onStartChallenge(challenge)}
-                    disabled={!challenge.is_unlocked}
-                    className={`ml-4 px-4 py-2 rounded-lg font-medium transition-colors ${
-                      challenge.is_unlocked
-                        ? 'bg-electric-blue hover:bg-electric-blue/80 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Level List */}
+          <div className="lg:col-span-1">
+            <div className="glass-dark rounded-xl p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Senarai Level</h3>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {levels.map((level) => (
+                  <div
+                    key={level.id}
+                    onClick={() => startLevel(level)}
+                    className={`p-4 rounded-lg cursor-pointer transition-all duration-300 ${
+                      selectedLevel?.id === level.id
+                        ? 'bg-electric-blue/20 border border-electric-blue/50'
+                        : level.unlocked
+                        ? 'bg-gray-800/50 border border-gray-700 hover:border-gray-600'
+                        : 'bg-gray-800/30 border border-gray-600 opacity-50 cursor-not-allowed'
                     }`}
                   >
-                    {challenge.is_unlocked ? 'Start Challenge' : 'Locked'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Challenge View Component
-function ChallengeView({ 
-  challenge, 
-  onBack, 
-  onCompleteTask,
-  onTaskSelect 
-}: {
-  challenge: Challenge
-  onBack: () => void
-  onCompleteTask: (challengeId: string, taskId: string) => void
-  onTaskSelect: (taskId: string) => void
-}) {
-  const completedTasks = challenge.student_progress?.completed_tasks || []
-  const progress = (completedTasks.length / challenge.tasks.length) * 100
-
-  const getTaskIcon = (type: string) => {
-    switch (type) {
-      case 'theory': return <BookOpen className="w-5 h-5" />
-      case 'practice': return <Code className="w-5 h-5" />
-      case 'quiz': return <Target className="w-5 h-5" />
-      case 'project': return <Star className="w-5 h-5" />
-      default: return <FileText className="w-5 h-5" />
-    }
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={onBack}
-          className="text-gray-400 hover:text-white transition-colors"
-        >
-          ← Back to Level Map
-        </button>
-      </div>
-
-      {/* Challenge Info */}
-      <div className="glass-dark rounded-xl p-8 mb-6">
-        <h1 className="text-3xl font-bold text-white mb-4">{challenge.title}</h1>
-        <p className="text-gray-300 mb-6">{challenge.description}</p>
-        
-        {/* Progress */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
-            <span>Overall Progress</span>
-            <span>{completedTasks.length}/{challenge.tasks.length} tasks completed</span>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-3">
-            <div 
-              className="bg-gradient-to-r from-electric-blue to-neon-cyan h-3 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-electric-blue">+{challenge.xp_reward}</div>
-            <div className="text-sm text-gray-400">Total XP</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-400">{challenge.time_estimate}</div>
-            <div className="text-sm text-gray-400">Est. Minutes</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-400">{Math.round(challenge.completion_rate)}%</div>
-            <div className="text-sm text-gray-400">Success Rate</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tasks */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-white mb-4">Tasks</h2>
-        {challenge.tasks.map((task, index) => {
-          const isCompleted = completedTasks.includes(task.id)
-          const isUnlocked = index === 0 || completedTasks.includes(challenge.tasks[index - 1].id)
-          
-          return (
-            <div key={task.id} className={`glass-dark rounded-xl p-6 transition-all duration-300 ${
-              isCompleted ? 'border border-green-500/30' : 
-              isUnlocked ? 'border border-electric-blue/30' : 'opacity-60'
-            }`}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                      isCompleted ? 'bg-green-500/20 text-green-400' : 
-                      isUnlocked ? 'bg-electric-blue/20 text-electric-blue' : 'bg-gray-700 text-gray-400'
-                    }`}>
-                      {isCompleted ? <CheckCircle className="w-4 h-4" /> : getTaskIcon(task.type)}
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-white">Level {level.order}</h4>
+                      <div className="flex items-center space-x-2">
+                        {level.completed && (
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                        )}
+                        {!level.unlocked && (
+                          <Lock className="w-4 h-4 text-gray-500" />
+                        )}
+                        <div className={`px-2 py-1 rounded text-xs font-medium ${
+                          level.difficulty === 'mudah' ? 'bg-green-500/20 text-green-400' :
+                          level.difficulty === 'sederhana' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {level.difficulty}
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-semibold text-white">{task.title}</h3>
-                    <span className="px-2 py-1 text-xs bg-electric-blue/20 text-electric-blue rounded-full">
-                      +{task.xp_reward} XP
-                    </span>
-                    {task.is_required && (
-                      <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded-full">
-                        Required
-                      </span>
+                    <p className="text-sm text-gray-400 mb-2">{level.title}</p>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{level.category}</span>
+                      <span>+{level.xpReward} XP</span>
+                    </div>
+                    {level.progress > 0 && (
+                      <div className="mt-2">
+                        <div className="w-full bg-gray-700 rounded-full h-1">
+                          <div 
+                            className="bg-electric-blue h-1 rounded-full transition-all"
+                            style={{ width: `${level.progress}%` }}
+                          ></div>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {Math.round(level.progress)}% selesai
+                        </div>
+                      </div>
                     )}
                   </div>
-                  
-                  <p className="text-gray-300 mb-4">{task.description}</p>
-                  
-                  {/* Task Type Indicator */}
-                  <div className="flex items-center space-x-2 text-sm text-gray-400">
-                    {getTaskIcon(task.type)}
-                    <span className="capitalize">{task.type}</span>
-                  </div>
-                </div>
-                
-                {isUnlocked && !isCompleted && (
-                  <div className="flex space-x-2 ml-4">
-                    <button
-                      onClick={() => onTaskSelect(task.id)}
-                      className="btn-secondary"
-                    >
-                      Start Task
-                    </button>
-                    <button
-                      onClick={() => onCompleteTask(challenge.id, task.id)}
-                      className="btn-primary"
-                    >
-                      Complete
-                    </button>
-                  </div>
-                )}
-                
-                {isCompleted && (
-                  <div className="ml-4 text-green-400 font-medium">
-                    ✓ Completed
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          )
-        })}
+          </div>
+
+          {/* Level Content */}
+          <div className="lg:col-span-2">
+            {selectedLevel ? (
+              <div className="glass-dark rounded-xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Level {selectedLevel.order}: {selectedLevel.title}</h3>
+                    <p className="text-gray-400">{selectedLevel.description}</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-electric-blue">
+                        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                      </div>
+                      <div className="text-xs text-gray-400">Masa</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-yellow-400">+{selectedLevel.xpReward}</div>
+                      <div className="text-xs text-gray-400">XP</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Level Progress */}
+                <div className="mb-6 p-4 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-white">Kemajuan Level</h4>
+                    <span className="text-sm text-gray-400">
+                      {selectedLevel.challenges.filter(c => c.completed).length}/{selectedLevel.challenges.length} cabaran selesai
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-electric-blue to-neon-cyan h-2 rounded-full transition-all"
+                      style={{ width: `${selectedLevel.progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Challenges */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-white mb-4">Cabaran</h4>
+                  {selectedLevel.challenges.map((challenge, index) => (
+                    <div
+                      key={challenge.id}
+                      className={`p-4 rounded-lg border transition-all ${
+                        challenge.completed
+                          ? 'border-green-500/50 bg-green-500/10'
+                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="font-medium text-white">Cabaran {index + 1}: {challenge.title}</h5>
+                        <div className="flex items-center space-x-2">
+                          {challenge.completed && (
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                          )}
+                          <span className="text-xs text-gray-400">{challenge.type}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-400 mb-3">{challenge.description}</p>
+                      
+                      {challenge.completed && (
+                        <div className="text-sm text-green-400 mb-2">
+                          Skor: {challenge.score}/{challenge.maxScore}
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={() => startChallenge(challenge)}
+                        className="px-4 py-2 bg-electric-blue hover:bg-electric-blue/90 text-white rounded-lg text-sm transition-colors"
+                      >
+                        {challenge.completed ? 'Lihat Semula' : 'Mulakan Cabaran'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Level Actions */}
+                <div className="mt-6 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      selectedLevel.challenges.forEach(challenge => {
+                        challenge.completed = false
+                        challenge.score = 0
+                      })
+                      selectedLevel.progress = 0
+                      selectedLevel.completed = false
+                      setSelectedLevel({ ...selectedLevel })
+                    }}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+                  >
+                    Reset Level
+                  </button>
+                  
+                  {selectedLevel.completed && (
+                    <div className="flex items-center space-x-2 text-green-400">
+                      <Trophy className="w-5 h-5" />
+                      <span>Level Selesai! +{selectedLevel.xpReward} XP</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="glass-dark rounded-xl p-6 flex items-center justify-center h-96">
+                <div className="text-center">
+                  <Trophy className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-gray-400 mb-2">Pilih Level</h3>
+                  <p className="text-gray-500">Pilih level dari senarai untuk mula cabaran</p>
+                </div>
+              </div>
+            )}
+
+            {/* Challenge Modal */}
+            {currentChallenge && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="glass-dark rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white">{currentChallenge.title}</h3>
+                    <button
+                      onClick={() => setCurrentChallenge(null)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <p className="text-gray-300 mb-6">{currentChallenge.description}</p>
+
+                  {/* Challenge Content based on type */}
+                  {currentChallenge.type === 'quiz' && (
+                    <div className="space-y-4">
+                      {currentChallenge.content.questions.map((question: any, index: number) => (
+                        <div key={index} className="p-4 bg-gray-800/50 rounded-lg">
+                          <h4 className="font-medium text-white mb-3">{question.question}</h4>
+                          <div className="space-y-2">
+                            {question.options.map((option: string, optionIndex: number) => (
+                              <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`question-${index}`}
+                                  value={optionIndex}
+                                  onChange={(e) => setUserAnswers({
+                                    ...userAnswers,
+                                    [`question-${index}`]: parseInt(e.target.value)
+                                  })}
+                                  className="w-4 h-4 text-electric-blue"
+                                />
+                                <span className="text-gray-300">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        onClick={() => submitQuiz(currentChallenge)}
+                        className="w-full px-6 py-3 bg-electric-blue hover:bg-electric-blue/90 text-white font-medium rounded-lg transition-colors"
+                      >
+                        Hantar Jawapan
+                      </button>
+                    </div>
+                  )}
+
+                  {currentChallenge.type === 'coding' && (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-800/50 rounded-lg">
+                        <h4 className="font-medium text-white mb-2">Tugasan:</h4>
+                        <p className="text-gray-300 mb-4">{currentChallenge.content.task}</p>
+                        
+                        {currentChallenge.content.starterCode && (
+                          <div className="mb-4">
+                            <h5 className="font-medium text-white mb-2">Kod Permulaan:</h5>
+                            <pre className="bg-gray-900 p-3 rounded text-sm text-gray-300 overflow-x-auto">
+                              <code>{currentChallenge.content.starterCode}</code>
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-white mb-2">Kod Anda:</h4>
+                        <textarea
+                          value={userAnswers[`code-${currentChallenge.id}`] || ''}
+                          onChange={(e) => setUserAnswers({
+                            ...userAnswers,
+                            [`code-${currentChallenge.id}`]: e.target.value
+                          })}
+                          className="w-full h-32 p-4 bg-gray-900 border border-gray-700 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-electric-blue resize-none"
+                          placeholder="Tulis kod Python anda di sini..."
+                        />
+                      </div>
+                      
+                      <button
+                        onClick={() => submitCodingChallenge(currentChallenge)}
+                        className="w-full px-6 py-3 bg-electric-blue hover:bg-electric-blue/90 text-white font-medium rounded-lg transition-colors"
+                      >
+                        Hantar Kod
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Results */}
+                  {showResults && (
+                    <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
+                      <h4 className="font-medium text-white mb-2">Keputusan:</h4>
+                      {currentChallenge.completed ? (
+                        <div className="flex items-center space-x-2 text-green-400">
+                          <CheckCircle className="w-5 h-5" />
+                          <span>Tahniah! Cabaran selesai. Skor: {currentChallenge.score}/{currentChallenge.maxScore}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2 text-red-400">
+                          <XCircle className="w-5 h-5" />
+                          <span>Cuba lagi. Skor: {currentChallenge.score}/{currentChallenge.maxScore}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
-
-export default EnhancedLevelSystem
