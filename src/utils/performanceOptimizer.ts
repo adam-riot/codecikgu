@@ -1,173 +1,135 @@
-// Advanced Performance Optimization System
-// src/utils/performanceOptimizer.ts
+// Performance optimization utilities
+import { useEffect, useRef, useCallback } from 'react'
 
-export interface PerformanceMetrics {
-  loadTime: number
-  renderTime: number
-  bundleSize: number
-  memoryUsage: number
-  cacheHitRate: number
-}
+// Performance monitoring class
+export class PerformanceMonitor {
+  private static metrics: Map<string, number[]> = new Map()
+  private static observers: PerformanceObserver[] = []
 
-export interface OptimizationStrategy {
-  lazyLoading: boolean
-  codesplitting: boolean
-  serviceWorker: boolean
-  compression: boolean
-  caching: CacheStrategy
-}
-
-export interface CacheStrategy {
-  static: 'cache-first' | 'stale-while-revalidate'
-  dynamic: 'network-first' | 'cache-first'
-  api: 'network-first' | 'cache-only'
-  ttl: number
-}
-
-export class PerformanceOptimizer {
-  private static metrics: PerformanceMetrics = {
-    loadTime: 0,
-    renderTime: 0,
-    bundleSize: 0,
-    memoryUsage: 0,
-    cacheHitRate: 0
-  }
-
-  /**
-   * Initialize performance monitoring
-   */
-  static init(): void {
-    // Performance observer untuk Core Web Vitals
-    if (typeof window !== 'undefined' && 'PerformanceObserver' in window) {
-      this.observeWebVitals()
-      this.observeResourceTiming()
-      this.observeMemoryUsage()
+  static startTimer(label: string): () => void {
+    const start = performance.now()
+    return () => {
+      const duration = performance.now() - start
+      this.recordMetric(label, duration)
     }
   }
 
-  /**
-   * Observe Core Web Vitals (LCP, FID, CLS)
-   */
-  private static observeWebVitals(): void {
-    // Largest Contentful Paint
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        if (entry.entryType === 'largest-contentful-paint') {
-          console.log('📊 LCP:', entry.startTime)
-          this.reportMetric('lcp', entry.startTime)
-        }
-      }
-    }).observe({ entryTypes: ['largest-contentful-paint'] })
-
-    // First Input Delay
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        const fidEntry = entry as any
-        if (fidEntry.processingStart) {
-          console.log('📊 FID:', fidEntry.processingStart - fidEntry.startTime)
-          this.reportMetric('fid', fidEntry.processingStart - fidEntry.startTime)
-        }
-      }
-    }).observe({ entryTypes: ['first-input'] })
-
-    // Cumulative Layout Shift
-    new PerformanceObserver((list) => {
-      let clsValue = 0
-      for (const entry of list.getEntries()) {
-        if (!(entry as any).hadRecentInput) {
-          clsValue += (entry as any).value
-        }
-      }
-      console.log('📊 CLS:', clsValue)
-      this.reportMetric('cls', clsValue)
-    }).observe({ entryTypes: ['layout-shift'] })
+  static recordMetric(label: string, value: number): void {
+    if (!this.metrics.has(label)) {
+      this.metrics.set(label, [])
+    }
+    this.metrics.get(label)!.push(value)
   }
 
-  /**
-   * Observe resource loading performance
-   */
-  private static observeResourceTiming(): void {
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        const resource = entry as PerformanceResourceTiming
-        
-        // Log slow resources
-        if (resource.duration > 1000) {
-          console.warn('🐌 Slow resource:', resource.name, `${resource.duration}ms`)
-        }
-        
-        // Track cache hits
-        if (resource.transferSize === 0) {
-          this.metrics.cacheHitRate++
-        }
-      }
-    }).observe({ entryTypes: ['resource'] })
+  static getAverageMetric(label: string): number {
+    const values = this.metrics.get(label) || []
+    if (values.length === 0) return 0
+    return values.reduce((a, b) => a + b, 0) / values.length
   }
 
-  /**
-   * Monitor memory usage
-   */
-  private static observeMemoryUsage(): void {
+  static getMetrics(): Record<string, { average: number; count: number; min: number; max: number }> {
+    const result: Record<string, any> = {}
+    
+    for (const [label, values] of this.metrics.entries()) {
+      if (values.length > 0) {
+        result[label] = {
+          average: values.reduce((a, b) => a + b, 0) / values.length,
+          count: values.length,
+          min: Math.min(...values),
+          max: Math.max(...values)
+        }
+      }
+    }
+    
+    return result
+  }
+
+  static initPerformanceMonitoring(): void {
+    // Monitor long tasks
+    if ('PerformanceObserver' in window) {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.duration > 50) { // Tasks longer than 50ms
+            console.warn('Long task detected:', entry)
+          }
+        }
+      })
+      observer.observe({ entryTypes: ['longtask'] })
+      this.observers.push(observer)
+    }
+
+    // Monitor memory usage
     if ('memory' in performance) {
       setInterval(() => {
         const memory = (performance as any).memory
-        this.metrics.memoryUsage = memory.usedJSHeapSize / memory.jsHeapSizeLimit
-        
-        // Warn if memory usage is high
-        if (this.metrics.memoryUsage > 0.8) {
-          console.warn('⚠️ High memory usage:', `${(this.metrics.memoryUsage * 100).toFixed(1)}%`)
+        if (memory.usedJSHeapSize > 50 * 1024 * 1024) { // 50MB
+          console.warn('High memory usage detected:', memory)
         }
-      }, 10000) // Check every 10 seconds
+      }, 10000)
     }
   }
 
-  /**
-   * Report metrics to analytics
-   */
-  private static reportMetric(name: string, value: number): void {
-    // Send to analytics service (implementation depends on analytics provider)
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'web_vitals', {
-        metric_name: name,
-        metric_value: Math.round(value),
-        custom_parameter: 'codecikgu_performance'
-      })
+  static cleanup(): void {
+    this.observers.forEach(observer => observer.disconnect())
+    this.observers = []
+  }
+}
+
+// Cache management
+export class CacheManager {
+  private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>()
+
+  static set(key: string, data: any, ttl = 300000): void { // 5 minutes default
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl
+    })
+  }
+
+  static get(key: string): any | null {
+    const item = this.cache.get(key)
+    if (!item) return null
+
+    if (Date.now() - item.timestamp > item.ttl) {
+      this.cache.delete(key)
+      return null
+    }
+
+    return item.data
+  }
+
+  static clear(): void {
+    this.cache.clear()
+  }
+
+  static getStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
     }
   }
+}
 
-  /**
-   * Get current performance metrics
-   */
-  static getMetrics(): PerformanceMetrics {
-    return { ...this.metrics }
-  }
-
-  /**
-   * Preload critical resources
-   */
-  static preloadCriticalResources(): void {
-    const criticalResources = [
-      '/fonts/mono-font.woff2',
-      '/api/user/profile',
-      '/api/challenges/featured'
+// Image optimization utilities
+export class ImageOptimizer {
+  static preloadCriticalImages(): void {
+    const criticalImages = [
+      '/favicon.svg',
+      '/next.svg',
+      '/vercel.svg'
     ]
 
-    criticalResources.forEach(resource => {
+    criticalImages.forEach(src => {
       const link = document.createElement('link')
       link.rel = 'preload'
-      link.href = resource
-      link.as = resource.includes('.woff') ? 'font' : 'fetch'
-      if (link.as === 'font') {
-        link.crossOrigin = 'anonymous'
-      }
+      link.as = 'image'
+      link.href = src
       document.head.appendChild(link)
     })
   }
 
-  /**
-   * Implement image lazy loading dengan intersection observer
-   */
-  static initImageLazyLoading(): void {
+  static lazyLoadImages(): void {
     const imageObserver = new IntersectionObserver((entries, observer) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -186,149 +148,223 @@ export class PerformanceOptimizer {
     })
   }
 
-  /**
-   * Optimize bundle loading dengan dynamic imports
-   */
+  static optimizeImageQuality(src: string, quality = 0.8): string {
+    // Add quality parameter for image optimization
+    if (src.includes('?')) {
+      return `${src}&q=${quality}`
+    }
+    return `${src}?q=${quality}`
+  }
+}
+
+// Bundle optimization
+export class BundleOptimizer {
   static async loadComponentDynamically<T>(
     componentPath: string, 
     fallback?: React.ComponentType
   ): Promise<T> {
     try {
-      const startTime = performance.now()
       const module = await import(componentPath)
-      const loadTime = performance.now() - startTime
-      
-      console.log(`📦 Component loaded: ${componentPath} in ${loadTime.toFixed(2)}ms`)
-      
       return module.default || module
     } catch (error) {
-      console.error(`❌ Failed to load component: ${componentPath}`, error)
+      console.error('Failed to load component:', componentPath, error)
+      if (fallback) {
+        return fallback as T
+      }
       throw error
     }
   }
 
-  /**
-   * Service Worker registration untuk caching
-   */
-  static registerServiceWorker(): void {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(registration => {
-            console.log('✅ SW registered:', registration)
-          })
-          .catch(error => {
-            console.log('❌ SW registration failed:', error)
-          })
-      })
-    }
+  static preloadComponent(componentPath: string): void {
+    const link = document.createElement('link')
+    link.rel = 'prefetch'
+    link.href = componentPath
+    document.head.appendChild(link)
   }
 
-  /**
-   * Optimize code editor performance
-   */
-  static optimizeCodeEditor() {
-    // Debounce untuk syntax highlighting
-    let highlightTimeout: NodeJS.Timeout
-    
-    return {
-      debouncedHighlight: (callback: () => void, delay = 300) => {
-        clearTimeout(highlightTimeout)
-        highlightTimeout = setTimeout(callback, delay)
-      },
-      
-      // Virtual scrolling untuk large files
-      virtualScrolling: (content: string[], viewportHeight: number) => {
-        const itemHeight = 20 // pixels per line
-        const visibleItems = Math.ceil(viewportHeight / itemHeight)
-        const buffer = 5
-        
-        return {
-          totalHeight: content.length * itemHeight,
-          visibleItems: visibleItems + buffer * 2,
-          startIndex: Math.max(0, Math.floor(window.scrollY / itemHeight) - buffer)
-        }
-      }
-    }
-  }
-
-  /**
-   * Mobile performance optimizations
-   */
   static optimizeForMobile(): void {
-    // Reduce animations untuk low-end devices
-    const isLowEndDevice = navigator.hardwareConcurrency <= 2
-    
-    if (isLowEndDevice) {
-      document.documentElement.style.setProperty('--animation-duration', '0.1s')
-      console.log('📱 Low-end device detected, reducing animations')
-    }
+    // Touch event optimization
+    let touchStartY = 0
+    let touchEndY = 0
 
-    // Touch delay optimization
-    let touchstartX = 0
-    let touchstartY = 0
-
-    document.addEventListener('touchstart', e => {
-      touchstartX = e.changedTouches[0].screenX
-      touchstartY = e.changedTouches[0].screenY
+    document.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY
     }, { passive: true })
 
-    document.addEventListener('touchend', e => {
-      const touchendX = e.changedTouches[0].screenX
-      const touchendY = e.changedTouches[0].screenY
-      
-      // Handle swipe gestures
-      const deltaX = touchendX - touchstartX
-      const deltaY = touchendY - touchstartY
-      
-      if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 50) {
-        // Horizontal swipe
-        const direction = deltaX > 0 ? 'right' : 'left'
+    document.addEventListener('touchend', (e) => {
+      touchEndY = e.changedTouches[0].clientY
+      const diff = touchStartY - touchEndY
+
+      if (Math.abs(diff) > 50) {
+        const direction = diff > 0 ? 'up' : 'down'
         document.dispatchEvent(new CustomEvent('swipe', { detail: { direction } }))
       }
     }, { passive: true })
   }
+}
 
-  /**
-   * Database query optimization
-   */
-  static optimizeQueries() {
+// Database query optimization
+export class QueryOptimizer {
+  private static queryCache = new Map<string, { data: any; timestamp: number; ttl: number }>()
+
+  static async batchQueries<T>(queries: Promise<T>[]): Promise<T[]> {
+    const results = await Promise.allSettled(queries)
+    return results.map(result => 
+      result.status === 'fulfilled' ? result.value : null
+    ) as T[]
+  }
+
+  static async cachedQuery<T>(
+    key: string, 
+    queryFn: () => Promise<T>, 
+    ttl = 300000 // 5 minutes
+  ): Promise<T> {
+    const cached = this.queryCache.get(key)
+    
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.data
+    }
+    
+    const data = await queryFn()
+    this.queryCache.set(key, { data, timestamp: Date.now(), ttl })
+    return data
+  }
+
+  static clearCache(): void {
+    this.queryCache.clear()
+  }
+
+  static getCacheStats(): { size: number; keys: string[] } {
     return {
-      // Batch multiple queries
-      batchQueries: async (queries: Promise<any>[]) => {
-        const results = await Promise.allSettled(queries)
-        return results.map(result => 
-          result.status === 'fulfilled' ? result.value : null
-        )
-      },
-
-      // Cache query results
-      queryCache: new Map<string, { data: any, timestamp: number, ttl: number }>(),
-      
-      cachedQuery: async function<T>(
-        key: string, 
-        queryFn: () => Promise<T>, 
-        ttl = 300000 // 5 minutes
-      ): Promise<T> {
-        const cached = this.queryCache.get(key)
-        
-        if (cached && Date.now() - cached.timestamp < cached.ttl) {
-          return cached.data
-        }
-        
-        const data = await queryFn()
-        this.queryCache.set(key, { data, timestamp: Date.now(), ttl })
-        return data
-      }
+      size: this.queryCache.size,
+      keys: Array.from(this.queryCache.keys())
     }
   }
 }
 
+// React performance hooks
+export function usePerformanceMonitor(label: string) {
+  const startTime = useRef<number>()
+
+  useEffect(() => {
+    startTime.current = performance.now()
+    
+    return () => {
+      if (startTime.current) {
+        const duration = performance.now() - startTime.current
+        PerformanceMonitor.recordMetric(label, duration)
+      }
+    }
+  }, [label])
+}
+
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
+export function useThrottle<T>(value: T, delay: number): T {
+  const [throttledValue, setThrottledValue] = useState<T>(value)
+  const lastRun = useRef<number>(0)
+
+  useEffect(() => {
+    const now = Date.now()
+    if (now - lastRun.current >= delay) {
+      setThrottledValue(value)
+      lastRun.current = now
+    } else {
+      const handler = setTimeout(() => {
+        setThrottledValue(value)
+        lastRun.current = Date.now()
+      }, delay - (now - lastRun.current))
+
+      return () => clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return throttledValue
+}
+
+export function useIntersectionObserver(
+  callback: (isIntersecting: boolean) => void,
+  options: IntersectionObserverInit = {}
+) {
+  const elementRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const element = elementRef.current
+    if (!element) return
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        callback(entry.isIntersecting)
+      })
+    }, options)
+
+    observer.observe(element)
+
+    return () => {
+      observer.unobserve(element)
+    }
+  }, [callback, options])
+
+  return elementRef
+}
+
 // Auto-initialize performance monitoring
 if (typeof window !== 'undefined') {
-  PerformanceOptimizer.init()
-  PerformanceOptimizer.preloadCriticalResources()
-  PerformanceOptimizer.initImageLazyLoading()
-  PerformanceOptimizer.registerServiceWorker()
-  PerformanceOptimizer.optimizeForMobile()
+  PerformanceMonitor.initPerformanceMonitoring()
+  
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    PerformanceMonitor.cleanup()
+  })
+}
+
+// Export main performance optimizer class
+export class PerformanceOptimizer {
+  static preloadCriticalResources(): void {
+    ImageOptimizer.preloadCriticalImages()
+  }
+
+  static initImageLazyLoading(): void {
+    ImageOptimizer.lazyLoadImages()
+  }
+
+  static async loadComponentDynamically<T>(
+    componentPath: string, 
+    fallback?: React.ComponentType
+  ): Promise<T> {
+    return BundleOptimizer.loadComponentDynamically(componentPath, fallback)
+  }
+
+  static optimizeForMobile(): void {
+    BundleOptimizer.optimizeForMobile()
+  }
+
+  static optimizeQueries() {
+    return QueryOptimizer
+  }
+
+  static getMetrics() {
+    return PerformanceMonitor.getMetrics()
+  }
+
+  static getCacheStats() {
+    return {
+      componentCache: CacheManager.getStats(),
+      queryCache: QueryOptimizer.getCacheStats()
+    }
+  }
 }

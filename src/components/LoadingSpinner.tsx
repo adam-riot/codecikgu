@@ -1,27 +1,38 @@
+'use client'
+
+import React from 'react'
+
 interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg'
-  text?: string
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+  color?: 'primary' | 'secondary' | 'white'
   className?: string
 }
 
-export default function LoadingSpinner({ 
+export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   size = 'md', 
-  text = 'Memuat...', 
-  className = '' 
-}: LoadingSpinnerProps) {
+  color = 'primary',
+  className = ''
+}) => {
   const sizeClasses = {
-    sm: 'w-6 h-6 border-2',
-    md: 'w-10 h-10 border-4',
-    lg: 'w-16 h-16 border-4'
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+    xl: 'w-12 h-12'
+  }
+
+  const colorClasses = {
+    primary: 'border-electric-blue/30 border-t-electric-blue',
+    secondary: 'border-neon-green/30 border-t-neon-green',
+    white: 'border-white/30 border-t-white'
   }
 
   return (
-    <div className={`flex flex-col items-center justify-center ${className}`}>
-      <div className={`${sizeClasses[size]} border-gray-600 border-t-electric-blue rounded-full animate-spin`}></div>
-      {text && (
-        <p className="mt-3 text-gray-400 text-sm loading-dots">{text}</p>
-      )}
-    </div>
+    <div 
+      data-testid="loading-spinner"
+      className={`${sizeClasses[size]} ${colorClasses[color]} border-2 rounded-full animate-spin ${className}`} 
+    />
   )
 }
+
+export default LoadingSpinner
 
