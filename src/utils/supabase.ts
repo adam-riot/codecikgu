@@ -45,16 +45,18 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // Fallback untuk development tanpa Supabase
 const isDevelopment = process.env.NODE_ENV === 'development'
+const isBuildTime = process.env.NODE_ENV === 'production' && typeof window === 'undefined'
 const hasSupabaseConfig = supabaseUrl && supabaseAnonKey
 
-// Mock client untuk development
+// Mock client untuk development dan build time
 function createMockClient() {
   return {
     auth: {
       getUser: async () => ({ data: { user: null }, error: null }),
       signInWithPassword: async () => ({ data: { user: null }, error: null }),
       signOut: async () => ({ error: null }),
-      getSession: async () => ({ data: { session: null }, error: null })
+      getSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
     },
     from: (table: string) => ({
       select: () => ({
@@ -70,12 +72,8 @@ function createMockClient() {
   } as any
 }
 
-if (!hasSupabaseConfig && !isDevelopment) {
-  throw new Error('Supabase URL or Anon Key is missing from environment variables.')
-}
-
 // Cipta client Supabase atau mock client untuk development
-export const supabase = hasSupabaseConfig 
+export const supabase = (hasSupabaseConfig && !isBuildTime)
   ? createClient(supabaseUrl!, supabaseAnonKey!)
   : createMockClient()
 

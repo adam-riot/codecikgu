@@ -80,7 +80,7 @@ export function sanitizeInput(input: string): string {
 
 // Admin middleware with enhanced security
 export async function adminMiddleware(request: NextRequest) {
-  const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown'
+  const clientIP = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
   
   // Rate limiting
   if (RateLimiter.isRateLimited(`admin-${clientIP}`)) {
@@ -142,7 +142,7 @@ export async function adminMiddleware(request: NextRequest) {
 
 // API rate limiting middleware
 export function apiRateLimitMiddleware(request: NextRequest) {
-  const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown'
+  const clientIP = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
   const endpoint = request.nextUrl.pathname
   
   if (RateLimiter.isRateLimited(`api-${clientIP}-${endpoint}`)) {

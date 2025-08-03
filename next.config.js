@@ -47,7 +47,8 @@ const nextConfig = {
   },
   // Performance optimizations
   experimental: {
-    optimizeCss: true,
+    // Temporarily disable CSS optimization to fix build error
+    // optimizeCss: true,
     optimizePackageImports: ['@monaco-editor/react', 'lucide-react'],
   },
   // Image optimization
