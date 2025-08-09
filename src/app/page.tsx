@@ -10,24 +10,42 @@ export default function HomePage() {
   const [userRole, setUserRole] = useState<string>('awam')
   const [userName, setUserName] = useState<string>('Tetamu')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        console.log('🔍 Starting user check...')
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError) {
+          console.error('Auth error:', authError)
+          setError('Authentication error')
+          setLoading(false)
+          return
+        }
+        
+        console.log('🔍 Auth user:', user ? 'Found' : 'Not found')
         
         if (user) {
           const userData = user as CustomUser
           setUser(userData)
           
-          // Fetch role and name from database
-          const [role, name] = await Promise.all([
-            getUserRole(userData),
-            getUserDisplayName(userData)
-          ])
-          
-          setUserRole(role)
-          setUserName(name)
+          try {
+            // Fetch role and name from database
+            const [role, name] = await Promise.all([
+              getUserRole(userData),
+              getUserDisplayName(userData)
+            ])
+            
+            console.log('🔍 Role:', role, 'Name:', name)
+            
+            setUserRole(role)
+            setUserName(name)
+          } catch (profileError) {
+            console.error('Profile fetch error:', profileError)
+            setError('Profile fetch error')
+          }
         } else {
           // No user logged in
           setUser(null)
@@ -36,6 +54,7 @@ export default function HomePage() {
         }
       } catch (error) {
         console.error('Error in checkUser:', error)
+        setError('General error')
       } finally {
         setLoading(false)
       }
@@ -49,6 +68,24 @@ export default function HomePage() {
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
         <div className="glass-dark rounded-2xl p-8 text-center">
           <div className="text-2xl text-gradient loading-dots">Memuat halaman</div>
+          {error && <div className="text-red-400 mt-4">Error: {error}</div>}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
+        <div className="glass-dark rounded-2xl p-8 text-center">
+          <div className="text-2xl text-red-400 mb-4">Error</div>
+          <div className="text-gray-300 mb-4">{error}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="btn-primary"
+          >
+            Reload Page
+          </button>
         </div>
       </div>
     )

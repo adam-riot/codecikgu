@@ -119,8 +119,8 @@ export default function RootLayout({
         {/* Preload critical resources */}
         <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
         
-        {/* Service Worker Registration */}
-        <script
+        {/* Temporarily disabled service worker for debugging */}
+        {/* <script
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
@@ -130,7 +130,7 @@ export default function RootLayout({
               }
             `
           }}
-        />
+        /> */}
       </head>
       <body className={inter.className}>
         <ThemeProvider>
