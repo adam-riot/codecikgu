@@ -1,30 +1,4 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-
 export default function HomePage() {
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setLoading(false)
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
-        <div className="bg-gray-800/50 backdrop-blur-md rounded-2xl p-8 text-center border border-gray-700">
-          <div className="text-2xl text-blue-400 animate-pulse">Memuat halaman</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       {/* Hero Section */}
@@ -41,12 +15,12 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <Link href="/daftar" className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105">
+              <a href="/daftar" className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105">
                 🚀 Daftar Sekarang
-              </Link>
-              <Link href="/login" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105">
+              </a>
+              <a href="/login" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105">
                 🔐 Log Masuk
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -66,33 +40,33 @@ export default function HomePage() {
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <Link href="/playground" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-blue-400 transition-all duration-300 group text-center">
+              <a href="/playground" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-blue-400 transition-all duration-300 group text-center">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">🖥️</div>
                 <h3 className="text-xl font-bold text-white mb-3">Playground</h3>
                 <p className="text-gray-400 text-sm mb-4">Kod Editor Interaktif dengan sokongan pelbagai bahasa</p>
                 <div className="text-blue-400 group-hover:underline">Mula Kod →</div>
-              </Link>
+              </a>
 
-              <Link href="/nota" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-green-400 transition-all duration-300 group text-center">
+              <a href="/nota" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-green-400 transition-all duration-300 group text-center">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">📚</div>
                 <h3 className="text-xl font-bold text-white mb-3">Nota</h3>
                 <p className="text-gray-400 text-sm mb-4">Sumber pembelajaran lengkap untuk Tingkatan 4 & 5</p>
                 <div className="text-green-400 group-hover:underline">Baca Nota →</div>
-              </Link>
+              </a>
 
-              <Link href="/leaderboard" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-cyan-400 transition-all duration-300 group text-center">
+              <a href="/leaderboard" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-cyan-400 transition-all duration-300 group text-center">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">🏆</div>
                 <h3 className="text-xl font-bold text-white mb-3">Leaderboard</h3>
                 <p className="text-gray-400 text-sm mb-4">Ranking & pencapaian pelajar terbaik</p>
                 <div className="text-cyan-400 group-hover:underline">Lihat Ranking →</div>
-              </Link>
+              </a>
 
-              <Link href="/daftar" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-purple-400 transition-all duration-300 group text-center">
+              <a href="/daftar" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-purple-400 transition-all duration-300 group text-center">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
                 <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
                 <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
                 <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -110,12 +84,12 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <Link href="/daftar" className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-5 px-10 rounded-lg transition-all duration-300 transform hover:scale-105 text-xl">
+              <a href="/daftar" className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-5 px-10 rounded-lg transition-all duration-300 transform hover:scale-105 text-xl">
                 Daftar Percuma Sekarang
-              </Link>
-              <Link href="/playground" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-5 px-10 rounded-lg transition-all duration-300 transform hover:scale-105 text-xl">
+              </a>
+              <a href="/playground" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-5 px-10 rounded-lg transition-all duration-300 transform hover:scale-105 text-xl">
                 Cuba Playground
-              </Link>
+              </a>
             </div>
           </div>
         </div>
