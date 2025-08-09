@@ -15,7 +15,6 @@ export default function HomePage() {
     const checkUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('Main page - Auth user:', user) // Debug log
         
         if (user) {
           const userData = user as CustomUser
@@ -26,9 +25,6 @@ export default function HomePage() {
             getUserRole(userData),
             getUserDisplayName(userData)
           ])
-          
-          console.log('Main page - Fetched role:', role) // Debug log
-          console.log('Main page - Fetched name:', name) // Debug log
           
           setUserRole(role)
           setUserName(name)

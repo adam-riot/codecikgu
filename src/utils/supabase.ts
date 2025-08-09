@@ -87,11 +87,8 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     // Check cache first
     const cached = profileCache.get(userId)
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log('Using cached profile for user:', userId) // Debug log
       return cached.profile
     }
-
-    console.log('Fetching profile from database for user:', userId) // Debug log
     
     const { data, error } = await supabase
       .from('profiles')
@@ -105,8 +102,6 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
       profileCache.set(userId, { profile: null, timestamp: Date.now() })
       return null
     }
-
-    console.log('Profile data from database:', data) // Debug log
     
     // Cache the result
     profileCache.set(userId, { profile: data, timestamp: Date.now() })
@@ -121,35 +116,28 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 // Helper function to get user role with database lookup
 export const getUserRole = async (userData: CustomUser | null): Promise<string> => {
   if (!userData) {
-    console.log('No user data provided, returning awam') // Debug log
     return 'awam'
   }
-  
-  console.log('Getting role for user:', userData.email, 'ID:', userData.id) // Debug log
   
   try {
     // First try to get role from database profile
     const profile = await getUserProfile(userData.id)
     
     if (profile && profile.role) {
-      console.log('Found role in database profile:', profile.role) // Debug log
       return profile.role
     }
     
     // Fallback to metadata if profile not found
     const metadataRole = userData.user_metadata?.role || userData.app_metadata?.role
     if (metadataRole) {
-      console.log('Found role in metadata:', metadataRole) // Debug log
       return metadataRole
     }
     
     // Email-based fallback
     if (userData.email?.includes('admin')) {
-      console.log('Using email-based admin detection') // Debug log
       return 'admin'
     }
     
-    console.log('No role found, defaulting to awam') // Debug log
     return 'awam'
     
   } catch (error) {
