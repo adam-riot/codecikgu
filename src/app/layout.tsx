@@ -1,14 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-// import '../styles/mobile.css'  // Temporarily disabled for debugging
-import Navbar from '@/components/Navbar'
-import ErrorBoundary from '@/components/ErrorBoundary'
-import NotificationProvider from '@/components/NotificationProvider'
-import { ThemeProvider } from '@/components/ThemeProvider'
-import { TutorialProvider } from '@/components/TutorialSystem'
-import { AchievementProvider } from '@/components/AchievementSystem'
-import { MobileBottomNav } from '@/components/MobileGestures'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,7 +16,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://codecikgu.vercel.app' ),
+  metadataBase: new URL('https://codecikgu.vercel.app'),
   alternates: {
     canonical: '/',
   },
@@ -100,14 +92,11 @@ export default function RootLayout({
   return (
     <html lang="ms">
       <head>
-        {/* Additional favicon links for better browser support */}
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="32x32" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="16x16" />
         <link rel="apple-touch-icon" href="/favicon.svg" />
         <link rel="mask-icon" href="/favicon.svg" color="#00d4ff" />
-        
-        {/* PWA and mobile optimization */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -115,39 +104,30 @@ export default function RootLayout({
         <meta name="application-name" content="CodeCikgu" />
         <meta name="msapplication-TileColor" content="#000000" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
-        
-        {/* Preload critical resources */}
         <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
-        
-        {/* Service Worker Registration - DISABLED FOR DEBUGGING */}
-        {/* <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js')
-                  .then(registration => console.log('SW registered:', registration))
-                  .catch(error => console.log('SW registration failed:', error))
-              }
-            `
-          }}
-        /> */}
       </head>
       <body className={inter.className}>
-        <ThemeProvider>
-          <ErrorBoundary>
-            <NotificationProvider>
-              <TutorialProvider>
-                <AchievementProvider>
-                  <Navbar />
-                  <main>
-                    {children}
-                  </main>
-                  <MobileBottomNav />
-                </AchievementProvider>
-              </TutorialProvider>
-            </NotificationProvider>
-          </ErrorBoundary>
-        </ThemeProvider>
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+          <nav className="bg-gray-900/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
+            <div className="container mx-auto px-4">
+              <div className="flex items-center justify-between h-16">
+                <div className="flex items-center space-x-8">
+                  <a className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-300" href="/">
+                    <img alt="CodeCikgu" width="32" height="32" className="hover:scale-110 transition-transform duration-300" src="/favicon.svg"/>
+                    <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">CodeCikgu</span>
+                  </a>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <a href="/daftar" className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">Daftar</a>
+                  <a href="/login" className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">Log Masuk</a>
+                </div>
+              </div>
+            </div>
+          </nav>
+          <main>
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   )
