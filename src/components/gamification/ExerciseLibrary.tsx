@@ -466,6 +466,17 @@ export default function ExerciseLibrary() {
         // Award XP
         if (user) {
           await awardXP(exercise.xpReward, `Selesai latihan: ${exercise.title}`)
+          // Log event
+          try {
+            await fetch('/api/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'exercise_completed',
+                metadata: { exerciseId: exercise.id, title: exercise.title, xp: exercise.xpReward }
+              })
+            })
+          } catch {}
         }
       }
     } catch (error) {

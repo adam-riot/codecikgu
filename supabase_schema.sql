@@ -72,6 +72,124 @@ $$;
 
 grant execute on function public.award_xp(uuid, text, integer) to anon, authenticated;
 
+-- Events table for telemetry
+create table if not exists public.events (
+  id bigserial primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  event_type text not null,
+  metadata jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.events enable row level security;
+
+drop policy if exists events_select_own on public.events;
+create policy events_select_own on public.events for select using (user_id = auth.uid());
+
+drop policy if exists events_insert_own on public.events;
+create policy events_insert_own on public.events for insert with check (user_id = auth.uid());
+
+create index if not exists idx_events_user_created_at on public.events(user_id, created_at desc);
+
+-- Leaderboard RPC (weekly/monthly/all-time)
+create or replace function public.get_leaderboard(
+  p_period text default 'weekly',
+  p_limit int default 20
+) returns table (
+  user_id uuid,
+  name text,
+  email text,
+  xp bigint
+)
+language sql
+security definer
+as $$
+  with range as (
+    select case lower(p_period)
+      when 'weekly' then now() - interval '7 days'
+      when 'monthly' then now() - interval '30 days'
+      else timestamp '1970-01-01'
+    end as start_time
+  )
+  select p.id as user_id,
+         coalesce(p.name, split_part(p.email, '@', 1)) as name,
+         p.email,
+         case when lower(p_period) in ('weekly','monthly') then coalesce(sum(x.mata), 0)
+              else coalesce(p.xp, 0)::bigint
+         end as xp
+  from public.profiles p
+  left join public.xp_log x on x.user_id = p.id
+    and lower(p_period) in ('weekly','monthly')
+    and x.created_at >= (select start_time from range)
+  group by p.id, p.name, p.email, p.xp
+  order by xp desc
+  limit p_limit;
+$$;
+
+grant execute on function public.get_leaderboard(text, int) to anon, authenticated;
+
+-- Quiz questions table (admin/guru manage)
+create table if not exists public.quiz_questions (
+  id uuid primary key default uuid_generate_v4(),
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  question_text text not null,
+  options jsonb not null, -- ["A", "B", "C", "D"] or array of strings
+  correct_answer text not null, -- e.g., "A"
+  points integer not null default 1,
+  created_at timestamptz not null default now()
+);
+
+alter table public.quiz_questions enable row level security;
+
+drop policy if exists quiz_q_select_all on public.quiz_questions;
+create policy quiz_q_select_all on public.quiz_questions for select using (true);
+
+drop policy if exists quiz_q_modify_admin_guru on public.quiz_questions;
+create policy quiz_q_modify_admin_guru on public.quiz_questions
+for all using ((select role from public.profiles where id = auth.uid()) in ('admin','guru'))
+with check ((select role from public.profiles where id = auth.uid()) in ('admin','guru'));
+
+create index if not exists idx_quiz_q_challenge on public.quiz_questions(challenge_id);
+
+-- Quiz submissions
+create table if not exists public.quiz_submissions (
+  id uuid primary key default uuid_generate_v4(),
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  answers jsonb not null, -- {questionId: "A"}
+  score integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.quiz_submissions enable row level security;
+
+drop policy if exists quiz_sub_select_own on public.quiz_submissions;
+create policy quiz_sub_select_own on public.quiz_submissions for select using (user_id = auth.uid());
+
+drop policy if exists quiz_sub_insert_own on public.quiz_submissions;
+create policy quiz_sub_insert_own on public.quiz_submissions for insert with check (user_id = auth.uid());
+
+create index if not exists idx_quiz_sub_user on public.quiz_submissions(user_id, created_at desc);
+
+-- Activity completions (reading/video) to avoid duplicate XP awards
+create table if not exists public.activity_completions (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  activity_key text not null, -- unique per user per activity (e.g., note:123, video:abc)
+  activity_type text not null check (activity_type in ('reading','video','other')),
+  metadata jsonb,
+  created_at timestamptz not null default now(),
+  unique(user_id, activity_key)
+);
+
+alter table public.activity_completions enable row level security;
+
+drop policy if exists activity_comp_select_own on public.activity_completions;
+create policy activity_comp_select_own on public.activity_completions for select using (user_id = auth.uid());
+
+drop policy if exists activity_comp_insert_own on public.activity_completions;
+create policy activity_comp_insert_own on public.activity_completions for insert with check (user_id = auth.uid());
+
 -- Create profiles table (if not exists)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),

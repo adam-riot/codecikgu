@@ -206,6 +206,14 @@ export default function EnhancedLevelSystem() {
     
     if (challenge.completed && selectedLevel) {
       updateLevelProgress(selectedLevel, challenge)
+      // Log event
+      try {
+        fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventType: 'challenge_completed', metadata: { challengeId: challenge.id, type: 'quiz', score } })
+        })
+      } catch {}
     }
   }
 
@@ -226,6 +234,13 @@ export default function EnhancedLevelSystem() {
     
     if (challenge.completed && selectedLevel) {
       updateLevelProgress(selectedLevel, challenge)
+      try {
+        fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventType: 'challenge_completed', metadata: { challengeId: challenge.id, type: 'coding' } })
+        })
+      } catch {}
     }
   }
 
