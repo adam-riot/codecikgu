@@ -107,19 +107,66 @@ export default function RootLayout({
         <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
       </head>
       <body className={inter.className}>
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-          <nav className="bg-gray-900/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
-            <div className="container mx-auto px-4">
-              <div className="flex items-center justify-between h-16">
-                <div className="flex items-center space-x-8">
-                  <a className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-300" href="/">
-                    <img alt="CodeCikgu" width="32" height="32" className="hover:scale-110 transition-transform duration-300" src="/favicon.svg"/>
-                    <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">CodeCikgu</span>
+        <div style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(to bottom right, #111827, #000000, #111827)',
+          color: 'white'
+        }}>
+          <nav style={{
+            background: 'rgba(17, 24, 39, 0.95)',
+            backdropFilter: 'blur(16px)',
+            borderBottom: '1px solid rgba(75, 85, 99, 0.5)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 50
+          }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                height: '4rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                  <a href="/" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    textDecoration: 'none',
+                    color: 'white'
+                  }}>
+                    <img alt="CodeCikgu" width="32" height="32" src="/favicon.svg" style={{
+                      transition: 'transform 0.3s ease'
+                    }} />
+                    <span style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(to right, #60a5fa, #06b6d4)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text'
+                    }}>CodeCikgu</span>
                   </a>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <a href="/daftar" className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">Daftar</a>
-                  <a href="/login" className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">Log Masuk</a>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <a href="/daftar" style={{
+                    background: '#3b82f6',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    transition: 'background-color 0.3s ease'
+                  }}>Daftar</a>
+                  <a href="/login" style={{
+                    background: '#374151',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    transition: 'background-color 0.3s ease'
+                  }}>Log Masuk</a>
                 </div>
               </div>
             </div>
