@@ -1,3 +1,77 @@
+-- Daily XP cap per user (example: 5000 XP)
+create table if not exists xp_daily_cap (
+  user_id uuid primary key,
+  date date not null default current_date,
+  total_xp integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.enforce_daily_xp_cap() returns trigger
+language plpgsql as $$
+declare
+  cap integer := 5000;
+  current_total integer := 0;
+begin
+  select total_xp into current_total from xp_daily_cap where user_id = new.user_id and date = current_date;
+  if current_total is null then
+    current_total := 0;
+  end if;
+  if current_total + new.mata > cap then
+    raise exception 'Daily XP cap exceeded';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_xp_log_daily_cap on xp_log;
+create trigger trg_xp_log_daily_cap
+before insert on xp_log
+for each row execute function public.enforce_daily_xp_cap();
+
+create or replace function public.update_xp_daily_totals() returns trigger
+language plpgsql as $$
+begin
+  insert into xp_daily_cap(user_id, date, total_xp)
+  values (new.user_id, current_date, new.mata)
+  on conflict (user_id) do update
+  set total_xp = xp_daily_cap.total_xp + new.mata,
+      date = current_date,
+      updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_xp_log_update_daily on xp_log;
+create trigger trg_xp_log_update_daily
+after insert on xp_log
+for each row execute function public.update_xp_daily_totals();
+
+-- Atomic XP award function (log + increment in one transaction)
+create or replace function public.award_xp(
+  p_user_id uuid,
+  p_activity text,
+  p_xp integer
+) returns void
+language plpgsql
+security definer
+as $$
+begin
+  -- Ensure caller is the same as target user
+  if auth.uid() is null or auth.uid() <> p_user_id then
+    raise exception 'Unauthorized';
+  end if;
+
+  insert into xp_log(user_id, aktiviti, mata)
+  values (p_user_id, p_activity, p_xp);
+
+  update profiles
+  set xp = coalesce(xp, 0) + p_xp
+  where id = p_user_id;
+end;
+$$;
+
+grant execute on function public.award_xp(uuid, text, integer) to anon, authenticated;
+
 -- Create profiles table (if not exists)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),

@@ -39,7 +39,38 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src 'self'; object-src 'none';",
+            value: (() => {
+              const isProd = process.env.NODE_ENV === 'production'
+              const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+              const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || ''
+
+              const scriptSrc = isProd
+                ? "'self'"
+                : "'self' 'unsafe-eval' 'unsafe-inline'"
+
+              const styleSrc = "'self' 'unsafe-inline'"
+              const imgSrc = "'self' data: https:"
+              const fontSrc = "'self' data:"
+              const workerSrc = "'self' blob:"
+              const connectSrcParts = ["'self'", 'https:', 'wss:']
+              if (supaUrl) connectSrcParts.push(supaUrl)
+              if (wsUrl) connectSrcParts.push(wsUrl)
+              const connectSrc = connectSrcParts.join(' ')
+
+              const base = [
+                `default-src 'self'`,
+                `script-src ${scriptSrc}`,
+                `style-src ${styleSrc}`,
+                `img-src ${imgSrc}`,
+                `font-src ${fontSrc}`,
+                `connect-src ${connectSrc}`,
+                `worker-src ${workerSrc}`,
+                `frame-src 'self'`,
+                `object-src 'none'`
+              ]
+              if (isProd) base.push('upgrade-insecure-requests')
+              return base.join('; ')
+            })(),
           },
         ],
       },

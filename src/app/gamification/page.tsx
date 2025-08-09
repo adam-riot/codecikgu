@@ -23,7 +23,9 @@ import {
   Rocket,
   Crown
 } from 'lucide-react'
-import { EnhancedLevelSystem, ExerciseLibrary } from '@/components/gamification'
+import dynamic from 'next/dynamic'
+const EnhancedLevelSystem = dynamic(() => import('@/components/gamification/EnhancedLevelSystem'), { ssr: false })
+const ExerciseLibrary = dynamic(() => import('@/components/gamification/ExerciseLibrary'), { ssr: false })
 import GamificationAccessControl from '@/components/auth/GamificationAccessControl'
 
 interface LearningPath {
