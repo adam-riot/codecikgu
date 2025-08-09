@@ -119,7 +119,7 @@ export default function RootLayout({
         {/* Preload critical resources */}
         <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
         
-        {/* Temporarily disabled service worker for debugging */}
+        {/* Service Worker Registration - DISABLED FOR DEBUGGING */}
         {/* <script
           dangerouslySetInnerHTML={{
             __html: `

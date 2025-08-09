@@ -10,22 +10,17 @@ export default function HomePage() {
   const [userRole, setUserRole] = useState<string>('awam')
   const [userName, setUserName] = useState<string>('Tetamu')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        console.log('🔍 Starting user check...')
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         
         if (authError) {
           console.error('Auth error:', authError)
-          setError('Authentication error')
           setLoading(false)
           return
         }
-        
-        console.log('🔍 Auth user:', user ? 'Found' : 'Not found')
         
         if (user) {
           const userData = user as CustomUser
@@ -38,13 +33,10 @@ export default function HomePage() {
               getUserDisplayName(userData)
             ])
             
-            console.log('🔍 Role:', role, 'Name:', name)
-            
             setUserRole(role)
             setUserName(name)
           } catch (profileError) {
             console.error('Profile fetch error:', profileError)
-            setError('Profile fetch error')
           }
         } else {
           // No user logged in
@@ -54,7 +46,6 @@ export default function HomePage() {
         }
       } catch (error) {
         console.error('Error in checkUser:', error)
-        setError('General error')
       } finally {
         setLoading(false)
       }
@@ -68,24 +59,6 @@ export default function HomePage() {
       <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
         <div className="glass-dark rounded-2xl p-8 text-center">
           <div className="text-2xl text-gradient loading-dots">Memuat halaman</div>
-          {error && <div className="text-red-400 mt-4">Error: {error}</div>}
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black flex items-center justify-center">
-        <div className="glass-dark rounded-2xl p-8 text-center">
-          <div className="text-2xl text-red-400 mb-4">Error</div>
-          <div className="text-gray-300 mb-4">{error}</div>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="btn-primary"
-          >
-            Reload Page
-          </button>
         </div>
       </div>
     )
@@ -196,153 +169,6 @@ export default function HomePage() {
                   <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
                 </Link>
               )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Programming Languages */}
-      <section className="py-20 bg-gradient-to-r from-gray-900/50 to-dark-black/50">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
-              💻 Bahasa Pengaturcaraan
-            </h2>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">☕</div>
-                <h3 className="text-lg font-bold text-white mb-2">Java</h3>
-                <p className="text-gray-400 text-sm">Object-oriented programming</p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🐍</div>
-                <h3 className="text-lg font-bold text-white mb-2">Python</h3>
-                <p className="text-gray-400 text-sm">Beginner-friendly syntax</p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">⚡</div>
-                <h3 className="text-lg font-bold text-white mb-2">C++</h3>
-                <p className="text-gray-400 text-sm">High-performance computing</p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🌐</div>
-                <h3 className="text-lg font-bold text-white mb-2">JavaScript</h3>
-                <p className="text-gray-400 text-sm">Web development</p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🔷</div>
-                <h3 className="text-lg font-bold text-white mb-2">C#</h3>
-                <p className="text-gray-400 text-sm">Microsoft ecosystem</p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-6 text-center card-hover group">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">🦀</div>
-                <h3 className="text-lg font-bold text-white mb-2">Rust</h3>
-                <p className="text-gray-400 text-sm">Memory-safe systems</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Platform Features */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
-              ✨ Mengapa CodeCikgu?
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <div className="glass-dark rounded-xl p-8 card-hover">
-                <div className="text-4xl mb-4">🎮</div>
-                <h3 className="text-xl font-bold text-white mb-4">Pembelajaran Interaktif</h3>
-                <p className="text-gray-400">
-                  Belajar sambil bermain dengan playground interaktif dan sistem ganjaran XP yang menarik.
-                </p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-8 card-hover">
-                <div className="text-4xl mb-4">📖</div>
-                <h3 className="text-xl font-bold text-white mb-4">Sukatan Pelajaran SPM</h3>
-                <p className="text-gray-400">
-                  Nota dan bahan pembelajaran yang mengikut sukatan pelajaran Sains Komputer SPM terkini.
-                </p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-8 card-hover">
-                <div className="text-4xl mb-4">📱</div>
-                <h3 className="text-xl font-bold text-white mb-4">Multi-Platform</h3>
-                <p className="text-gray-400">
-                  Akses dari mana-mana peranti - desktop, tablet, atau telefon pintar dengan responsive design.
-                </p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-8 card-hover">
-                <div className="text-4xl mb-4">🏆</div>
-                <h3 className="text-xl font-bold text-white mb-4">Sistem Ranking</h3>
-                <p className="text-gray-400">
-                  Bersaing dengan rakan-rakan melalui sistem XP dan leaderboard untuk motivasi pembelajaran.
-                </p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-8 card-hover">
-                <div className="text-4xl mb-4">👥</div>
-                <h3 className="text-xl font-bold text-white mb-4">Multi-Role Support</h3>
-                <p className="text-gray-400">
-                  Sokongan untuk admin, murid, dan pengguna awam dengan ciri-ciri yang disesuaikan.
-                </p>
-              </div>
-
-              <div className="glass-dark rounded-xl p-8 card-hover">
-                <div className="text-4xl mb-4">💰</div>
-                <h3 className="text-xl font-bold text-white mb-4">Percuma Selamanya</h3>
-                <p className="text-gray-400">
-                  Platform pembelajaran yang sepenuhnya percuma untuk semua pelajar Malaysia.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Platform Info */}
-      <section className="py-20 bg-gradient-to-r from-dark-black/50 to-gray-900/50">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-gradient">
-              📊 Platform Info
-            </h2>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              <div className="text-center">
-                <div className="text-4xl mb-4">🚀</div>
-                <div className="text-3xl font-bold text-electric-blue mb-2">Beta</div>
-                <div className="text-gray-400">Status Platform</div>
-              </div>
-
-              <div className="text-center">
-                <div className="text-4xl mb-4">💻</div>
-                <div className="text-3xl font-bold text-neon-green mb-2">6</div>
-                <div className="text-gray-400">Bahasa Disokong</div>
-              </div>
-
-              <div className="text-center">
-                <div className="text-4xl mb-4">📅</div>
-                <div className="text-3xl font-bold text-neon-cyan mb-2">2024</div>
-                <div className="text-gray-400">Tahun Pelancaran</div>
-              </div>
-
-              <div className="text-center">
-                <div className="text-4xl mb-4">💰</div>
-                <div className="text-3xl font-bold text-purple-400 mb-2">Free</div>
-                <div className="text-gray-400">Harga Penggunaan</div>
-              </div>
             </div>
           </div>
         </div>
