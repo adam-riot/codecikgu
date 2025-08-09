@@ -1,71 +1,162 @@
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(to bottom right, #111827, #000000, #111827)',
+      color: 'white'
+    }}>
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="container mx-auto px-4 py-20">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-7xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 leading-tight">
+      <section style={{ position: 'relative', overflow: 'hidden' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '5rem 1rem' }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
+            <h1 style={{
+              fontSize: 'clamp(2.5rem, 8vw, 4.5rem)',
+              fontWeight: 'bold',
+              marginBottom: '2rem',
+              background: 'linear-gradient(to right, #60a5fa, #06b6d4)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              lineHeight: '1.2'
+            }}>
               Selamat Datang<br />
               ke CodeCikgu
             </h1>
-            <p className="text-xl md:text-2xl text-gray-300 mb-12 leading-relaxed">
-              Platform pembelajaran <span className="text-blue-400 font-semibold">Sains Komputer</span> yang interaktif untuk murid Tingkatan 4 & 5.<br />
+            <p style={{
+              fontSize: 'clamp(1.125rem, 4vw, 1.5rem)',
+              color: '#d1d5db',
+              marginBottom: '3rem',
+              lineHeight: '1.6'
+            }}>
+              Platform pembelajaran <span style={{ color: '#60a5fa', fontWeight: '600' }}>Sains Komputer</span> yang interaktif untuk murid Tingkatan 4 & 5.<br />
               Belajar dengan cara yang menyeronokkan dan dapatkan ganjaran!
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <a href="/daftar" className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105">
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <a href="/daftar" style={{
+                background: 'linear-gradient(to right, #3b82f6, #06b6d4)',
+                color: 'white',
+                fontWeight: 'bold',
+                padding: '1rem 2rem',
+                borderRadius: '0.5rem',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                display: 'inline-block'
+              }}>
                 🚀 Daftar Sekarang
               </a>
-              <a href="/login" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105">
+              <a href="/login" style={{
+                background: '#374151',
+                color: 'white',
+                fontWeight: 'bold',
+                padding: '1rem 2rem',
+                borderRadius: '0.5rem',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                display: 'inline-block'
+              }}>
                 🔐 Log Masuk
               </a>
             </div>
           </div>
         </div>
-        
-        {/* Animated background elements */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-blue-400/10 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-32 h-32 bg-cyan-400/10 rounded-full blur-xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-green-400/10 rounded-full blur-xl animate-pulse delay-500"></div>
       </section>
 
       {/* Quick Access Features */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+      <section style={{ padding: '5rem 1rem' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            <h2 style={{
+              fontSize: 'clamp(1.875rem, 6vw, 3rem)',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginBottom: '4rem',
+              background: 'linear-gradient(to right, #60a5fa, #06b6d4)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
               🎯 Ciri-Ciri Platform
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <a href="/playground" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-blue-400 transition-all duration-300 group text-center">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">🖥️</div>
-                <h3 className="text-xl font-bold text-white mb-3">Playground</h3>
-                <p className="text-gray-400 text-sm mb-4">Kod Editor Interaktif dengan sokongan pelbagai bahasa</p>
-                <div className="text-blue-400 group-hover:underline">Mula Kod →</div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '2rem'
+            }}>
+              <a href="/playground" style={{
+                background: 'rgba(31, 41, 55, 0.5)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '0.75rem',
+                padding: '2rem',
+                border: '1px solid rgba(75, 85, 99, 0.5)',
+                textDecoration: 'none',
+                color: 'white',
+                textAlign: 'center',
+                transition: 'all 0.3s ease'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🖥️</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Playground</h3>
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1rem' }}>Kod Editor Interaktif dengan sokongan pelbagai bahasa</p>
+                <div style={{ color: '#60a5fa' }}>Mula Kod →</div>
               </a>
 
-              <a href="/nota" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-green-400 transition-all duration-300 group text-center">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">📚</div>
-                <h3 className="text-xl font-bold text-white mb-3">Nota</h3>
-                <p className="text-gray-400 text-sm mb-4">Sumber pembelajaran lengkap untuk Tingkatan 4 & 5</p>
-                <div className="text-green-400 group-hover:underline">Baca Nota →</div>
+              <a href="/nota" style={{
+                background: 'rgba(31, 41, 55, 0.5)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '0.75rem',
+                padding: '2rem',
+                border: '1px solid rgba(75, 85, 99, 0.5)',
+                textDecoration: 'none',
+                color: 'white',
+                textAlign: 'center',
+                transition: 'all 0.3s ease'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📚</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Nota</h3>
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1rem' }}>Sumber pembelajaran lengkap untuk Tingkatan 4 & 5</p>
+                <div style={{ color: '#10b981' }}>Baca Nota →</div>
               </a>
 
-              <a href="/leaderboard" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-cyan-400 transition-all duration-300 group text-center">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">🏆</div>
-                <h3 className="text-xl font-bold text-white mb-3">Leaderboard</h3>
-                <p className="text-gray-400 text-sm mb-4">Ranking & pencapaian pelajar terbaik</p>
-                <div className="text-cyan-400 group-hover:underline">Lihat Ranking →</div>
+              <a href="/leaderboard" style={{
+                background: 'rgba(31, 41, 55, 0.5)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '0.75rem',
+                padding: '2rem',
+                border: '1px solid rgba(75, 85, 99, 0.5)',
+                textDecoration: 'none',
+                color: 'white',
+                textAlign: 'center',
+                transition: 'all 0.3s ease'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏆</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Leaderboard</h3>
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1rem' }}>Ranking & pencapaian pelajar terbaik</p>
+                <div style={{ color: '#06b6d4' }}>Lihat Ranking →</div>
               </a>
 
-              <a href="/daftar" className="bg-gray-800/50 backdrop-blur-md rounded-xl p-8 border border-gray-700 hover:border-purple-400 transition-all duration-300 group text-center">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
-                <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
-                <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
-                <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
+              <a href="/daftar" style={{
+                background: 'rgba(31, 41, 55, 0.5)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '0.75rem',
+                padding: '2rem',
+                border: '1px solid rgba(75, 85, 99, 0.5)',
+                textDecoration: 'none',
+                color: 'white',
+                textAlign: 'center',
+                transition: 'all 0.3s ease'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👤</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Daftar</h3>
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginBottom: '1rem' }}>Cipta akaun untuk akses penuh semua ciri</p>
+                <div style={{ color: '#8b5cf6' }}>Daftar Sekarang →</div>
               </a>
             </div>
           </div>
@@ -73,21 +164,60 @@ export default function HomePage() {
       </section>
 
       {/* Call to Action */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl md:text-5xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+      <section style={{ padding: '5rem 1rem' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
+            <h2 style={{
+              fontSize: 'clamp(1.875rem, 6vw, 3rem)',
+              fontWeight: 'bold',
+              marginBottom: '2rem',
+              background: 'linear-gradient(to right, #60a5fa, #06b6d4)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
               🎓 Mula Pembelajaran Anda Hari Ini
             </h2>
-            <p className="text-xl text-gray-300 mb-12">
+            <p style={{
+              fontSize: '1.25rem',
+              color: '#d1d5db',
+              marginBottom: '3rem'
+            }}>
               Sertai ribuan pelajar yang telah memulakan perjalanan pembelajaran Sains Komputer mereka dengan CodeCikgu
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              <a href="/daftar" className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold py-5 px-10 rounded-lg transition-all duration-300 transform hover:scale-105 text-xl">
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <a href="/daftar" style={{
+                background: 'linear-gradient(to right, #3b82f6, #06b6d4)',
+                color: 'white',
+                fontWeight: 'bold',
+                padding: '1.25rem 2.5rem',
+                borderRadius: '0.5rem',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                display: 'inline-block',
+                fontSize: '1.125rem'
+              }}>
                 Daftar Percuma Sekarang
               </a>
-              <a href="/playground" className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-5 px-10 rounded-lg transition-all duration-300 transform hover:scale-105 text-xl">
+              <a href="/playground" style={{
+                background: '#374151',
+                color: 'white',
+                fontWeight: 'bold',
+                padding: '1.25rem 2.5rem',
+                borderRadius: '0.5rem',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                display: 'inline-block',
+                fontSize: '1.125rem'
+              }}>
                 Cuba Playground
               </a>
             </div>
