@@ -40,13 +40,13 @@ export interface UserProfile {
 }
 
 // Baca pembolehubah persekitaran dengan cara yang paling serasi
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // Fallback untuk development tanpa Supabase
 const isDevelopment = process.env.NODE_ENV === 'development'
 const isBuildTime = process.env.NODE_ENV === 'production' && typeof window === 'undefined'
-const hasSupabaseConfig = supabaseUrl && supabaseAnonKey && supabaseUrl !== 'https://your-project.supabase.co'
+const hasSupabaseConfig = supabaseUrl && supabaseAnonKey
 
 // Mock client untuk development dan build time
 function createMockClient() {
