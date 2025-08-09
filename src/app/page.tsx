@@ -2,56 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
 import { Play, BookOpen, Trophy, UserPlus } from 'lucide-react'
 
 export default function HomePage() {
-  const [user, setUser] = useState<CustomUser | null>(null)
-  const [userRole, setUserRole] = useState<string>('awam')
-  const [userName, setUserName] = useState<string>('Tetamu')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (authError) {
-          console.error('Auth error:', authError)
-          setLoading(false)
-          return
-        }
-        
-        if (user) {
-          const userData = user as CustomUser
-          setUser(userData)
-          
-          try {
-            // Fetch role and name from database
-            const [role, name] = await Promise.all([
-              getUserRole(userData),
-              getUserDisplayName(userData)
-            ])
-            
-            setUserRole(role)
-            setUserName(name)
-          } catch (profileError) {
-            console.error('Profile fetch error:', profileError)
-          }
-        } else {
-          // No user logged in
-          setUser(null)
-          setUserRole('awam')
-          setUserName('Tetamu')
-        }
-      } catch (error) {
-        console.error('Error in checkUser:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
+    // Simulate loading time
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 1000)
 
-    checkUser()
+    return () => clearTimeout(timer)
   }, [])
 
   if (loading) {
@@ -64,22 +26,13 @@ export default function HomePage() {
     )
   }
 
-  // Always show public landing page content (no auto-redirect)
+  // Always show public landing page content
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="container mx-auto px-4 py-20">
           <div className="max-w-4xl mx-auto text-center">
-            {/* Dynamic greeting based on user status */}
-            {user ? (
-              <div className="mb-4">
-                <span className="text-lg text-gray-400">
-                  {userRole === 'admin' ? '👨‍💼 Admin' : userRole === 'murid' ? '👨‍🎓 Murid' : '👤 Pengguna'} • {userName}
-                </span>
-              </div>
-            ) : null}
-            
             <h1 className="text-4xl md:text-7xl font-bold mb-8 text-gradient leading-tight">
               Selamat Datang<br />
               ke CodeCikgu
@@ -90,28 +43,13 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              {user ? (
-                <>
-                  <Link href="/playground" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
-                    <Play className="w-6 h-6" />
-                    <span>🚀 Mula Kod</span>
-                  </Link>
-                  <Link href="/nota" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
-                    <BookOpen className="w-6 h-6" />
-                    <span>📚 Baca Nota</span>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/daftar" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
-                    <UserPlus className="w-6 h-6" />
-                    <span>🚀 Daftar Sekarang</span>
-                  </Link>
-                  <Link href="/login" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
-                    <span>🔐 Log Masuk</span>
-                  </Link>
-                </>
-              )}
+              <Link href="/daftar" className="btn-primary text-lg px-8 py-4 flex items-center space-x-3">
+                <UserPlus className="w-6 h-6" />
+                <span>🚀 Daftar Sekarang</span>
+              </Link>
+              <Link href="/login" className="btn-secondary text-lg px-8 py-4 flex items-center space-x-3">
+                <span>🔐 Log Masuk</span>
+              </Link>
             </div>
           </div>
         </div>
@@ -152,23 +90,12 @@ export default function HomePage() {
                 <div className="text-neon-cyan group-hover:underline">Lihat Ranking →</div>
               </Link>
 
-              {user ? (
-                <Link href={`/dashboard-${userRole}`} className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
-                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                    {userRole === 'admin' ? '👨‍💼' : userRole === 'murid' ? '👨‍🎓' : '👤'}
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-3">Dashboard</h3>
-                  <p className="text-gray-400 text-sm mb-4">Akses dashboard {userRole === 'admin' ? 'admin' : userRole === 'murid' ? 'murid' : 'awam'} anda</p>
-                  <div className="text-purple-400 group-hover:underline">Ke Dashboard →</div>
-                </Link>
-              ) : (
-                <Link href="/daftar" className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
-                  <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
-                  <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
-                  <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
-                  <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
-                </Link>
-              )}
+              <Link href="/daftar" className="glass-dark rounded-xl p-8 card-hover neon-glow-purple group text-center">
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">👤</div>
+                <h3 className="text-xl font-bold text-white mb-3">Daftar</h3>
+                <p className="text-gray-400 text-sm mb-4">Cipta akaun untuk akses penuh semua ciri</p>
+                <div className="text-purple-400 group-hover:underline">Daftar Sekarang →</div>
+              </Link>
             </div>
           </div>
         </div>
@@ -179,39 +106,21 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-5xl font-bold mb-8 text-gradient">
-              🎓 {user ? 'Teruskan Pembelajaran Anda' : 'Mula Pembelajaran Anda Hari Ini'}
+              🎓 Mula Pembelajaran Anda Hari Ini
             </h2>
             <p className="text-xl text-gray-300 mb-12">
-              {user 
-                ? `Selamat kembali, ${userName}! Teruskan perjalanan pembelajaran Sains Komputer anda.`
-                : 'Sertai ribuan pelajar yang telah memulakan perjalanan pembelajaran Sains Komputer mereka dengan CodeCikgu'
-              }
+              Sertai ribuan pelajar yang telah memulakan perjalanan pembelajaran Sains Komputer mereka dengan CodeCikgu
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-              {user ? (
-                <>
-                  <Link href="/playground" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
-                    <Play className="w-6 h-6" />
-                    <span>Mula Kod</span>
-                  </Link>
-                  <Link href={`/dashboard-${userRole}`} className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
-                    <Trophy className="w-6 h-6" />
-                    <span>Ke Dashboard</span>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/daftar" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
-                    <UserPlus className="w-6 h-6" />
-                    <span>Daftar Percuma Sekarang</span>
-                  </Link>
-                  <Link href="/playground" className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
-                    <Play className="w-6 h-6" />
-                    <span>Cuba Playground</span>
-                  </Link>
-                </>
-              )}
+              <Link href="/daftar" className="btn-primary text-xl px-10 py-5 flex items-center space-x-3">
+                <UserPlus className="w-6 h-6" />
+                <span>Daftar Percuma Sekarang</span>
+              </Link>
+              <Link href="/playground" className="btn-secondary text-xl px-10 py-5 flex items-center space-x-3">
+                <Play className="w-6 h-6" />
+                <span>Cuba Playground</span>
+              </Link>
             </div>
           </div>
         </div>
