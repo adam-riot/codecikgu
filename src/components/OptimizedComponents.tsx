@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 
 // Simple search hook that can be used in any component
 export function useSearch<T>(data: T[], searchKeys: (keyof T)[]) {
@@ -22,7 +22,7 @@ export function useSearch<T>(data: T[], searchKeys: (keyof T)[]) {
 
 // Simple filter hook
 export function useFilter<T>(data: T[]) {
-  const [filters, setFilters] = useState<Record<string, any>>({})
+  const [filters, setFilters] = useState<Record<string, unknown>>({})
 
   const filteredData = useMemo(() => {
     let result = [...data]
@@ -36,7 +36,7 @@ export function useFilter<T>(data: T[]) {
     return result
   }, [data, filters])
 
-  const setFilter = (key: string, value: any) => {
+  const setFilter = (key: string, value: unknown) => {
     setFilters(prev => ({ ...prev, [key]: value }))
   }
 
@@ -128,6 +128,7 @@ export const LazyImage: React.FC<{
           isLoaded ? 'opacity-100' : 'opacity-0'
         } ${className}`}
         loading="lazy"
+        style={{ width: '100%', height: 'auto' }}
       />
     </div>
   )

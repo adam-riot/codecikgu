@@ -1,27 +1,24 @@
 'use client'
 
 import React, { useState } from 'react'
-import { 
-  Trophy, 
-  BookOpen, 
-  Target, 
-  Star,
-  Gamepad2,
-  GraduationCap,
+import {
   Code,
-  Brain,
   Network,
-  Database,
+  Brain,
   FileText,
   Users,
   Award,
-  TrendingUp,
   Calendar,
   Zap,
   Shield,
-  Lightbulb,
-  Rocket,
-  Crown
+  Crown,
+  Trophy,
+  BookOpen,
+  Target,
+  Star,
+  GraduationCap,
+  Database,
+  Gamepad
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 const EnhancedLevelSystem = dynamic(() => import('@/components/gamification/EnhancedLevelSystem'), { ssr: false })
@@ -492,7 +489,7 @@ export default function GamificationPage() {
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center space-x-3 mb-4">
-              <Gamepad2 className="w-10 h-10 text-electric-blue" />
+              <Gamepad className="w-10 h-10 text-electric-blue" />
               <div>
                 <h1 className="text-4xl font-bold text-gradient">CodeCikgu Learning System</h1>
                 <p className="text-gray-400">Platform pembelajaran Sains Komputer berdasarkan DSKP Malaysia</p>
@@ -513,7 +510,10 @@ export default function GamificationPage() {
             {navItems.map(item => (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id as any)}
+                onClick={() => {
+                  const view = item.id as 'overview' | 'levels' | 'exercises' | 'achievements' | 'leaderboard'
+                  setCurrentView(view)
+                }}
                 className="glass-dark rounded-2xl p-6 text-left transition-all duration-300 hover:scale-105 hover:border-electric-blue/30 group"
               >
                 <div className="flex items-center space-x-4 mb-4">

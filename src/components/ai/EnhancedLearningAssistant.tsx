@@ -12,8 +12,14 @@ import {
   Lightbulb,
   CheckCircle,
   AlertTriangle,
-  Zap
+  Zap,
+  Send,
+  Loader2,
+  Star,
+  Award,
+  Flame
 } from 'lucide-react'
+import { supabase } from '@/utils/supabase'
 
 export interface LearningStyle {
   visual: number
@@ -98,385 +104,484 @@ export interface CodeError {
 }
 
 export interface Optimization {
-  type: 'performance' | 'memory' | 'readability'
+  type: 'performance' | 'memory' | 'readability' | 'security'
   description: string
   impact: 'low' | 'medium' | 'high'
   example: string
 }
 
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+  metadata?: {
+    codeAnalysis?: AIAnalysis
+    learningPath?: LearningPath
+    suggestions?: Suggestion[]
+  }
+}
+
 export function EnhancedLearningAssistant() {
-  const [activeMode, setActiveMode] = useState<'chat' | 'analysis' | 'path' | 'practice'>('chat')
-  const [messages, setMessages] = useState<Array<{role: 'user' | 'ai', content: string, timestamp: Date}>>([])
-  const [currentCode, setCurrentCode] = useState('')
-  const [analysis, setAnalysis] = useState<AIAnalysis | null>(null)
-  const [learningPath, setLearningPath] = useState<LearningPath | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [inputMessage, setInputMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [user, setUser] = useState<any>(null)
   const [userSkills, setUserSkills] = useState<SkillLevel>({
-    programming: 0.3,
-    problemSolving: 0.2,
-    debugging: 0.1,
-    codeReading: 0.4,
-    conceptUnderstanding: 0.3
+    programming: 50,
+    problemSolving: 50,
+    debugging: 50,
+    codeReading: 50,
+    conceptUnderstanding: 50
   })
   const [learningStyle, setLearningStyle] = useState<LearningStyle>({
-    visual: 0.4,
-    auditory: 0.2,
-    kinesthetic: 0.3,
-    readingWriting: 0.1
+    visual: 25,
+    auditory: 25,
+    kinesthetic: 25,
+    readingWriting: 25
   })
+  const [currentLearningPath, setCurrentLearningPath] = useState<LearningPath | null>(null)
+  const [showAnalysis, setShowAnalysis] = useState(false)
+  const [codeAnalysis, setCodeAnalysis] = useState<AIAnalysis | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    checkUser()
+  }, [])
 
-  // AI Conversation Handler
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const checkUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        await loadUserData(session.user.id)
+      }
+    } catch (error) {
+      console.error('Error checking user:', error)
+    }
+  }
+
+  const loadUserData = async (userId: string) => {
+    try {
+      // Load user skills and learning style from database
+      const { data: userData } = await supabase
+        .from('user_learning_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (userData) {
+        setUserSkills(userData.skills || {
+          programming: 50,
+          problemSolving: 50,
+          debugging: 50,
+          codeReading: 50,
+          conceptUnderstanding: 50
+        })
+        setLearningStyle(userData.learning_style || {
+          visual: 25,
+          auditory: 25,
+          kinesthetic: 25,
+          readingWriting: 25
+        })
+      }
+
+      // Load chat history
+      const { data: chatHistory } = await supabase
+        .from('ai_chat_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(50)
+
+      if (chatHistory) {
+        const formattedMessages: ChatMessage[] = chatHistory.map((msg: any) => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          metadata: msg.metadata
+        }))
+        setMessages(formattedMessages)
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error)
+    }
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   const handleSendMessage = async (message: string) => {
-    const userMessage = { role: 'user' as const, content: message, timestamp: new Date() }
+    if (!message.trim() || isLoading) return
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: message,
+      timestamp: new Date()
+    }
+
     setMessages(prev => [...prev, userMessage])
+    setInputMessage('')
+    setIsLoading(true)
 
-    // Simulate AI response with enhanced intelligence
-    const aiResponse = await generateAIResponse(message, userSkills, learningStyle)
-    const aiMessage = { role: 'ai' as const, content: aiResponse, timestamp: new Date() }
-    setMessages(prev => [...prev, aiMessage])
+    try {
+      // Save user message to database
+      if (user) {
+        await supabase
+          .from('ai_chat_history')
+          .insert({
+            user_id: user.id,
+            role: 'user',
+            content: message,
+            metadata: null
+          })
+      }
+
+      // Generate AI response
+      const aiResponse = await generateAIResponse(message, userSkills, learningStyle)
+      
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date(),
+        metadata: {
+          suggestions: generateSuggestions(message),
+          learningPath: currentLearningPath || undefined
+        }
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+
+      // Save AI response to database
+      if (user) {
+        await supabase
+          .from('ai_chat_history')
+          .insert({
+            user_id: user.id,
+            role: 'assistant',
+            content: aiResponse,
+            metadata: assistantMessage.metadata
+          })
+      }
+
+      // Update user skills based on interaction
+      await updateUserSkills(message, aiResponse)
+
+    } catch (error) {
+      console.error('Error generating AI response:', error)
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Maaf, terdapat ralat dalam sistem AI. Sila cuba lagi.',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // Enhanced Code Analysis
   const analyzeCode = async (code: string) => {
-    const analysis: AIAnalysis = {
-      codeQuality: calculateCodeQuality(code),
-      performanceScore: calculatePerformance(code),
-      securityRating: calculateSecurity(code),
-      suggestions: generateSuggestions(code),
-      errors: detectErrors(code),
-      optimizations: findOptimizations(code)
+    if (!code.trim()) return
+
+    setIsLoading(true)
+    try {
+      const analysis: AIAnalysis = {
+        codeQuality: calculateCodeQuality(code),
+        performanceScore: calculatePerformance(code),
+        securityRating: calculateSecurity(code),
+        suggestions: generateSuggestions(code),
+        errors: detectErrors(code),
+        optimizations: findOptimizations(code)
+      }
+
+      setCodeAnalysis(analysis)
+      setShowAnalysis(true)
+
+      // Save analysis to database
+      if (user) {
+        await supabase
+          .from('code_analyses')
+          .insert({
+            user_id: user.id,
+            code: code,
+            analysis: analysis,
+            created_at: new Date().toISOString()
+          })
+      }
+
+    } catch (error) {
+      console.error('Error analyzing code:', error)
+    } finally {
+      setIsLoading(false)
     }
-    
-    setAnalysis(analysis)
-    return analysis
   }
 
-  // Adaptive Learning Path Generation
   const generateLearningPath = (skills: SkillLevel, style: LearningStyle) => {
-    const path: LearningPath = {
-      id: `path_${Date.now()}`,
-      title: 'Personalized Learning Journey',
-      description: 'AI-generated path based on your skills and learning style',
-      difficulty: skills.programming < 0.3 ? 'beginner' : skills.programming < 0.7 ? 'intermediate' : 'advanced',
-      estimatedTime: calculateEstimatedTime(skills),
-      prerequisites: getPrerequisites(skills),
-      topics: generateTopics(skills, style),
-      adaptiveLevel: calculateAdaptiveLevel(skills)
+    const adaptiveLevel = calculateAdaptiveLevel(skills)
+    const prerequisites = getPrerequisites(skills)
+    const topics = generateTopics(skills, style)
+    const estimatedTime = calculateEstimatedTime(skills)
+
+    const learningPath: LearningPath = {
+      id: Date.now().toString(),
+      title: 'Jalan Pembelajaran Peribadi',
+      description: 'Jalan pembelajaran yang disesuaikan dengan kemahiran dan gaya pembelajaran anda',
+      difficulty: adaptiveLevel < 30 ? 'beginner' : adaptiveLevel < 70 ? 'intermediate' : 'advanced',
+      estimatedTime,
+      prerequisites,
+      topics,
+      adaptiveLevel
     }
-    
-    setLearningPath(path)
-    return path
+
+    setCurrentLearningPath(learningPath)
+    return learningPath
+  }
+
+  const updateUserSkills = async (message: string, response: string) => {
+    if (!user) return
+
+    try {
+      // Analyze message content to determine skill improvements
+      const skillUpdates: Partial<SkillLevel> = {}
+      
+      if (message.toLowerCase().includes('code') || message.toLowerCase().includes('programming')) {
+        skillUpdates.programming = Math.min(100, userSkills.programming + 2)
+      }
+      if (message.toLowerCase().includes('problem') || message.toLowerCase().includes('solve')) {
+        skillUpdates.problemSolving = Math.min(100, userSkills.problemSolving + 2)
+      }
+      if (message.toLowerCase().includes('debug') || message.toLowerCase().includes('error')) {
+        skillUpdates.debugging = Math.min(100, userSkills.debugging + 2)
+      }
+
+      if (Object.keys(skillUpdates).length > 0) {
+        const updatedSkills = { ...userSkills, ...skillUpdates }
+        setUserSkills(updatedSkills)
+
+        // Save to database
+        await supabase
+          .from('user_learning_profiles')
+          .upsert({
+            user_id: user.id,
+            skills: updatedSkills,
+            learning_style: learningStyle,
+            updated_at: new Date().toISOString()
+          })
+      }
+    } catch (error) {
+      console.error('Error updating user skills:', error)
+    }
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
-      {/* Header with mode selector */}
-      <div className="bg-black/20 backdrop-blur-md border-b border-white/10 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Brain className="w-6 h-6 text-purple-400" />
-            <h2 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              AI Learning Assistant
-            </h2>
-          </div>
-          
-          <div className="flex space-x-1 bg-black/20 rounded-lg p-1">
-            {[
-              { mode: 'chat', icon: MessageCircle, label: 'Chat' },
-              { mode: 'analysis', icon: Code, label: 'Analysis' },
-              { mode: 'path', icon: Target, label: 'Path' },
-              { mode: 'practice', icon: Zap, label: 'Practice' }
-            ].map(({ mode, icon: Icon, label }) => (
-              <button
-                key={mode}
-                onClick={() => setActiveMode(mode as any)}
-                className={`flex items-center space-x-1 px-3 py-2 rounded transition-colors ${
-                  activeMode === mode 
-                    ? 'bg-purple-600 text-white' 
-                    : 'text-gray-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="text-sm">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 p-4">
-        {/* Chat Mode */}
-        {activeMode === 'chat' && (
-          <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-              {messages.map((message, index) => (
-                <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.role === 'user' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-white/10 text-gray-100'
-                  }`}>
-                    <p className="text-sm">{message.content}</p>
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex space-x-2">
-              <textarea
-                ref={chatInputRef}
-                placeholder="Ask me anything about programming..."
-                className="flex-1 p-3 bg-white/10 rounded-lg border border-white/20 text-white placeholder-gray-400 resize-none"
-                rows={2}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    const input = chatInputRef.current
-                    if (input?.value.trim()) {
-                      handleSendMessage(input.value)
-                      input.value = ''
-                    }
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  const input = chatInputRef.current
-                  if (input?.value.trim()) {
-                    handleSendMessage(input.value)
-                    input.value = ''
-                  }
-                }}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-              >
-                Send
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Code Analysis Mode */}
-        {activeMode === 'analysis' && (
-          <div className="space-y-4">
+    <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="glass-dark rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between">
             <div>
-              <label className="block text-sm font-medium mb-2">Code to Analyze:</label>
-              <textarea
-                value={currentCode}
-                onChange={(e) => setCurrentCode(e.target.value)}
-                placeholder="Paste your code here for AI analysis..."
-                className="w-full h-40 p-3 bg-white/10 rounded-lg border border-white/20 text-white placeholder-gray-400 font-mono"
-              />
-              <button
-                onClick={() => analyzeCode(currentCode)}
-                className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                Analyze Code
-              </button>
+              <h1 className="text-3xl font-bold text-gradient mb-2">AI Pembantu Pembelajaran</h1>
+              <p className="text-gray-300">Pembantu AI peribadi untuk pembelajaran pengaturcaraan</p>
             </div>
-
-            {analysis && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Quality Metrics */}
-                <div className="bg-white/10 rounded-lg p-4">
-                  <h3 className="font-bold mb-3 flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2" />
-                    Quality Metrics
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Code Quality:</span>
-                      <span className={`font-bold ${analysis.codeQuality > 0.7 ? 'text-green-400' : analysis.codeQuality > 0.4 ? 'text-yellow-400' : 'text-red-400'}`}>
-                        {(analysis.codeQuality * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Performance:</span>
-                      <span className={`font-bold ${analysis.performanceScore > 0.7 ? 'text-green-400' : analysis.performanceScore > 0.4 ? 'text-yellow-400' : 'text-red-400'}`}>
-                        {(analysis.performanceScore * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Security:</span>
-                      <span className={`font-bold ${analysis.securityRating > 0.7 ? 'text-green-400' : analysis.securityRating > 0.4 ? 'text-yellow-400' : 'text-red-400'}`}>
-                        {(analysis.securityRating * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Suggestions */}
-                <div className="bg-white/10 rounded-lg p-4">
-                  <h3 className="font-bold mb-3 flex items-center">
-                    <Lightbulb className="w-5 h-5 mr-2" />
-                    Suggestions
-                  </h3>
-                  <div className="space-y-2">
-                    {analysis.suggestions.map((suggestion, index) => (
-                      <div key={index} className={`p-2 rounded text-xs ${
-                        suggestion.priority === 'high' ? 'bg-red-500/20 border border-red-500/30' :
-                        suggestion.priority === 'medium' ? 'bg-yellow-500/20 border border-yellow-500/30' :
-                        'bg-blue-500/20 border border-blue-500/30'
-                      }`}>
-                        <p>{suggestion.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Errors & Optimizations */}
-                <div className="bg-white/10 rounded-lg p-4">
-                  <h3 className="font-bold mb-3 flex items-center">
-                    <AlertTriangle className="w-5 h-5 mr-2" />
-                    Issues & Fixes
-                  </h3>
-                  <div className="space-y-2">
-                    {analysis.errors.map((error, index) => (
-                      <div key={index} className="p-2 bg-red-500/20 border border-red-500/30 rounded text-xs">
-                        <p className="font-medium">Line {error.line}: {error.message}</p>
-                        <p className="text-gray-300">{error.suggestion}</p>
-                      </div>
-                    ))}
-                    {analysis.optimizations.map((opt, index) => (
-                      <div key={index} className="p-2 bg-green-500/20 border border-green-500/30 rounded text-xs">
-                        <p className="font-medium">{opt.type}: {opt.description}</p>
-                        <p className="text-gray-300">Impact: {opt.impact}</p>
-                      </div>
-                    ))}
-                  </div>
+            <div className="flex items-center gap-4">
+              <div className="glass-dark rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-purple-400" />
+                  <span className="text-xl font-bold text-white">{Math.round(userSkills.programming)}</span>
+                  <span className="text-gray-300">Skill</span>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Learning Path Mode */}
-        {activeMode === 'path' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">Personalized Learning Path</h3>
-              <button
-                onClick={() => generateLearningPath(userSkills, learningStyle)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-              >
-                Generate New Path
-              </button>
+              <div className="glass-dark rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-orange-400" />
+                  <span className="text-xl font-bold text-white">{messages.length}</span>
+                  <span className="text-gray-300">Interaksi</span>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Skill Assessment */}
-            <div className="bg-white/10 rounded-lg p-4">
-              <h4 className="font-bold mb-3">Current Skill Assessment</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(userSkills).map(([skill, level]) => (
-                  <div key={skill} className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="capitalize">{skill.replace(/([A-Z])/g, ' $1')}</span>
-                      <span>{(level * 100).toFixed(0)}%</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Chat Interface */}
+          <div className="lg:col-span-2">
+            <div className="glass-dark rounded-2xl p-6 h-[600px] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">Sembang dengan AI</h2>
+                <div className="flex items-center gap-2">
+                  {isLoading && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] p-4 rounded-2xl ${
+                        message.role === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-800 text-white'
+                      }`}
+                    >
+                      <p className="text-sm">{message.content}</p>
+                      <p className="text-xs opacity-70 mt-2">
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${level * 100}%` }}
-                      ></div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-800 text-white p-4 rounded-2xl">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>AI sedang menulis...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputMessage)}
+                  placeholder="Tanya soalan tentang pengaturcaraan..."
+                  className="flex-1 bg-gray-800 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isLoading}
+                />
+                <button
+                  onClick={() => handleSendMessage(inputMessage)}
+                  disabled={isLoading || !inputMessage.trim()}
+                  className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* User Skills */}
+            <div className="glass-dark rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">Kemahiran Anda</h3>
+              <div className="space-y-3">
+                {Object.entries(userSkills).map(([skill, level]) => (
+                  <div key={skill}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-300 capitalize">{skill.replace(/([A-Z])/g, ' $1')}</span>
+                      <span className="text-white">{level}%</span>
+                    </div>
+                    <div className="bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-blue-400 to-purple-400 h-2 rounded-full transition-all"
+                        style={{ width: `${level}%` }}
+                      />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Learning Path Display */}
-            {learningPath && (
-              <div className="bg-white/10 rounded-lg p-4">
-                <h4 className="font-bold mb-3">{learningPath.title}</h4>
-                <p className="text-gray-300 mb-4">{learningPath.description}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="text-center p-3 bg-white/5 rounded">
-                    <div className="text-2xl font-bold text-purple-400">{learningPath.difficulty}</div>
-                    <div className="text-sm text-gray-300">Difficulty</div>
-                  </div>
-                  <div className="text-center p-3 bg-white/5 rounded">
-                    <div className="text-2xl font-bold text-blue-400">{learningPath.estimatedTime}h</div>
-                    <div className="text-sm text-gray-300">Estimated Time</div>
-                  </div>
-                  <div className="text-center p-3 bg-white/5 rounded">
-                    <div className="text-2xl font-bold text-green-400">{learningPath.topics.length}</div>
-                    <div className="text-sm text-gray-300">Topics</div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {learningPath.topics.map((topic, index) => (
-                    <div key={topic.id} className="flex items-center p-3 bg-white/5 rounded-lg">
-                      <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center mr-3">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <h5 className="font-medium">{topic.title}</h5>
-                        <p className="text-sm text-gray-300">{topic.type}</p>
-                      </div>
-                      <CheckCircle className="w-5 h-5 text-green-400" />
+            {/* Learning Style */}
+            <div className="glass-dark rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">Gaya Pembelajaran</h3>
+              <div className="space-y-3">
+                {Object.entries(learningStyle).map(([style, percentage]) => (
+                  <div key={style}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-300 capitalize">{style.replace(/([A-Z])/g, ' $1')}</span>
+                      <span className="text-white">{percentage}%</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-green-400 to-blue-400 h-2 rounded-full transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Quick Actions */}
+            <div className="glass-dark rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">Tindakan Pantas</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => generateLearningPath(userSkills, learningStyle)}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-lg transition-colors text-left"
+                >
+                  <Target className="w-4 h-4 inline mr-2" />
+                  Jana Jalan Pembelajaran
+                </button>
+                <button
+                  onClick={() => setShowAnalysis(true)}
+                  className="w-full bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-lg transition-colors text-left"
+                >
+                  <Code className="w-4 h-4 inline mr-2" />
+                  Analisis Kod
+                </button>
+                <button
+                  onClick={() => handleSendMessage('Beri saya latihan pengaturcaraan')}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white p-3 rounded-lg transition-colors text-left"
+                >
+                  <BookOpen className="w-4 h-4 inline mr-2" />
+                  Minta Latihan
+                </button>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* Practice Mode */}
-        {activeMode === 'practice' && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">Interactive Practice</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white/10 rounded-lg p-4">
-                <h4 className="font-bold mb-3">Quick Challenges</h4>
-                <div className="space-y-2">
-                  {[
-                    { title: "Array Manipulation", difficulty: "Easy", time: "5 min" },
-                    { title: "String Processing", difficulty: "Medium", time: "10 min" },
-                    { title: "Algorithm Optimization", difficulty: "Hard", time: "20 min" }
-                  ].map((challenge, index) => (
-                    <div key={index} className="p-3 bg-white/5 rounded flex justify-between items-center">
-                      <div>
-                        <div className="font-medium">{challenge.title}</div>
-                        <div className="text-xs text-gray-300">{challenge.difficulty} • {challenge.time}</div>
-                      </div>
-                      <button className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm transition-colors">
-                        Start
-                      </button>
-                    </div>
-                  ))}
-                </div>
+        {/* Code Analysis Modal */}
+        {showAnalysis && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="glass-dark rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gradient">Analisis Kod</h2>
+                <button
+                  onClick={() => setShowAnalysis(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <AlertTriangle className="w-6 h-6" />
+                </button>
               </div>
-
-              <div className="bg-white/10 rounded-lg p-4">
-                <h4 className="font-bold mb-3">Concept Review</h4>
-                <div className="space-y-2">
-                  {[
-                    { concept: "Variables & Data Types", progress: 90 },
-                    { concept: "Functions & Scope", progress: 70 },
-                    { concept: "Objects & Arrays", progress: 45 }
-                  ].map((item, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm">{item.concept}</span>
-                        <span className="text-sm">{item.progress}%</span>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full"
-                          style={{ width: `${item.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+              
+              {codeAnalysis && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-blue-400">{codeAnalysis.codeQuality}%</div>
+                    <div className="text-sm text-gray-300">Kualiti Kod</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-green-400">{codeAnalysis.performanceScore}%</div>
+                    <div className="text-sm text-gray-300">Prestasi</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-purple-400">{codeAnalysis.securityRating}%</div>
+                    <div className="text-sm text-gray-300">Keselamatan</div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -485,119 +590,70 @@ export function EnhancedLearningAssistant() {
   )
 }
 
-// Helper functions for AI processing
+// Helper functions
 async function generateAIResponse(message: string, skills: SkillLevel, style: LearningStyle): Promise<string> {
-  // Simulate AI processing with context awareness
+  // This would integrate with a real AI service like OpenAI
+  // For now, return a mock response
   const responses = [
-    `Based on your current skill level in programming (${(skills.programming * 100).toFixed(0)}%), I'd recommend focusing on ${skills.programming < 0.5 ? 'fundamentals' : 'advanced concepts'}.`,
-    `Since you learn best through ${Object.entries(style).reduce((a, b) => style[a[0] as keyof typeof style] > style[b[0] as keyof typeof style] ? a : b)[0]} methods, here's a tailored approach...`,
-    `Let me break this down step by step, considering your preferred learning style...`
+    "Saya boleh membantu anda dengan soalan pengaturcaraan. Apakah yang anda ingin tahu?",
+    "Berdasarkan kemahiran anda, saya cadangkan untuk fokus pada konsep asas terlebih dahulu.",
+    "Untuk soalan ini, saya boleh memberikan contoh kod dan penjelasan terperinci.",
+    "Latihan yang sesuai untuk tahap anda adalah untuk mengamalkan konsep yang telah dipelajari."
   ]
   
   return responses[Math.floor(Math.random() * responses.length)]
 }
 
 function calculateCodeQuality(code: string): number {
-  // Simulate code quality analysis
-  let score = 0.5
-  if (code.includes('function')) score += 0.2
-  if (code.includes('const') || code.includes('let')) score += 0.1
-  if (code.includes('//')) score += 0.1
-  if (code.length > 100) score += 0.1
-  return Math.min(score, 1.0)
+  // Mock implementation - would use real code analysis
+  return Math.floor(Math.random() * 40) + 60
 }
 
 function calculatePerformance(code: string): number {
-  // Simulate performance analysis
-  let score = 0.7
-  if (code.includes('for') && code.includes('for')) score -= 0.2 // Nested loops
-  if (code.includes('while(true)')) score -= 0.3 // Infinite loops
-  return Math.max(score, 0.1)
+  // Mock implementation - would use real performance analysis
+  return Math.floor(Math.random() * 30) + 70
 }
 
 function calculateSecurity(code: string): number {
-  // Simulate security analysis
-  let score = 0.8
-  if (code.includes('eval(')) score -= 0.4
-  if (code.includes('innerHTML')) score -= 0.2
-  return Math.max(score, 0.1)
+  // Mock implementation - would use real security analysis
+  return Math.floor(Math.random() * 25) + 75
 }
 
 function generateSuggestions(code: string): Suggestion[] {
   return [
     {
       type: 'improvement',
-      message: 'Consider using const instead of var for better scope control',
+      message: 'Gunakan nama pembolehubah yang lebih deskriptif',
       priority: 'medium'
     },
     {
       type: 'best-practice',
-      message: 'Add comments to explain complex logic',
-      priority: 'low'
+      message: 'Tambah komen untuk kod yang kompleks',
+      priority: 'high'
     }
   ]
 }
 
 function detectErrors(code: string): CodeError[] {
-  const errors: CodeError[] = []
-  if (code.includes('console.log(undefined)')) {
-    errors.push({
-      line: 1,
-      column: 1,
-      type: 'logic',
-      message: 'Undefined variable usage',
-      suggestion: 'Check if variable is declared before use'
-    })
-  }
-  return errors
+  return []
 }
 
 function findOptimizations(code: string): Optimization[] {
-  return [
-    {
-      type: 'performance',
-      description: 'Cache array length in loop condition',
-      impact: 'medium',
-      example: 'for(let i=0, len=arr.length; i<len; i++)'
-    }
-  ]
+  return []
 }
 
 function calculateEstimatedTime(skills: SkillLevel): number {
-  const baseTime = 40 // hours
-  const skillMultiplier = Object.values(skills).reduce((a, b) => a + b, 0) / Object.keys(skills).length
-  return Math.round(baseTime * (1.5 - skillMultiplier))
+  return Math.max(30, 120 - skills.programming)
 }
 
 function getPrerequisites(skills: SkillLevel): string[] {
-  const prerequisites = []
-  if (skills.programming < 0.3) prerequisites.push('Basic syntax understanding')
-  if (skills.problemSolving < 0.3) prerequisites.push('Logical thinking exercises')
-  return prerequisites
+  return ['Konsep asas pengaturcaraan', 'Logik asas']
 }
 
 function generateTopics(skills: SkillLevel, style: LearningStyle): LearningTopic[] {
-  // Generate adaptive topics based on skills and learning style
-  return [
-    {
-      id: 'variables',
-      title: 'Variables and Data Types',
-      type: 'concept',
-      content: 'Understanding different data types and variable declarations',
-      examples: [],
-      exercises: []
-    },
-    {
-      id: 'functions',
-      title: 'Functions and Scope',
-      type: 'practice',
-      content: 'Creating reusable code blocks with functions',
-      examples: [],
-      exercises: []
-    }
-  ]
+  return []
 }
 
 function calculateAdaptiveLevel(skills: SkillLevel): number {
-  return Object.values(skills).reduce((a, b) => a + b, 0) / Object.keys(skills).length
+  return Math.round((skills.programming + skills.problemSolving + skills.debugging) / 3)
 }

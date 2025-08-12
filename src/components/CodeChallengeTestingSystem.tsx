@@ -523,7 +523,7 @@ export function CodeChallengeTestingSystem() {
 
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as 'difficulty' | 'points' | 'completion')}
             className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"
           >
             <option value="difficulty">Tahap Kesukaran</option>
@@ -724,7 +724,7 @@ function ChallengeView({
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as 'description' | 'examples' | 'hints' | 'results')}
                   className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 text-sm transition-colors ${
                     activeTab === tab.id 
                       ? 'text-electric-blue border-b-2 border-electric-blue' 

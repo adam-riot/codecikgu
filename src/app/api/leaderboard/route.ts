@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ period, limit, results: data || [] })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

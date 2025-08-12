@@ -1,12 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { 
-  BarChart3,
   LineChart,
-  PieChart,
   TrendingUp,
-  TrendingDown,
   Users,
   BookOpen,
   Clock,
@@ -15,7 +12,6 @@ import {
   Star,
   Activity,
   Brain,
-  Zap,
   Eye,
   Calendar,
   Filter,
@@ -27,16 +23,9 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
-  Plus,
-  CheckCircle,
-  AlertTriangle,
-  Info,
   HelpCircle,
   Lightbulb,
   Map,
-  Globe,
-  Monitor,
-  Smartphone,
   Code,
   Video,
   FileText
@@ -95,18 +84,7 @@ interface ContentAnalytics {
   timeSpent: number
 }
 
-interface LearnerBehavior {
-  sessionDuration: number[]
-  preferredLearningTime: string[]
-  deviceUsage: {
-    desktop: number
-    mobile: number
-    tablet: number
-  }
-  learningPace: 'slow' | 'normal' | 'fast'
-  engagementPattern: string
-  strugglingTopics: string[]
-}
+
 
 interface PerformanceTrend {
   date: string
@@ -130,40 +108,16 @@ interface AssessmentAnalytics {
   improvementAreas: string[]
 }
 
-interface LearningObjective {
-  id: string
-  title: string
-  description: string
-  achievementRate: number
-  averageAttempts: number
-  timeToAchieve: number
-  prerequisites: string[]
-  nextSteps: string[]
-}
 
-interface PredictiveInsights {
-  riskFactors: string[]
-  successPredictors: string[]
-  recommendedInterventions: string[]
-  projectedOutcomes: {
-    completionRate: number
-    timeToCompletion: number
-    skillMastery: number
-  }
-}
+
+
 
 export function LearningAnalytics() {
   const [selectedView, setSelectedView] = useState<'overview' | 'skills' | 'paths' | 'content' | 'behavior' | 'assessment' | 'predictive'>('overview')
   const [timeRange, setTimeRange] = useState('30d')
   const [selectedMetric, setSelectedMetric] = useState('all')
-  const [selectedSkill, setSelectedSkill] = useState('')
-  const [selectedPath, setSelectedPath] = useState('')
-  const [showDetails, setShowDetails] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('engagement')
-  const [filterLevel, setFilterLevel] = useState('all')
-  const [autoRefresh, setAutoRefresh] = useState(false)
   
   const { addNotification } = useNotifications()
 
@@ -458,7 +412,7 @@ export function LearningAnalytics() {
             <Eye className="w-4 h-4 text-electric-blue" />
             <select
               value={selectedView}
-              onChange={(e) => setSelectedView(e.target.value as any)}
+              onChange={(e) => setSelectedView(e.target.value as 'overview' | 'skills' | 'paths' | 'content' | 'behavior' | 'assessment' | 'predictive')}
               className="px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
             >
               <option value="overview">Overview</option>

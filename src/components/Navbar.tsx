@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { supabase, getUserRole, getUserDisplayName, type CustomUser } from '@/utils/supabase'
 import { ThemeToggle } from '@/components/ThemeProvider'
 import { TutorialSelector } from '@/components/TutorialSystem'
+import { Session } from '@supabase/supabase-js'
 
 export default function Navbar() {
   const router = useRouter()
@@ -19,20 +20,37 @@ export default function Navbar() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.warn('Supabase auth error:', error.message)
+          // Set default state when Supabase is not configured
+          setUser(null)
+          setUserRole('awam')
+          setUserName('Tetamu')
+          setLoading(false)
+          return
+        }
         
         if (user) {
           const userData = user as CustomUser
           setUser(userData)
           
-          // Fetch role and name from database
-          const [role, name] = await Promise.all([
-            getUserRole(userData),
-            getUserDisplayName(userData)
-          ])
-          
-          setUserRole(role)
-          setUserName(name)
+          try {
+            // Fetch role and name from database
+            const [role, name] = await Promise.all([
+              getUserRole(userData),
+              getUserDisplayName(userData)
+            ])
+            
+            setUserRole(role)
+            setUserName(name)
+          } catch (profileError) {
+            console.warn('Error fetching user profile:', profileError)
+            // Set default values if profile fetch fails
+            setUserRole('awam')
+            setUserName(userData.email || 'Pengguna')
+          }
         } else {
           setUser(null)
           setUserRole('awam')
@@ -40,6 +58,10 @@ export default function Navbar() {
         }
       } catch (error) {
         console.error('Error fetching user data:', error)
+        // Set default state on error
+        setUser(null)
+        setUserRole('awam')
+        setUserName('Tetamu')
       } finally {
         setLoading(false)
       }
@@ -48,19 +70,32 @@ export default function Navbar() {
     fetchUserData()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
-      if (session?.user) {
-        const userData = session.user as CustomUser
-        setUser(userData)
-        
-        const [role, name] = await Promise.all([
-          getUserRole(userData),
-          getUserDisplayName(userData)
-        ])
-        
-        setUserRole(role)
-        setUserName(name)
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
+      try {
+        if (session?.user) {
+          const userData = session.user as CustomUser
+          setUser(userData)
+          
+          try {
+            const [role, name] = await Promise.all([
+              getUserRole(userData),
+              getUserDisplayName(userData)
+            ])
+            
+            setUserRole(role)
+            setUserName(name)
+          } catch (profileError) {
+            console.warn('Error fetching user profile on auth change:', profileError)
+            setUserRole('awam')
+            setUserName(userData.email || 'Pengguna')
+          }
+        } else {
+          setUser(null)
+          setUserRole('awam')
+          setUserName('Tetamu')
+        }
+      } catch (error) {
+        console.error('Error in auth state change:', error)
         setUser(null)
         setUserRole('awam')
         setUserName('Tetamu')

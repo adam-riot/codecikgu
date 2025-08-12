@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { CheckCircle, XCircle, Clock, Trophy, RotateCcw, ChevronRight } from 'lucide-react'
 import { useNotifications } from './NotificationProvider'
 
@@ -114,6 +114,35 @@ export function InteractiveQuiz({ quiz }: { quiz: Quiz }) {
 
   const currentQuestion = quiz.questions[state.currentQuestionIndex]
 
+  const calculateScore = useCallback(() => {
+    let correct = 0
+    quiz.questions.forEach(question => {
+      const userAnswer = state.answers[question.id]
+      const correctOption = question.options.find(opt => opt.isCorrect)
+      if (userAnswer === correctOption?.id) {
+        correct++
+      }
+    })
+    return Math.round((correct / quiz.questions.length) * 100)
+  }, [quiz.questions, state.answers])
+
+  const handleQuizComplete = useCallback(() => {
+    const score = calculateScore()
+    setState(prev => ({
+      ...prev,
+      isCompleted: true,
+      score,
+      showResults: true
+    }))
+
+    const passed = score >= quiz.passingScore
+    addNotification({
+      type: passed ? 'success' : 'error',
+      title: passed ? '🎉 Kuiz Berjaya!' : '📚 Cuba Lagi',
+      message: `Skor anda: ${score}%. ${passed ? `Anda mendapat ${quiz.xpReward} XP!` : 'Teruskan pembelajaran!'}`
+    })
+  }, [calculateScore, quiz.passingScore, quiz.xpReward, addNotification])
+
   // Timer effect
   useEffect(() => {
     if (state.timeRemaining > 0 && !state.isCompleted) {
@@ -124,7 +153,7 @@ export function InteractiveQuiz({ quiz }: { quiz: Quiz }) {
     } else if (state.timeRemaining === 0 && !state.isCompleted) {
       handleQuizComplete()
     }
-  }, [state.timeRemaining, state.isCompleted])
+  }, [state.timeRemaining, state.isCompleted, handleQuizComplete])
 
   const handleAnswerSelect = (optionId: string) => {
     setSelectedOption(optionId)
@@ -157,35 +186,6 @@ export function InteractiveQuiz({ quiz }: { quiz: Quiz }) {
     setSelectedOption('')
     setShowExplanation(false)
     setShowHint(false)
-  }
-
-  const handleQuizComplete = () => {
-    const score = calculateScore()
-    setState(prev => ({
-      ...prev,
-      isCompleted: true,
-      score,
-      showResults: true
-    }))
-
-    const passed = score >= quiz.passingScore
-    addNotification({
-      type: passed ? 'success' : 'error',
-      title: passed ? '🎉 Kuiz Berjaya!' : '📚 Cuba Lagi',
-      message: `Skor anda: ${score}%. ${passed ? `Anda mendapat ${quiz.xpReward} XP!` : 'Teruskan pembelajaran!'}`
-    })
-  }
-
-  const calculateScore = () => {
-    let correct = 0
-    quiz.questions.forEach(question => {
-      const userAnswer = state.answers[question.id]
-      const correctOption = question.options.find(opt => opt.isCorrect)
-      if (userAnswer === correctOption?.id) {
-        correct++
-      }
-    })
-    return Math.round((correct / quiz.questions.length) * 100)
   }
 
   const restartQuiz = () => {

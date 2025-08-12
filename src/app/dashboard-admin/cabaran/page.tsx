@@ -366,10 +366,6 @@ export default function AdminCabaranPage() {
       {showSimpleTest && (
         <SimpleCreateChallenge
           onClose={() => setShowSimpleTest(false)}
-          onChallengeCreated={() => {
-            setShowSimpleTest(false)
-            fetchChallenges()
-          }}
         />
       )}
     </div>

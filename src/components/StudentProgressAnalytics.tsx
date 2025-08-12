@@ -15,7 +15,6 @@ import {
   Download, 
   Share2, 
   Eye, 
-  EyeOff,
   ArrowUp, 
   ArrowDown, 
   Minus,
@@ -135,17 +134,20 @@ interface Badge {
   category: string
 }
 
+interface Insight {
+  type: 'positive' | 'warning' | 'neutral'
+  title: string
+  description: string
+  impact: 'high' | 'medium' | 'low'
+  recommendation: string
+}
+
 export function StudentProgressAnalytics() {
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null)
   const [selectedTimeRange, setSelectedTimeRange] = useState('30d')
-  const [selectedMetric, setSelectedMetric] = useState('xp')
-  const [showComparison, setShowComparison] = useState(false)
-  const [comparisonStudents, setComparisonStudents] = useState<string[]>([])
-  const [reportType, setReportType] = useState('individual')
-  const [filterBy, setFilterBy] = useState('all')
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   const [selectedView, setSelectedView] = useState('overview')
-  const [insights, setInsights] = useState<any[]>([])
+  const [insights, setInsights] = useState<Insight[]>([])
   
   const { addNotification } = useNotifications()
 
@@ -274,7 +276,7 @@ export function StudentProgressAnalytics() {
   }, [])
 
   const generateInsights = () => {
-    const studentInsights = [
+    const studentInsights: Insight[] = [
       {
         type: 'positive',
         title: 'Consistent Learning Streak',

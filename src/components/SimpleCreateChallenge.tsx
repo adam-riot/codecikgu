@@ -4,13 +4,11 @@ import React, { useState } from 'react'
 
 interface SimpleCreateChallengeProps {
   onClose?: () => void
-  onChallengeCreated?: () => void
 }
 
-export default function SimpleCreateChallenge({ onClose, onChallengeCreated }: SimpleCreateChallengeProps) {
+export default function SimpleCreateChallenge({ onClose }: SimpleCreateChallengeProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('Title input change:', e.target.value)
@@ -60,7 +58,7 @@ export default function SimpleCreateChallenge({ onClose, onChallengeCreated }: S
                 autoFocus
               />
               <p className="text-xs text-gray-500 mt-1">
-                Current value: "{title}" (length: {title.length})
+                Current value: &quot;{title}&quot; (length: {title.length})
               </p>
             </div>
 
@@ -76,7 +74,7 @@ export default function SimpleCreateChallenge({ onClose, onChallengeCreated }: S
                 rows={4}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Current value: "{description}" (length: {description.length})
+                Current value: &quot;{description}&quot; (length: {description.length})
               </p>
             </div>
 
@@ -84,7 +82,6 @@ export default function SimpleCreateChallenge({ onClose, onChallengeCreated }: S
               <button
                 type="submit"
                 className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
-                disabled={isSubmitting}
               >
                 Test Submit
               </button>

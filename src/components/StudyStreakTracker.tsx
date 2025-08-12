@@ -8,7 +8,6 @@ import {
   Target, 
   CheckCircle, 
   Clock,
-  TrendingUp,
   Award,
   Star,
   Gift,
@@ -189,7 +188,6 @@ const sampleStreakData: StreakData = {
 export function StudyStreakTracker() {
   const [streakData, setStreakData] = useState<StreakData>(sampleStreakData)
   const [currentView, setCurrentView] = useState<'overview' | 'calendar' | 'milestones' | 'rewards'>('overview')
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const { addNotification } = useNotifications()
 
   // Load streak data from localStorage
@@ -247,27 +245,6 @@ export function StudyStreakTracker() {
     if (streak >= 7) return 'text-yellow-400'
     if (streak >= 3) return 'text-green-400'
     return 'text-gray-400'
-  }
-
-  const getCalendarGrid = () => {
-    const today = new Date()
-    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000))
-    const days = []
-    
-    for (let d = new Date(thirtyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0]
-      const activity = streakData.activities.find(a => a.date === dateStr)
-      
-      days.push({
-        date: dateStr,
-        dayOfMonth: d.getDate(),
-        isToday: dateStr === today.toISOString().split('T')[0],
-        hasActivity: !!activity,
-        activity: activity
-      })
-    }
-    
-    return days
   }
 
   if (currentView === 'calendar') {
@@ -336,7 +313,7 @@ export function StudyStreakTracker() {
             </div>
 
             <div className="space-y-4">
-              {streakData.activities.slice(0, 5).map((activity, index) => (
+              {streakData.activities.slice(0, 5).map((activity) => (
                 <div key={activity.date} className="flex items-start space-x-4 p-4 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-electric-blue/20">
                     <CheckCircle className="w-4 h-4 text-electric-blue" />
@@ -447,7 +424,7 @@ export function StudyStreakTracker() {
             <div className="text-center">
               <Star className="w-8 h-8 text-yellow-400 mx-auto mb-3" />
               <p className="text-gray-300 text-sm italic mb-2">
-                "Konsistensi adalah kunci kepada kejayaan."
+                &quot;Konsistensi adalah kunci kepada kejayaan.&quot;
               </p>
               <p className="text-gray-500 text-xs">- Motivasi Harian</p>
             </div>
@@ -683,7 +660,6 @@ function StreakRewards({
       <div className="grid gap-6 md:grid-cols-2">
         {streakData.rewards.map((reward) => {
           const canClaim = streakData.currentStreak >= reward.streakRequired && !reward.isClaimed
-          const isEligible = streakData.currentStreak >= reward.streakRequired
           
           return (
             <div

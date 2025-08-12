@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import { POST } from '../update-xp/route'
 
 // Mock Next.js modules
@@ -25,7 +24,7 @@ jest.mock('@supabase/auth-helpers-nextjs', () => ({
 }))
 
 describe('/api/update-xp', () => {
-  const mockSupabase = require('@supabase/auth-helpers-nextjs').createRouteHandlerClient()
+  const mockSupabase = jest.requireMock('@supabase/auth-helpers-nextjs').createRouteHandlerClient()
 
   beforeEach(() => {
     jest.clearAllMocks()

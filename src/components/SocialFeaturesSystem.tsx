@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { 
   Users, 
   MessageCircle, 
@@ -407,7 +407,7 @@ export function SocialFeaturesSystem() {
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setCurrentView(tab.id as any)}
+                onClick={() => setCurrentView(tab.id as 'groups' | 'discover' | 'sessions' | 'challenges' | 'community')}
                 className={`flex items-center space-x-2 px-3 py-2 rounded text-sm transition-colors ${
                   currentView === tab.id 
                     ? 'bg-electric-blue text-black' 

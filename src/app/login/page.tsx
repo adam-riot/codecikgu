@@ -40,7 +40,7 @@ export default function LoginPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   // Add notification function
-  const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
+  const addNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
     const notification: Notification = { id, type, message }
     
@@ -49,17 +49,6 @@ export default function LoginPage() {
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
-  }
-
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        await redirectBasedOnRole(session.user.id)
-      }
-    }
-    checkUser()
   }, [])
 
   // Function to get user role and redirect accordingly
@@ -102,6 +91,7 @@ export default function LoginPage() {
     }
   }, [router, addNotification])
 
+  // Check if user is already logged in
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession()

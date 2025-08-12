@@ -49,7 +49,7 @@ export const ROLE_PERMISSIONS: Record<string, AdminPermissions> = {
 
 export class AdminService {
   /**
-   * Create a new admin user
+   * Create a new admin user in the profiles table
    */
   static async createAdminUser(userData: {
     email: string
@@ -57,19 +57,64 @@ export class AdminService {
     permissions?: string[]
   }): Promise<AdminRole> {
     try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .insert({
-          email: userData.email,
-          role: userData.role,
-          permissions: userData.permissions || [],
-          is_active: true
-        })
-        .select()
+      // First check if user exists in profiles
+      const { data: existingUser, error: checkError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', userData.email)
         .single()
 
-      if (error) throw error
-      return data
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError
+      }
+
+      if (existingUser) {
+        // Update existing user to admin role
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ 
+            role: 'admin',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingUser.id)
+
+        if (updateError) throw updateError
+
+        return {
+          id: existingUser.id,
+          email: existingUser.email,
+          role: 'super_admin',
+          permissions: userData.permissions || [],
+          created_at: existingUser.created_at,
+          last_login: new Date().toISOString(),
+          is_active: true
+        }
+      } else {
+        // Create new admin user
+        const { data: newUser, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            email: userData.email,
+            role: 'admin',
+            name: userData.email.split('@')[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+
+        return {
+          id: newUser.id,
+          email: newUser.email,
+          role: 'super_admin',
+          permissions: userData.permissions || [],
+          created_at: newUser.created_at,
+          last_login: new Date().toISOString(),
+          is_active: true
+        }
+      }
     } catch (error) {
       console.error('Error creating admin user:', error)
       throw error
@@ -77,15 +122,15 @@ export class AdminService {
   }
 
   /**
-   * Get admin user by ID
+   * Get admin user by ID from profiles table
    */
   static async getAdminUser(userId: string): Promise<AdminRole | null> {
     try {
       const { data, error } = await supabase
-        .from('admin_users')
+        .from('profiles')
         .select('*')
         .eq('id', userId)
-        .eq('is_active', true)
+        .eq('role', 'admin')
         .single()
 
       if (error) {
@@ -93,7 +138,15 @@ export class AdminService {
         throw error
       }
 
-      return data
+      return {
+        id: data.id,
+        email: data.email,
+        role: 'super_admin',
+        permissions: [],
+        created_at: data.created_at,
+        last_login: data.updated_at,
+        is_active: true
+      }
     } catch (error) {
       console.error('Error fetching admin user:', error)
       return null
@@ -101,23 +154,31 @@ export class AdminService {
   }
 
   /**
-   * Get admin user by email
+   * Get admin user by email from profiles table
    */
   static async getAdminUserByEmail(email: string): Promise<AdminRole | null> {
     try {
       const { data, error } = await supabase
-        .from('admin_users')
+        .from('profiles')
         .select('*')
-        .eq('email', email.toLowerCase())
-        .eq('is_active', true)
+        .eq('email', email)
+        .eq('role', 'admin')
         .single()
 
       if (error) {
-        if (error.code === 'PGRST116') return null
+        if (error.code === 'PGRST116') return null // No rows returned
         throw error
       }
 
-      return data
+      return {
+        id: data.id,
+        email: data.email,
+        role: 'super_admin',
+        permissions: [],
+        created_at: data.created_at,
+        last_login: data.updated_at,
+        is_active: true
+      }
     } catch (error) {
       console.error('Error fetching admin user by email:', error)
       return null
@@ -125,7 +186,7 @@ export class AdminService {
   }
 
   /**
-   * Update admin user role
+   * Update admin user role in profiles table
    */
   static async updateAdminRole(
     userId: string, 
@@ -133,12 +194,10 @@ export class AdminService {
   ): Promise<boolean> {
     try {
       const { error } = await supabase
-        .from('admin_users')
+        .from('profiles')
         .update({ 
-          role,
-          permissions: ROLE_PERMISSIONS[role] ? Object.keys(ROLE_PERMISSIONS[role]).filter(
-            key => ROLE_PERMISSIONS[role][key as keyof AdminPermissions]
-          ) : []
+          role: 'admin',
+          updated_at: new Date().toISOString()
         })
         .eq('id', userId)
 
@@ -151,11 +210,21 @@ export class AdminService {
   }
 
   /**
-   * Check if user has specific role
+   * Check if user has admin role
    */
   static async hasRole(userId: string, role: AdminRole['role']): Promise<boolean> {
-    const adminUser = await this.getAdminUser(userId)
-    return adminUser?.role === role
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+      if (error) return false
+      return data.role === 'admin'
+    } catch (error) {
+      return false
+    }
   }
 
   /**
@@ -165,31 +234,58 @@ export class AdminService {
     userId: string, 
     permission: keyof AdminPermissions
   ): Promise<boolean> {
-    const adminUser = await this.getAdminUser(userId)
-    if (!adminUser) return false
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
 
-    const rolePermissions = ROLE_PERMISSIONS[adminUser.role]
-    return rolePermissions?.[permission] || false
+      if (error) return false
+      
+      // Admin users have all permissions
+      if (data.role === 'admin') return true
+      
+      // For other roles, check specific permissions
+      const userPermissions = ROLE_PERMISSIONS[data.role] || {}
+      return userPermissions[permission] || false
+    } catch (error) {
+      return false
+    }
   }
 
   /**
    * Get user permissions
    */
   static async getUserPermissions(userId: string): Promise<AdminPermissions | null> {
-    const adminUser = await this.getAdminUser(userId)
-    if (!adminUser) return null
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
 
-    return ROLE_PERMISSIONS[adminUser.role] || null
+      if (error) return null
+      
+      // Admin users have all permissions
+      if (data.role === 'admin') {
+        return ROLE_PERMISSIONS.super_admin
+      }
+      
+      return ROLE_PERMISSIONS[data.role] || null
+    } catch (error) {
+      return null
+    }
   }
 
   /**
-   * Update last login timestamp
+   * Update last login time
    */
   static async updateLastLogin(userId: string): Promise<void> {
     try {
       await supabase
-        .from('admin_users')
-        .update({ last_login: new Date().toISOString() })
+        .from('profiles')
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', userId)
     } catch (error) {
       console.error('Error updating last login:', error)
@@ -202,8 +298,11 @@ export class AdminService {
   static async deactivateAdminUser(userId: string): Promise<boolean> {
     try {
       const { error } = await supabase
-        .from('admin_users')
-        .update({ is_active: false })
+        .from('profiles')
+        .update({ 
+          role: 'awam',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', userId)
 
       if (error) throw error
@@ -215,20 +314,29 @@ export class AdminService {
   }
 
   /**
-   * List all admin users
+   * Get all admin users from profiles table
    */
   static async getAllAdminUsers(): Promise<AdminRole[]> {
     try {
       const { data, error } = await supabase
-        .from('admin_users')
+        .from('profiles')
         .select('*')
-        .eq('is_active', true)
+        .eq('role', 'admin')
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return data || []
+
+      return (data || []).map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        role: 'super_admin',
+        permissions: [],
+        created_at: user.created_at,
+        last_login: user.updated_at,
+        is_active: true
+      }))
     } catch (error) {
-      console.error('Error fetching admin users:', error)
+      console.error('Error fetching all admin users:', error)
       return []
     }
   }
@@ -243,8 +351,8 @@ export class AuditService {
     action: string
     tableName: string
     recordId?: string
-    oldValues?: any
-    newValues?: any
+    oldValues?: unknown
+    newValues?: unknown
   }) {
     try {
       await supabase

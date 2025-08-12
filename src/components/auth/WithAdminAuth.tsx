@@ -10,7 +10,7 @@ interface WithAdminAuthProps {
 export function WithAdminAuth({ requiredRole, children }: WithAdminAuthProps) {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; role: string; name?: string } | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -59,7 +59,7 @@ export function WithAdminAuth({ requiredRole, children }: WithAdminAuthProps) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <p className="text-gray-600">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     )

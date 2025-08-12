@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 
 type Row = { user_id: string; name: string; email: string; xp: number }
 
@@ -9,7 +9,7 @@ export default function LeaderboardPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch(`/api/leaderboard?period=${period}`)
@@ -18,9 +18,9 @@ export default function LeaderboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [period])
 
-  useEffect(() => { load() }, [period])
+  useEffect(() => { load() }, [load])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-black via-gray-900 to-dark-black">
@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
           <h1 className="text-3xl font-bold text-white">Papan Kedudukan</h1>
           <select
             value={period}
-            onChange={(e) => setPeriod(e.target.value as any)}
+            onChange={(e) => setPeriod(e.target.value as 'weekly' | 'monthly' | 'all')}
             className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"
           >
             <option value="weekly">Mingguan</option>

@@ -405,7 +405,7 @@ console.log('Start coding and click Run to execute!');`,
                         <pre className="text-gray-300 whitespace-pre-wrap">{executionOutput}</pre>
                       ) : (
                         <div className="text-gray-500">
-                          Click "Run" to execute your code and see the output here...
+                          Click &quot;Run&quot; to execute your code and see the output here...
                         </div>
                       )}
                     </div>

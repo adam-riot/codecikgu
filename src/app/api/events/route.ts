@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: 'Failed to log event' }, { status: 500 })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

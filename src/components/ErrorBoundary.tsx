@@ -12,10 +12,10 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback?: React.ComponentType<any> },
+  { children: React.ReactNode; fallback?: React.ComponentType<{ error?: Error; resetError: () => void }> },
   ErrorBoundaryState
 > {
-  constructor(props: { children: React.ReactNode; fallback?: React.ComponentType<any> }) {
+  constructor(props: { children: React.ReactNode; fallback?: React.ComponentType<{ error?: Error; resetError: () => void }> }) {
     super(props)
     this.state = { hasError: false }
   }

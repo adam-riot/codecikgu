@@ -3,47 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { 
   Trophy, 
-  Medal, 
   Clock, 
   Users, 
   Code, 
-  Play, 
-  Pause,
-  Square,
   CheckCircle,
-  XCircle,
-  AlertCircle,
-  Star,
-  Zap,
-  Target,
-  Award,
-  Crown,
-  Flag,
-  Timer,
-  Calendar,
-  MapPin,
-  TrendingUp,
-  BarChart3,
-  Filter,
   Search,
-  Download,
-  Share2,
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  Plus,
-  Eye,
-  Lock,
-  Unlock,
-  Flame,
-  Globe,
-  Heart,
-  ThumbsUp,
-  MessageSquare,
   Send,
-  Settings,
-  RefreshCw,
-  Info
+  RefreshCw
 } from 'lucide-react'
 import { useNotifications } from './NotificationProvider'
 
@@ -415,7 +381,7 @@ export function CompetitiveProgrammingContests() {
         }
       }
     }
-  }, [selectedContest])
+  }, [selectedContest, addNotification, mockLeaderboard, mockProblems])
 
   const formatTime = (milliseconds: number) => {
     const hours = Math.floor(milliseconds / (1000 * 60 * 60))

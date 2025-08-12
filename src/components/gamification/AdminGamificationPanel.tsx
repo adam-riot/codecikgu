@@ -222,17 +222,17 @@ function OverviewTab() {
         <div className="space-y-3">
           <div className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg">
             <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span className="text-gray-300">Challenge "PHP Arrays Mastery" completed by 15 students</span>
+            <span className="text-gray-300">Challenge &ldquo;PHP Arrays Mastery&rdquo; completed by 15 students</span>
             <span className="text-sm text-gray-500 ml-auto">2 hours ago</span>
           </div>
           <div className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg">
             <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-            <span className="text-gray-300">New exercise "CSS Grid Tutorial" added to Web Development</span>
+            <span className="text-gray-300">New exercise &ldquo;CSS Grid Tutorial&rdquo; added to Web Development</span>
             <span className="text-sm text-gray-500 ml-auto">5 hours ago</span>
           </div>
           <div className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg">
             <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-            <span className="text-gray-300">Level 2.3 "Arrays & Lists" unlocked for 23 students</span>
+            <span className="text-gray-300">Level 2.3 &ldquo;Arrays & Lists&rdquo; unlocked for 23 students</span>
             <span className="text-sm text-gray-500 ml-auto">1 day ago</span>
           </div>
         </div>

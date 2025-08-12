@@ -5,58 +5,25 @@ import {
   BarChart3, 
   Users, 
   Clock, 
-  TrendingUp, 
-  TrendingDown, 
   Activity, 
   Target, 
-  Award, 
   Book, 
-  Code, 
-  Video, 
-  MessageSquare,
-  Calendar,
-  Filter,
   Download,
   Share2,
   RefreshCw,
   Settings,
   Eye,
-  EyeOff,
   ArrowUp,
   ArrowDown,
   Minus,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Search,
   Globe,
   Smartphone,
   Monitor,
   Zap,
-  Heart,
-  Star,
-  Trophy,
-  Medal,
-  Flag,
-  AlertTriangle,
-  CheckCircle,
-  Info,
-  Bell,
-  MapPin,
-  PieChart,
-  LineChart,
-  Layers,
-  Database,
   Server,
-  Wifi,
-  WifiOff,
-  UserPlus,
-  UserMinus,
-  UserCheck,
-  UserX,
-  Compass,
-  Navigation,
-  Map
+  Calendar,
+  Filter,
+  Star
 } from 'lucide-react'
 import { useNotifications } from './NotificationProvider'
 
@@ -71,14 +38,7 @@ interface UsageMetrics {
   completionRate: number
 }
 
-interface UserEngagement {
-  dailyActive: number[]
-  weeklyActive: number[]
-  monthlyActive: number[]
-  sessionDuration: number[]
-  pageViews: number[]
-  feature: string[]
-}
+
 
 interface ContentMetrics {
   totalChallenges: number
@@ -152,13 +112,16 @@ interface PerformanceData {
 
 export function UsageStatisticsDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState('30d')
-  const [selectedMetric, setSelectedMetric] = useState('users')
-  const [selectedView, setSelectedView] = useState('overview')
-  const [dateRange, setDateRange] = useState({ start: '', end: '' })
+
+
+
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [refreshInterval, setRefreshInterval] = useState(30) // seconds
+  const [selectedView, setSelectedView] = useState('overview')
+
   const [isLoading, setIsLoading] = useState(false)
   const [showRealTime, setShowRealTime] = useState(false)
+
   const [selectedFilters, setSelectedFilters] = useState({
     userType: 'all',
     platform: 'all',
@@ -179,7 +142,7 @@ export function UsageStatisticsDashboard() {
     completionRate: 67.8
   })
 
-  const [contentMetrics, setContentMetrics] = useState<ContentMetrics>({
+  const [contentMetrics] = useState<ContentMetrics>({
     totalChallenges: 456,
     completedChallenges: 12847,
     avgAttempts: 2.4,
@@ -205,7 +168,7 @@ export function UsageStatisticsDashboard() {
     }
   })
 
-  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
+  const [systemMetrics] = useState<SystemMetrics>({
     serverUptime: 99.8,
     responseTime: 125,
     errorRate: 0.2,
@@ -291,15 +254,7 @@ export function UsageStatisticsDashboard() {
     })
   }
 
-  const getMetricIcon = (metric: string) => {
-    switch (metric) {
-      case 'users': return <Users className="w-5 h-5" />
-      case 'sessions': return <Activity className="w-5 h-5" />
-      case 'content': return <Book className="w-5 h-5" />
-      case 'performance': return <Zap className="w-5 h-5" />
-      default: return <BarChart3 className="w-5 h-5" />
-    }
-  }
+
 
   const getTrendIcon = (value: number, isPositive = true) => {
     if (value > 0) {
@@ -655,7 +610,7 @@ export function UsageStatisticsDashboard() {
             </h3>
             
             <div className="space-y-4">
-              {geographicData.map((country, index) => (
+              {geographicData.map((country) => (
                 <div key={country.country} className="p-4 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">

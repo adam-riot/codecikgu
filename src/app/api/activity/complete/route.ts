@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     if (xpErr) return NextResponse.json({ error: 'Failed to award XP' }, { status: 500 })
 
     return NextResponse.json({ success: true, xpEarned: xp })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }

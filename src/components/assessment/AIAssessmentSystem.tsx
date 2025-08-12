@@ -569,7 +569,7 @@ function AssessmentResults({ session, onRestart }: { session: AssessmentSession,
         <div className="text-center mb-8">
           <Award className="w-16 h-16 mx-auto mb-4 text-yellow-400" />
           <h1 className="text-3xl font-bold mb-2">Assessment Complete!</h1>
-          <p className="text-gray-300">Here's your detailed performance analysis</p>
+          <p className="text-gray-300">Here&apos;s your detailed performance analysis</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

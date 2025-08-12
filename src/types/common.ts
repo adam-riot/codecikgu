@@ -12,7 +12,10 @@ export interface User {
 }
 
 export interface Profile extends User {
-  // Additional profile fields
+  // Additional profile fields can be added here
+  avatar_url?: string
+  bio?: string
+  preferences?: Record<string, unknown>
 }
 
 export interface Challenge {
@@ -52,7 +55,7 @@ export interface DebugLog {
   step: string
   status: 'success' | 'error' | 'info'
   message: string
-  data?: any
+  data?: unknown
 }
 
 export interface Stats {

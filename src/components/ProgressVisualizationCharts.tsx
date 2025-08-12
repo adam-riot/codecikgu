@@ -14,12 +14,9 @@ import {
   Code,
   Zap,
   Award,
-  ChevronDown,
-  ChevronUp,
   Download,
   RefreshCw,
-  Filter,
-  Eye,
+
   PieChart,
   Activity,
   Flame
@@ -68,6 +65,17 @@ interface ComparisonData {
   userValue: number
   averageValue: number
   topPerformerValue: number
+}
+
+interface TotalsData {
+  totalXp: number
+  totalTime: number
+  totalChallenges: number
+  totalVideos: number
+  totalQuizzes: number
+  avgDaily: number
+  activeDays: number
+  currentStreak: number
 }
 
 // Sample data generation
@@ -141,7 +149,6 @@ export function ProgressVisualizationCharts() {
   const [skillProgress, setSkillProgress] = useState<SkillProgress[]>(generateSkillProgress())
   const [activityHeatmap, setActivityHeatmap] = useState<ActivityHeatmap[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [showComparison, setShowComparison] = useState(false)
   const { addNotification } = useNotifications()
 
   useEffect(() => {
@@ -191,7 +198,7 @@ export function ProgressVisualizationCharts() {
     })
   }
 
-  const calculateTotals = () => {
+  const calculateTotals = (): TotalsData => {
     return {
       totalXp: learningData.reduce((sum, day) => sum + day.xpGained, 0),
       totalTime: learningData.reduce((sum, day) => sum + day.timeSpent, 0),
@@ -268,7 +275,7 @@ export function ProgressVisualizationCharts() {
           
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as any)}
+            onChange={(e) => setTimeRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
             className="px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"
           >
             <option value="7d">7 Hari</option>
@@ -344,7 +351,7 @@ export function ProgressVisualizationCharts() {
               ].map(view => (
                 <button
                   key={view.id}
-                  onClick={() => setViewType(view.id as any)}
+                  onClick={() => setViewType(view.id as 'overview' | 'detailed' | 'comparison' | 'heatmap')}
                   className={`flex items-center space-x-2 px-3 py-2 rounded text-sm transition-colors ${
                     viewType === view.id 
                       ? 'bg-electric-blue text-black' 
@@ -363,7 +370,7 @@ export function ProgressVisualizationCharts() {
               <span className="text-gray-400 text-sm">Metrik:</span>
               <select
                 value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value as any)}
+                onChange={(e) => setSelectedMetric(e.target.value as 'xp' | 'time' | 'challenges' | 'all')}
                 className="px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
               >
                 <option value="all">Semua Metrik</option>
@@ -417,11 +424,7 @@ export function ProgressVisualizationCharts() {
 
       {/* Insights and Recommendations */}
       <div className="mt-8">
-        <InsightsSection 
-          learningData={learningData} 
-          skillProgress={skillProgress}
-          totals={totals}
-        />
+        <InsightsSection />
       </div>
     </div>
   )
@@ -464,7 +467,6 @@ function OverviewCharts({
   formatTime: (minutes: number) => string
 }) {
   const maxXp = Math.max(...learningData.map(d => d.xpGained))
-  const maxTime = Math.max(...learningData.map(d => d.timeSpent))
 
   return (
     <div className="grid lg:grid-cols-2 gap-6">
@@ -1042,7 +1044,7 @@ function SkillsProgressSection({ skillProgress }: { skillProgress: SkillProgress
         
         <select
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value as any)}
+                      onChange={(e) => setSelectedCategory(e.target.value as 'all' | 'programming' | 'theory' | 'practice')}
           className="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm"
         >
           <option value="all">Semua Kategori</option>
@@ -1093,15 +1095,7 @@ function SkillsProgressSection({ skillProgress }: { skillProgress: SkillProgress
   )
 }
 
-function InsightsSection({ 
-  learningData, 
-  skillProgress, 
-  totals 
-}: {
-  learningData: LearningData[]
-  skillProgress: SkillProgress[]
-  totals: any
-}) {
+function InsightsSection() {
   const insights = [
     {
       type: 'positive',

@@ -177,7 +177,7 @@ export default function CreateMultiTypeChallenge({ onClose, onChallengeCreated }
     setQuizQuestions(quizQuestions.filter(q => q.id !== questionId))
   }
 
-  const updateQuestion = (questionId: string, field: keyof QuizQuestion, value: any) => {
+  const updateQuestion = (questionId: string, field: keyof QuizQuestion, value: string | number | boolean | string[]) => {
     console.log('Updating question:', questionId, field, value) // Debug log
     setQuizQuestions(prevQuestions => 
       prevQuestions.map(q => 
@@ -287,7 +287,6 @@ export default function CreateMultiTypeChallenge({ onClose, onChallengeCreated }
   }
 
   const renderSpecificFields = () => {
-    const currentType = challengeTypes.find(t => t.value === challenge.type)
     const colorClasses = {
       blue: 'bg-blue-50 border-blue-200',
       purple: 'bg-purple-50 border-purple-200',
@@ -497,7 +496,7 @@ export default function CreateMultiTypeChallenge({ onClose, onChallengeCreated }
                 <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
                   <div className="text-4xl mb-2">📝</div>
                   <p className="font-medium">Belum ada soalan</p>
-                  <p className="text-sm">Klik "Tambah Soalan" untuk mula cipta kuiz</p>
+                  <p className="text-sm">Klik &quot;Tambah Soalan&quot; untuk mula cipta kuiz</p>
                 </div>
               ) : (
                 <div className="space-y-4">

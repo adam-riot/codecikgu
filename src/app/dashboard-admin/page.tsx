@@ -5,6 +5,7 @@ import { supabase } from '@/utils/supabase'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { AdminGamificationPanel } from '@/components/gamification'
+import PerformanceMonitor from '@/components/PerformanceMonitor';
 
 interface Profile {
   id: string
@@ -670,6 +671,11 @@ export default function DashboardAdmin() {
           {activeTab === 'gamification' && (
             <AdminGamificationPanel />
           )}
+
+          {/* Performance Monitoring Section */}
+          <div className="mb-8">
+            <PerformanceMonitor />
+          </div>
         </div>
       </div>
     </div>

@@ -1,24 +1,15 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   Code, 
   Palette, 
-  Eye, 
   Settings, 
   Download, 
-  Upload,
-  Sun,
-  Moon,
-  Zap,
   Type,
   Hash,
   Quote,
-  Braces,
-  ChevronDown,
-  ChevronUp,
   Monitor,
-  Smartphone,
   Copy,
   Check
 } from 'lucide-react'
@@ -321,12 +312,10 @@ foreach($doubled as $num) {
   const [showMinimap, setShowMinimap] = useState(true)
   const [wordWrap, setWordWrap] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [customTheme, setCustomTheme] = useState<SyntaxTheme | null>(null)
   const [copied, setCopied] = useState(false)
-  const editorRef = useRef<HTMLDivElement>(null)
   const { addNotification } = useNotifications()
 
-  const highlightCode = (text: string, language: Language, theme: SyntaxTheme) => {
+  const highlightCode = (text: string, language: Language) => {
     let highlighted = text
 
     // Apply syntax highlighting rules
@@ -374,7 +363,7 @@ foreach($doubled as $num) {
         title: '📋 Kod Disalin',
         message: 'Kod telah disalin ke clipboard'
       })
-    } catch (error) {
+    } catch {
       addNotification({
         type: 'error',
         title: '❌ Ralat',
@@ -548,7 +537,7 @@ body {
   }
 
   const codeLines = code.split('\n')
-  const highlightedCode = highlightCode(code, selectedLanguage, selectedTheme)
+          const highlightedCode = highlightCode(code, selectedLanguage)
 
   return (
     <div className="max-w-7xl mx-auto p-6">

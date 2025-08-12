@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { 
   User,
   Users,
@@ -34,7 +34,6 @@ import {
   Share2,
   Settings,
   Eye,
-  EyeOff,
   Mail,
   Phone,
   MapPin,
@@ -154,19 +153,14 @@ interface ActivityLog {
   description: string
   timestamp: string
   category: 'content' | 'student' | 'system' | 'communication'
-  metadata?: any
+  metadata?: Record<string, unknown>
 }
 
 export function TeacherPerformanceInsights() {
   const [selectedTeacher, setSelectedTeacher] = useState<string>('')
   const [viewMode, setViewMode] = useState<'individual' | 'comparison' | 'department'>('individual')
   const [timeRange, setTimeRange] = useState('30d')
-  const [selectedMetric, setSelectedMetric] = useState('overall')
-  const [showDetails, setShowDetails] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('rating')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [filterDepartment, setFilterDepartment] = useState('all')
   const [isLoading, setIsLoading] = useState(false)
   
   const { addNotification } = useNotifications()
@@ -427,9 +421,9 @@ export function TeacherPerformanceInsights() {
                          teacher.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          teacher.subjects.some(subject => subject.toLowerCase().includes(searchQuery.toLowerCase()))
     
-    const matchesDepartment = filterDepartment === 'all' || teacher.department === filterDepartment
+    // const matchesDepartment = filterDepartment === 'all' || teacher.department === filterDepartment // This line was removed
     
-    return matchesSearch && matchesDepartment
+    return matchesSearch
   })
 
   return (

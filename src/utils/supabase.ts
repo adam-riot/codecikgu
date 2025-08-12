@@ -43,39 +43,72 @@ export interface UserProfile {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Fallback untuk development tanpa Supabase
-const isDevelopment = process.env.NODE_ENV === 'development'
-const isBuildTime = process.env.NODE_ENV === 'production' && typeof window === 'undefined'
-const hasSupabaseConfig = supabaseUrl && supabaseAnonKey
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined'
 
-// Mock client untuk development dan build time
-function createMockClient() {
+// Check if we have valid Supabase configuration
+const hasValidSupabaseConfig = supabaseUrl && supabaseAnonKey && 
+  supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined' &&
+  supabaseUrl !== '' && supabaseAnonKey !== ''
+
+// Enhanced mock client for better error handling
+function createEnhancedMockClient() {
+  console.warn('⚠️ Supabase environment variables not found. Using mock client.')
+  
   return {
     auth: {
-      getUser: async () => ({ data: { user: null }, error: null }),
-      signInWithPassword: async () => ({ data: { user: null }, error: null }),
+      getUser: async () => ({ 
+        data: { user: null }, 
+        error: { message: 'Supabase not configured' } 
+      }),
+      signInWithPassword: async () => ({ 
+        data: { user: null }, 
+        error: { message: 'Supabase not configured' } 
+      }),
       signOut: async () => ({ error: null }),
-      getSession: async () => ({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+      getSession: async () => ({ 
+        data: { session: null }, 
+        error: { message: 'Supabase not configured' } 
+      }),
+      onAuthStateChange: () => ({ 
+        data: { 
+          subscription: { 
+            unsubscribe: () => {},
+            on: () => {}
+          } 
+        } 
+      })
     },
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          single: async () => ({ data: null, error: { code: 'PGRST116' } })
+          single: async () => ({ 
+            data: null, 
+            error: { message: 'Supabase not configured', code: 'PGRST116' } 
+          })
         }),
         order: () => ({ data: [], error: null })
       }),
-      insert: async () => ({ data: null, error: null }),
-      update: async () => ({ data: null, error: null }),
-      delete: async () => ({ data: null, error: null })
+      insert: async () => ({ 
+        data: null, 
+        error: { message: 'Supabase not configured' } 
+      }),
+      update: async () => ({ 
+        data: null, 
+        error: { message: 'Supabase not configured' } 
+      }),
+      delete: async () => ({ 
+        data: null, 
+        error: { message: 'Supabase not configured' } 
+      })
     })
   } as any
 }
 
-// Cipta client Supabase atau mock client untuk development
-export const supabase = (hasSupabaseConfig && !isBuildTime)
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
-  : createMockClient()
+// Create Supabase client or enhanced mock client
+export const supabase = hasValidSupabaseConfig
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : createEnhancedMockClient()
 
 // Cache for user profiles to avoid repeated database calls
 const profileCache = new Map<string, { profile: UserProfile | null, timestamp: number }>()
@@ -84,6 +117,12 @@ const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 // Helper function to get user profile from database
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
+    // Check if Supabase is properly configured
+    if (!hasValidSupabaseConfig) {
+      console.warn('⚠️ Cannot fetch user profile: Supabase not configured')
+      return null
+    }
+
     // Check cache first
     const cached = profileCache.get(userId)
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -98,17 +137,14 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 
     if (error) {
       console.error('Error fetching user profile:', error)
-      // Cache null result to avoid repeated failed requests
-      profileCache.set(userId, { profile: null, timestamp: Date.now() })
       return null
     }
-    
+
     // Cache the result
     profileCache.set(userId, { profile: data, timestamp: Date.now() })
-    
     return data
   } catch (error) {
-    console.error('Exception in getUserProfile:', error)
+    console.error('Error in getUserProfile:', error)
     return null
   }
 }
